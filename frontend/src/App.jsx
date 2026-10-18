@@ -22,6 +22,7 @@ import Transfers from './pages/reports/Transfers';
 import Receivables from './pages/reports/Receivables';
 import Exceptions from './pages/reports/Exceptions';
 import SyncHealth from './pages/reports/SyncHealth';
+import Ledgers from './pages/ledgers/Ledgers';
 import Help from './pages/Help';
 import { ALL_ROLES, ADMIN_ONLY, PERM } from './utils/roles';
 
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="/reports/transfers" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Transfers /></ProtectedRoute>} />
           <Route path="/reports/receivables" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Receivables /></ProtectedRoute>} />
           <Route path="/reports/exceptions" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Exceptions /></ProtectedRoute>} />
+          <Route path="/ledgers" element={<ProtectedRoute permission={PERM.LEDGERS_VIEW}><Ledgers /></ProtectedRoute>} />
           <Route path="/sync" element={<ProtectedRoute roles={ALL_ROLES}><SyncHealth /></ProtectedRoute>} />
           <Route path="/help" element={<ProtectedRoute roles={ALL_ROLES}><Help /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

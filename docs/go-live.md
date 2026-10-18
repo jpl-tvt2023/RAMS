@@ -27,6 +27,9 @@ This takes RAMS from the test setup to production, step by step. It also covers 
 4. **The Flipkart / Amazon stock-transfer linking key** is still open.
    - Until it's decided, those vendors stay *Stock transfer — not matched* (Matching rules → Vendors).
 5. **Vercel region (done):** both projects are set to Mumbai (bom1).
+6. **Ledgers: where the real opening balances come from.** Until they are loaded, each party starts on a **₹10,000 placeholder** on 8 June 2026, carried forward by Tally's vouchers. The screen marks it *Placeholder, not from Tally*. The day's check doesn't depend on it.
+   - Decide the source: Tally's party balances as at 7 June 2026, or a sheet.
+   - The maintainer then loads them with a script into `ledger_openings`. That script isn't written yet.
    - RAMS production runs there since the M7 deploy (PR #9, 2026-10-06).
    - ROMS production moves there on its next production deploy.
 
@@ -35,7 +38,7 @@ This takes RAMS from the test setup to production, step by step. It also covers 
 1. **You:** create the Turso database `royalmart-rams` in the `royalmart` org, region `aws-ap-south-1` (Mumbai), and make a token for it.
 2. **Maintainer:**
    1. In `backend/.env`, set `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` to it. **Check the URL twice:** `npm run migrate` writes to whatever it points at.
-   2. `npm run migrate`, which applies 001–015.
+   2. `npm run migrate`, which applies 001–016.
    3. `RAMS_ADMIN_USERNAME=… RAMS_ADMIN_PASSWORD='…' npm run bootstrap-admin`. It creates the first Admin, who changes the password at first sign-in.
    4. `npm run agent-token -- --name "Office PC"`. It prints the Connector token **once**; hand it to you privately.
 3. **You:** in Vercel (RAMS project → Environment Variables, **Production**):
@@ -67,7 +70,7 @@ Until step 2 is done, ROMS production answers RAMS with "The integration is not 
       ```
       powershell -ExecutionPolicy Bypass -File .\install-service.ps1
       ```
-      - The first time, it opens `C:\ProgramData\RAMS\connector.json`. Paste in the Connector token (from step 1), set `apiUrl` to the production RAMS address, save, and run the script again.
+      - The first time, it opens `C:\ProgramData\RAMS\connector.json`. Paste in the Connector token (from step 1), set `apiUrl` to `https://accounting.theroyalmart.co.in`, save, and run the script again.
       - It copies itself to `C:\RAMS\Connector`, adds the task **RAMS Connector** (it starts when you sign in, and restarts if it stops) and starts it.
    4. Check it with `C:\RAMS\Connector\rams-connector.cmd status`. Every company should show, and the **Tally sync** card on RAMS's Dashboard should say *Connector online*.
 4. **In RAMS:** Admin → Tally companies. Turn sync **on** for MH, HR and WB. The first backfill runs after office hours (about 5 minutes for MH).
@@ -92,6 +95,7 @@ Each step is a setting on **Matching → Auto-fill**, not a deploy. It can be pu
 ## 5. After go-live
 
 - **Daily:** Matching → Match review → *Needs review*, and Matching → Auto-fill → *Needs a person* and *Refused by ROMS*.
+- **Daily:** **Ledgers** → *Needs attention*: the days where what was entered for a party differs from Tally.
 - **Weekly:** Matching → Party ledgers → *Not set*. Map any new ledger, including head-office ledgers that marketplaces pay into.
 - **Weekly:** Reports → **Debtors**, status *Overdue*: chase what is past its credit days. Status *No PO*: invoices to link to a ROMS PO.
 - **If something looks old:** the Dashboard's **Tally sync** card says whether the Connector is online, Tally is answering, and when each company last synced.

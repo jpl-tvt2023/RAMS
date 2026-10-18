@@ -23,6 +23,7 @@ const TITLES = [
   ['/reports/transfers', 'Stock transfers'],
   ['/reports/receivables', 'Receivables'],
   ['/reports/exceptions', 'Exceptions'],
+  ['/ledgers', 'Ledgers'],
   ['/sync', 'Sync health'],
   ['/help', 'Help & FAQ'],
 ];

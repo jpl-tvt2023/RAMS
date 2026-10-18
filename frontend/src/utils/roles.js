@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Settings, Users, ScrollText, Building2, Link2, ListChecks, SlidersHorizontal, BookUser, ShieldCheck, LifeBuoy, PenLine,
-  FileText, Receipt, ArrowLeftRight, Wallet, AlertTriangle, Activity, BarChart3, IndianRupee,
+  FileText, Receipt, ArrowLeftRight, Wallet, AlertTriangle, Activity, BarChart3, IndianRupee, BookOpen,
 } from 'lucide-react';
 import { isReleased } from './releases';
 
@@ -39,6 +39,9 @@ export const PERM = {
   AUTOFILL_SETTINGS: 'autofill.settings',
   REPORTS_VIEW: 'reports.view',
   REPORTS_SETTINGS: 'reports.settings',
+  LEDGERS_VIEW: 'ledgers.view',
+  LEDGERS_ENTRY: 'ledgers.entry',
+  LEDGERS_SETTINGS: 'ledgers.settings',
   SYNC_COMPANIES: 'sync.companies',
   SYNC_SCHEDULE: 'sync.schedule',
   SYNC_RUN: 'sync.run',
@@ -123,6 +126,13 @@ export const NAV = withoutHeld([
         label: 'Sync health', path: '/sync', icon: Activity, description: 'The Connector, Tally, each company and every sync run', roles: ALL_ROLES,
       },
     ],
+  },
+  {
+    label: 'Ledgers',
+    path: '/ledgers',
+    icon: BookOpen,
+    description: 'A party’s day, entered here and checked against Tally',
+    permission: PERM.LEDGERS_VIEW,
   },
   {
     label: 'Admin',

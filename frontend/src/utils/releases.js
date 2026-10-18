@@ -21,6 +21,9 @@ export const PERM_SCREENS = {
   'reports.view': ['/reports/debtors', '/reports/invoices', '/reports/notes', '/reports/transfers', '/reports/receivables', '/reports/exceptions'],
   'reports.settings': ['/reports/receivables'],
   'sync.run': ['/sync'],
+  'ledgers.view': ['/ledgers'],
+  'ledgers.entry': ['/ledgers'],
+  'ledgers.settings': ['/ledgers'],
 };
 
 export const permissionReleased = (key) => !PERM_SCREENS[key] || PERM_SCREENS[key].some(isReleased);

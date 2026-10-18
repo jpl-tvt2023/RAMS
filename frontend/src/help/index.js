@@ -11,6 +11,7 @@ import { autoFill } from './autofill';
 import {
   debtorsHelp, invoicesHelp, notesHelp, transfersHelp, receivablesHelp, exceptionsHelp, syncHealthHelp,
 } from './reports';
+import { ledgersHelp } from './ledgers';
 import { isReleased } from '../utils/releases';
 
 export const HELP_SECTIONS = [
@@ -27,6 +28,7 @@ export const HELP_SECTIONS = [
   receivablesHelp,
   exceptionsHelp,
   syncHealthHelp,
+  ledgersHelp,
   tallyCompanies,
   rolesPermissions,
   users,

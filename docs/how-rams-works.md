@@ -8,7 +8,7 @@
 
 Royal Mart keeps its **accounts in Tally** and its **marketplace orders in ROMS** (the Royal Mart portal). Until now, the two never spoke to each other. Someone had to read an invoice number in Tally and type it into ROMS, and nobody could easily see which order had been invoiced, paid or credited.
 
-**RAMS is the bridge between them.** It reads the books from Tally, matches each ROMS order to the Tally invoice that billed it, and each return to the credit note that settled it. With your permission, it then writes Tally's invoice and credit-note numbers into ROMS. Report screens, such as what every marketplace owes, follow one at a time.
+**RAMS is the bridge between them.** It reads the books from Tally, matches each ROMS order to the Tally invoice that billed it, and each return to the credit note that settled it. With your permission, it then writes Tally's invoice and credit-note numbers into ROMS. Report screens, such as what every marketplace owes, follow one at a time. On **Ledgers**, your team records each party's day, and RAMS checks it against Tally.
 
 ```
    TALLY                      RAMS                         ROMS
@@ -29,11 +29,11 @@ Royal Mart keeps its **accounts in Tally** and its **marketplace orders in ROMS*
 |---|---|---|---|
 | **Tally** | The accounts: invoices, credit notes, receipts, journals | The accountant | **Only reads it.** RAMS can never change anything in Tally. |
 | **ROMS** | The orders portal: marketplace POs, dispatch (Builty), GRN, returns (RTV) | Operations staff | Reads the orders and returns. Writes only two pairs of fields, and only when switched on. |
-| **RAMS** | The bridge; report screens follow one at a time | Accounts team, owners | Its own website: `royalmartaccounting.vercel.app` |
+| **RAMS** | The bridge; report screens follow one at a time | Accounts team, owners | Its own website: `accounting.theroyalmart.co.in` |
 
 ## 3. What RAMS will never do
 
-- **It never changes Tally.** Every request it makes to Tally is "export" (read). There is no way for it to write.
+- **It never changes Tally.** Every request it makes to Tally is "export" (read). There is no way for it to write. What your team enters on *Ledgers* stays in RAMS.
 - **It never deletes anything in ROMS.**
 - **It writes only four fields in ROMS:**
   - the **Bill No** and **Bill Date** of an order
@@ -202,7 +202,40 @@ Until the rest arrive, RAMS keeps working in the background: it copies the books
 
 **Something to start on in Tally now:** several marketplaces pay into a *head-office* ledger "On Account", not against the warehouse-ledger invoices. In Tally's bill-wise view, those invoices therefore look unpaid. Setting those receipts against their invoices in Tally will make the figures exact when the reports arrive.
 
-## 11. Who can do what
+## 11. Ledgers: a party's day, checked against Tally
+
+**Ledgers** has its own item in the top bar. It is where your team records each party's day, and RAMS checks it against Tally.
+
+1. Choose the **marketplace** (for example Blinkit), then one of its **parties** (for example BLINK COMMERCE PVT LTD(MUMBAI M12)), then the **day** (today, to begin with).
+2. RAMS shows the party's **opening balance** on that day.
+3. Your team enters that day's **invoices, debit notes, credit notes and receipts** for the party: what it is, its number and the amount. A receipt can carry its bank reference (UTR).
+4. RAMS works out the **closing balance**, and checks every entry against Tally's vouchers for that party and day.
+
+| On screen | What it means |
+|---|---|
+| **In Tally** | Tally has the same voucher, on the same day, for the same amount (₹1 slack for rounding) |
+| **Amount differs** | Tally has it, for a different amount |
+| **Different day** | Tally has the same number within a week, on another date |
+| **Not in Tally yet** | Not in Tally, but Tally may not be written up yet. This lasts 2 days, a setting you can change |
+| **Not in Tally** | Still missing after those days |
+| **Only in Tally** | Tally has a voucher on the party that nobody entered here, a journal or TDS for example |
+
+The day as a whole says **Matches Tally**, **Waiting for Tally** or **Differs from Tally by ₹…**, and shows RAMS's closing and Tally's side by side. Every day that differs is listed under *Needs attention* when you open Ledgers. A party is checked from the first day anyone enters something for it.
+
+**What you enter stays in RAMS.** It is never sent to Tally. The accountant posts in Tally as always, and RAMS compares the two.
+
+**The opening balance, for now.** RAMS's copy of Tally starts on 8 June 2026, and each party's balance on that day isn't loaded yet.
+- So every party starts at a **placeholder of ₹10,000** on 8 June. Tally's real vouchers since then carry it forward, so each day opens where Tally's closing of the day before left off.
+- The screen marks it *Placeholder, not from Tally*.
+- The day's check is exact anyway: it compares the entries with Tally's vouchers, and the difference between the two closings doesn't depend on the opening.
+- The real balances will be loaded later, once we agree where they come from.
+
+**To decide together:**
+- **Head-office ledgers.** Marketplaces often pay into a head-office ledger, so the warehouse parties show invoices and credit notes but no receipts. On the real data, the Blinkit warehouse ledgers have no receipts at all. Map each head-office ledger to its marketplace on *Matching → Party ledgers*, so receipts can be entered against it.
+- **Journals and TDS.** Only four kinds of entry are made here, so Tally's journals and TDS show as *Only in Tally*. Should there be a fifth kind, or should some Tally voucher types count without an entry?
+- **Locking a checked day.** Should a day be locked once it is checked?
+
+## 12. Who can do what
 
 There are four roles. **Admin and Owner can always do everything**, and they decide what the other two may do, on *Admin → Roles & permissions*.
 
@@ -210,6 +243,9 @@ There are four roles. **Admin and Owner can always do everything**, and they dec
 |---|---|---|
 | See matching and auto-fill | ✓ | ✓ |
 | See Debtors (Reports) | ✓ | ✓ |
+| See Ledgers | ✓ | ✓ |
+| Enter, change and remove ledger entries | ✓ | – |
+| Change the ledger settings (days to wait, tolerance, placeholder opening) | – (Admin/Owner) | – |
 | Run matching, confirm or reject links, map ledgers, change matching rules | ✓ | – |
 | Approve auto-fill writes | ✓ | – |
 | Switch auto-fill modes, write over a different value in ROMS | – (Admin/Owner) | – |
@@ -217,7 +253,7 @@ There are four roles. **Admin and Owner can always do everything**, and they dec
 
 Every change anyone makes in RAMS is recorded in the **Audit Log**, with who made it and when.
 
-## 12. What you can change yourselves (no programmer needed)
+## 13. What you can change yourselves (no programmer needed)
 
 - **Which Tally companies sync, and the office hours**
 - **Which company the reports open on** (the star on *Admin → Tally companies*; MH for now)
@@ -225,9 +261,10 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 - **Each vendor's handling:** match it, treat it as a stock transfer, or ignore it
 - **Which party ledger belongs to which marketplace**
 - **Auto-fill:** each field's mode, whether to rewrite short forms, and which Bill Date to keep
+- **Ledgers:** how many days either side may wait for the other, the amount tolerance, and the placeholder opening
 - **What Accountants and Viewers may do**
 
-## 13. Safety and privacy
+## 14. Safety and privacy
 
 - **Tally:** read only.
 - **ROMS:** read, plus four fields that can only be written when switched on. Each write is checked by ROMS's own rules and recorded in its history.
@@ -237,7 +274,7 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 - **The data** is held in a database in **Mumbai**. The website is set to run in Mumbai too, which also makes it faster.
 - **Every change** in RAMS is in the Audit Log; every change in ROMS is in ROMS's history.
 
-## 14. Progress and next steps
+## 15. Progress and next steps
 
 | Step | What | State |
 |---|---|---|
@@ -248,11 +285,12 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 | 5 | Matching, with review screens and rules | Done, live on the test setup |
 | 6 | Auto-fill into ROMS | Done, being tried on the test setup |
 | 7 | The report screens | Delivered one at a time, each after you have reviewed it. Debtors is out; the rest follow |
+| – | Ledgers: a party's day, entered in RAMS and checked against Tally | Built and tested; goes on the test setup after your review. Openings are a ₹10,000 placeholder until the real balances are loaded |
 | 8 | Go-live: production database, Connector installed on the office PC, the trial weeks | Prepared (see *go-live.md*); needs the office PC and your go-ahead |
 
 **Still to be decided:** how to link Flipkart and Amazon stock transfers to their ROMS rows.
 
-## 15. Words used
+## 16. Words used
 
 | Word | Meaning |
 |---|---|
