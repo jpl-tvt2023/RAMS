@@ -35,7 +35,7 @@ This takes RAMS from the test setup to production, step by step. It also covers 
 1. **You:** create the Turso database `royalmart-rams` in the `royalmart` org, region `aws-ap-south-1` (Mumbai), and make a token for it.
 2. **Maintainer:**
    1. In `backend/.env`, set `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` to it. **Check the URL twice:** `npm run migrate` writes to whatever it points at.
-   2. `npm run migrate`, which applies 001–014.
+   2. `npm run migrate`, which applies 001–015.
    3. `RAMS_ADMIN_USERNAME=… RAMS_ADMIN_PASSWORD='…' npm run bootstrap-admin`. It creates the first Admin, who changes the password at first sign-in.
    4. `npm run agent-token -- --name "Office PC"`. It prints the Connector token **once**; hand it to you privately.
 3. **You:** in Vercel (RAMS project → Environment Variables, **Production**):
