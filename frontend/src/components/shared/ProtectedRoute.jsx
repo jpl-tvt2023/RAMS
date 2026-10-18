@@ -1,10 +1,12 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { isReleased } from '../../utils/releases';
 
 // Redirects, never 403s: no session -> /login; a first or reset password still
 // in force -> /force-reset (the API enforces this too); a role, or a missing
 // permission (Admin -> Roles & permissions), that may not see the page ->
-// /dashboard. (Adapted from ROMS.)
+// /dashboard; so does a screen still held for later delivery (utils/releases.js),
+// for every role. (Adapted from ROMS.)
 export default function ProtectedRoute({ children, roles, permission }) {
   const { user, loading, can } = useAuth();
   const { pathname } = useLocation();
@@ -21,6 +23,7 @@ export default function ProtectedRoute({ children, roles, permission }) {
   if (user.is_first_login && pathname !== '/force-reset') return <Navigate to="/force-reset" replace />;
   if (roles && !roles.some((r) => (user.roles || []).includes(r))) return <Navigate to="/dashboard" replace />;
   if (permission && !can(permission)) return <Navigate to="/dashboard" replace />;
+  if (!isReleased(pathname)) return <Navigate to="/dashboard" replace />;
 
   return children;
 }

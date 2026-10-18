@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import Debtors from '../Debtors';
 import Invoices from '../Invoices';
 import Receivables from '../Receivables';
 import Exceptions from '../Exceptions';
@@ -11,7 +12,7 @@ import * as reports from '../../../api/reports.api';
 import * as sync from '../../../api/sync.api';
 
 vi.mock('../../../api/reports.api', () => ({
-  getInvoices: vi.fn(), getNotes: vi.fn(), getTransfers: vi.fn(), getReceivables: vi.fn(), getExceptions: vi.fn(),
+  getDebtors: vi.fn(), getInvoices: vi.fn(), getNotes: vi.fn(), getTransfers: vi.fn(), getReceivables: vi.fn(), getExceptions: vi.fn(),
   getReportSettings: vi.fn(), updateReportSettings: vi.fn(), updateTerms: vi.fn(),
 }));
 vi.mock('../../../api/sync.api', () => ({ getSyncStatus: vi.fn(), getSyncRuns: vi.fn(), syncNow: vi.fn() }));
@@ -46,6 +47,64 @@ beforeEach(() => {
   reports.getReportSettings.mockResolvedValue({
     settings: { default_credit_days: 30, exception_days: 15 },
     terms: [{ vendor: 'Blinkit', credit_days: null }, { vendor: 'Scootsy', credit_days: 5 }],
+  });
+});
+
+const DEBTOR = {
+  guid: 'g607', company_id: 2, company: 'MH', number: '607/RM/26-27', date: '2026-07-01', party: 'BLINK COMMERCE PVT LTD(LUCKNOW L4)',
+  vendor: 'Blinkit', pos: ['B002'], vendor_pos: ['4500123456'], total_paise: 12988395, credit_notes_paise: 39800,
+  credit_notes: [{ guid: 'cn1', number: 'CN/1501', date: '2026-07-20', voucher_type: 'Credit Note', amount_paise: 39800, rtv_no: 'RTV-77' }],
+  outstanding_paise: 12948595, status: 'overdue', due_date: '2026-07-31', overdue_days: 67,
+};
+
+describe('Debtors', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    reports.getDebtors.mockResolvedValue({
+      rows: [DEBTOR, { ...DEBTOR, guid: 'g6', number: '6/RM/26-27', pos: [], vendor_pos: [], credit_notes: [], credit_notes_paise: 0, vendor: null }],
+      total: 2, page: 1, page_size: 50, companies: [...COMPANIES, { id: 3, code: 'HR', name: 'Roymax HR' }], company_id: 2,
+      tabs: [{ vendor: 'Amazon', count: 0 }, { vendor: 'Blinkit', count: 1 }], all: 2, unknown: 1,
+      totals: { invoices: 2, total_paise: 25976790, credit_notes_paise: 39800, outstanding_paise: 25897190, overdue_paise: 25897190 },
+    });
+  });
+
+  test('opens on the default company; each invoice with its internal and vendor PO numbers, amount, CN and outstanding', async () => {
+    renderWithProviders(<Debtors />, { user: VIEWER });
+    expect(await screen.findAllByText('607/RM/26-27')).not.toHaveLength(0);
+    expect(reports.getDebtors).toHaveBeenCalledWith(expect.objectContaining({ company_id: 'default', page: 1 }));
+    expect(screen.getByLabelText('Company')).toHaveValue('2');
+    expect(screen.getByRole('columnheader', { name: 'Internal PO no' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Vendor PO no' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'B002' })).toHaveAttribute('href', '/matching');
+    expect(screen.getByText('4500123456')).toBeInTheDocument();
+    expect(screen.getAllByText('₹1,29,883.95').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('67 days overdue').length).toBeGreaterThan(0);
+    expect(screen.getByRole('tab', { name: 'All (2)' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Amazon (0)' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Not known (1)' })).toBeInTheDocument();
+  });
+
+  test('a marketplace tab and the status dropdown filter', async () => {
+    renderWithProviders(<Debtors />, { user: VIEWER });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Blinkit (1)' }));
+    await waitFor(() => expect(reports.getDebtors).toHaveBeenLastCalledWith(expect.objectContaining({ vendor: 'Blinkit', page: 1 })));
+    await user.selectOptions(screen.getByLabelText('Status'), 'Overdue');
+    await waitFor(() => expect(reports.getDebtors).toHaveBeenLastCalledWith(expect.objectContaining({ vendor: 'Blinkit', status: 'overdue' })));
+    await user.selectOptions(screen.getByLabelText('Company'), 'All companies (consolidated)');
+    await waitFor(() => expect(reports.getDebtors).toHaveBeenLastCalledWith(expect.not.objectContaining({ company_id: expect.anything() })));
+  });
+
+  test('clicking a CN amount opens each credit note’s details', async () => {
+    renderWithProviders(<Debtors />, { user: VIEWER });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Credit notes on 607/RM/26-27' }));
+    const dialog = screen.getByRole('dialog', { name: 'Credit notes — 607/RM/26-27' });
+    expect(within(dialog).getByText('CN/1501')).toBeInTheDocument();
+    expect(within(dialog).getByText('RTV-77')).toBeInTheDocument();
+    expect(within(dialog).getByText('₹398.00')).toBeInTheDocument();
+    expect(within(dialog).getByText('20 Jul 2026')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Credit notes on 6/RM/26-27' })).not.toBeInTheDocument();
   });
 });
 

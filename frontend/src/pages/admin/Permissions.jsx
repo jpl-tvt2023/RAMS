@@ -7,10 +7,13 @@ import { HistoryButton } from '../../components/shared/HistoryDrawer';
 import HelpLink from '../../components/shared/HelpLink';
 import { getPermissions, updatePermissions } from '../../api/settings.api';
 import { formatDateTime } from '../../utils/formatters';
+import { permissionReleased } from '../../utils/releases';
 
 // Admin/Owner only: what Accountants and Viewers may do. Admin and Owner hold
 // every permission, shown ticked and locked. Users, the Audit Log and this page
-// are not in the list -- they stay Admin/Owner only.
+// are not in the list -- they stay Admin/Owner only. A permission whose screens
+// are all still held (utils/releases.js) isn't shown; the draft keeps it as it
+// is, so saving never takes it away.
 const sameMatrix = (a, b) => a && b && Object.keys(a).every((r) => [...a[r]].sort().join() === [...b[r]].sort().join());
 
 export default function Permissions() {
@@ -42,7 +45,8 @@ export default function Permissions() {
     } finally { setSaving(false); }
   };
 
-  const areas = data ? [...new Set(data.catalog.map((p) => p.area))] : [];
+  const catalog = data ? data.catalog.filter((p) => permissionReleased(p.key)) : [];
+  const areas = [...new Set(catalog.map((p) => p.area))];
   const dirty = data && !sameMatrix(draft, data.matrix);
 
   return (
@@ -78,7 +82,7 @@ export default function Permissions() {
                 <tr key={area} className="bg-gray-50/60 border-b border-gray-100">
                   <td colSpan={5} className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">{area}</td>
                 </tr>,
-                ...data.catalog.filter((p) => p.area === area).map((p) => (
+                ...catalog.filter((p) => p.area === area).map((p) => (
                   <tr key={p.key} className="border-b border-gray-100">
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">{p.label}</p>

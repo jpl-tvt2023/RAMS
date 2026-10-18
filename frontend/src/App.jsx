@@ -15,6 +15,7 @@ import MatchReview from './pages/matching/MatchReview';
 import MatchingRules from './pages/matching/MatchingRules';
 import PartyLedgers from './pages/matching/PartyLedgers';
 import AutoFill from './pages/matching/AutoFill';
+import Debtors from './pages/reports/Debtors';
 import Invoices from './pages/reports/Invoices';
 import Notes from './pages/reports/Notes';
 import Transfers from './pages/reports/Transfers';
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/matching/rules" element={<ProtectedRoute permission={PERM.MATCHING_VIEW}><MatchingRules /></ProtectedRoute>} />
           <Route path="/matching/parties" element={<ProtectedRoute permission={PERM.MATCHING_VIEW}><PartyLedgers /></ProtectedRoute>} />
           <Route path="/matching/autofill" element={<ProtectedRoute permission={PERM.AUTOFILL_VIEW}><AutoFill /></ProtectedRoute>} />
+          <Route path="/reports/debtors" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Debtors /></ProtectedRoute>} />
           <Route path="/reports/invoices" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Invoices /></ProtectedRoute>} />
           <Route path="/reports/notes" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Notes /></ProtectedRoute>} />
           <Route path="/reports/transfers" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Transfers /></ProtectedRoute>} />

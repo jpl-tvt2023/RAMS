@@ -6,7 +6,8 @@ const { latestConnector } = require('../services/connectorStatus');
 // The Tally companies RAMS knows about (Admin -> Tally companies). Which ones
 // sync is data, not code: the Connector lists every company it sees, and an
 // Admin or Owner turns each one's sync on or off here. Turning a company off
-// stops its sync and keeps what is already mirrored.
+// stops its sync and keeps what is already mirrored. One company can be the
+// default the report screens open on (is_default).
 
 const shape = (row, connector) => {
   const loaded = connector && connector.loaded.get(row.guid);
@@ -19,6 +20,7 @@ const shape = (row, connector) => {
     gstin: row.gstin ?? null,
     books_from: row.books_from ?? null,
     sync_enabled: Boolean(row.sync_enabled),
+    is_default: Boolean(row.is_default),
     loaded_in_tally: Boolean(loaded),
     vouchers: Number(row.vouchers || 0),
     first_seen_at: row.first_seen_at,
@@ -43,7 +45,9 @@ async function list(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// PATCH /api/companies/:id { sync_enabled?, code? } -- the sync.companies permission.
+// PATCH /api/companies/:id { sync_enabled?, code?, is_default? } -- the
+// sync.companies permission. is_default only takes true: the default moves to
+// this company from whichever had it.
 async function update(req, res, next) {
   try {
     const id = Number.parseInt(req.params.id, 10);
@@ -58,11 +62,18 @@ async function update(req, res, next) {
       if (!CODE_RE.test(code)) return res.status(400).json({ message: 'Code must be 1-10 letters, digits or -' });
       after.code = code;
     }
+    if (body.is_default !== undefined) {
+      if (body.is_default !== true) return res.status(400).json({ message: 'Make another company the default instead' });
+      after.is_default = 1;
+    }
     if (!Object.keys(after).length) return res.status(400).json({ message: 'Nothing to change' });
 
     const { rows: [before] } = await db.execute({ sql: 'SELECT * FROM tally_companies WHERE id = ?', args: [id] });
     if (!before) return res.status(404).json({ message: 'Company not found' });
-    const changes = diffFields(before, after, ['sync_enabled', 'code']);
+    if (after.is_default && !(after.sync_enabled ?? Number(before.sync_enabled))) {
+      return res.status(400).json({ message: `Turn sync on for ${before.name} first: the reports only read synced companies` });
+    }
+    const changes = diffFields(before, after, ['sync_enabled', 'code', 'is_default']);
     if (changes.length) {
       const syncChange = changes.find((c) => c.field === 'sync_enabled');
       let action = 'TALLY_COMPANY_UPDATE';
@@ -70,10 +81,14 @@ async function update(req, res, next) {
       if (syncChange) {
         action = after.sync_enabled ? 'TALLY_COMPANY_SYNC_ON' : 'TALLY_COMPANY_SYNC_OFF';
         description = `${before.name}: sync turned ${after.sync_enabled ? 'on' : 'off'}`;
+      } else if (after.is_default) {
+        action = 'TALLY_COMPANY_DEFAULT';
+        description = `${before.name} is now the default company for reports`;
       }
       const sets = Object.keys(after).map((k) => `${k} = ?`);
       const tx = await db.transaction('write');
       try {
+        if (after.is_default) await tx.execute({ sql: 'UPDATE tally_companies SET is_default = 0 WHERE is_default = 1 AND id <> ?', args: [id] });
         await tx.execute({
           sql: `UPDATE tally_companies SET ${sets.join(', ')}, updated_at = datetime('now'), updated_by = ? WHERE id = ?`,
           args: [...Object.values(after), req.user.id, id],

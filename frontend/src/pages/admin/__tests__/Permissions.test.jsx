@@ -13,10 +13,12 @@ const CATALOG = [
   { key: 'matching.view', area: 'Matching', label: 'See matching', description: 'Match review and the rest' },
   { key: 'matching.rules', area: 'Matching', label: 'Change matching rules', description: 'How POs are matched' },
   { key: 'sync.schedule', area: 'Tally sync', label: 'Change the sync schedule', description: 'Office hours' },
+  { key: 'reports.view', area: 'Reports', label: 'See the reports', description: 'The report screens' },
+  { key: 'reports.settings', area: 'Reports', label: 'Change credit terms', description: 'Credit days' },
 ];
 const VIEW = {
   catalog: CATALOG, roles: ['Accountant', 'Viewer'],
-  matrix: { Accountant: ['matching.view', 'matching.rules'], Viewer: ['matching.view'] },
+  matrix: { Accountant: ['matching.view', 'matching.rules', 'reports.view'], Viewer: ['matching.view'] },
   updated_at: null, updated_by_name: null,
 };
 
@@ -36,9 +38,15 @@ describe('Roles & permissions', () => {
     await user.click(screen.getByLabelText('Viewer: See matching'));
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(settingsApi.updatePermissions).toHaveBeenCalledWith({
-      Accountant: ['matching.view', 'matching.rules', 'sync.schedule'],
+      Accountant: ['matching.view', 'matching.rules', 'reports.view', 'sync.schedule'],
       Viewer: [],
     });
     expect(await screen.findByText(/Last changed .* by Keshav/)).toBeInTheDocument();
+  });
+
+  test('a permission whose screens are all held is not shown', async () => {
+    renderWithProviders(<Permissions />, { user: ADMIN });
+    expect(await screen.findByText('See the reports')).toBeInTheDocument(); // Debtors is released
+    expect(screen.queryByText('Change credit terms')).not.toBeInTheDocument(); // Receivables is still held
   });
 });

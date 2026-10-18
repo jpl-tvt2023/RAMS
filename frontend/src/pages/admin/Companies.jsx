@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pencil, Power, PowerOff } from 'lucide-react';
+import {
+  Pencil, Power, PowerOff, Star,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import AppShell from '../../components/layout/AppShell';
 import Modal from '../../components/ui/Modal';
@@ -18,8 +20,9 @@ import { formatDateTime } from '../../utils/formatters';
 // Roles & permissions); each part's buttons show only with its own permission.
 // Companies are created in Tally by the accountants; the
 // Connector lists every company it finds loaded there, and this page chooses
-// which ones RAMS mirrors -- and, in the Sync schedule panel, when. Which
-// companies sync, and when, is data, never code.
+// which ones RAMS mirrors -- and, in the Sync schedule panel, when -- and which
+// one the report screens open on (the star). Which companies sync, and when,
+// is data, never code.
 const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand';
 
 export default function Companies() {
@@ -90,7 +93,10 @@ export default function Companies() {
                     <p className="font-medium text-gray-900">{c.name}</p>
                     <p className="text-xs text-gray-400 font-mono">{c.guid}</p>
                   </td>
-                  <td className="px-4 py-3 font-semibold text-gray-800">{c.code || '—'}</td>
+                  <td className="px-4 py-3 font-semibold text-gray-800 whitespace-nowrap">
+                    {c.code || '—'}
+                    {c.is_default && <Badge color="brand" className="ml-2">Default for reports</Badge>}
+                  </td>
                   <td className="px-4 py-3 text-gray-600">{c.state_name || '—'}</td>
                   <td className="px-4 py-3 text-gray-600 font-mono text-xs">{c.gstin || '—'}</td>
                   <td className="px-4 py-3">
@@ -108,6 +114,9 @@ export default function Companies() {
                       ) : (
                         <button onClick={() => setConfirm({ company: c, on: true })} title="Turn sync on" aria-label={`Turn sync on for ${c.name}`} className="p-1.5 rounded hover:bg-green-50 text-green-600 transition-colors"><Power size={14} /></button>
                       ))}
+                      {canSync && c.sync_enabled && !c.is_default && (
+                        <button onClick={() => save(c, { is_default: true }, `Reports now open on ${c.code || c.name}`)} disabled={saving} title="Make the default for reports" aria-label={`Make ${c.name} the default for reports`} className="p-1.5 rounded hover:bg-amber-50 text-amber-500 transition-colors"><Star size={14} /></button>
+                      )}
                       {canSync && <button onClick={() => setEditing({ company: c, code: c.code || '' })} title="Edit code" aria-label={`Edit code for ${c.name}`} className="p-1.5 rounded hover:bg-blue-50 text-blue-500 transition-colors"><Pencil size={14} /></button>}
                       <HistoryButton entityType="tally_company" entityId={c.id} title={`History — ${c.name}`} />
                     </div>

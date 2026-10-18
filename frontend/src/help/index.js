@@ -3,13 +3,15 @@
 // steps }], faq: [{ q, a }] }. `path` ties it to a page, which links here
 // with <HelpLink section={id} />. Every page in the top bar must have one
 // (utils/__tests__/help.test.js), so a new screen can't ship without its guide.
+// A screen still held (utils/releases.js) has its section left out.
 import { signingIn, dashboard } from './gettingStarted';
 import { users, auditLog, tallyCompanies, rolesPermissions } from './admin';
 import { matchReview, matchingRules, partyLedgers, generalFaq } from './matching';
 import { autoFill } from './autofill';
 import {
-  invoicesHelp, notesHelp, transfersHelp, receivablesHelp, exceptionsHelp, syncHealthHelp,
+  debtorsHelp, invoicesHelp, notesHelp, transfersHelp, receivablesHelp, exceptionsHelp, syncHealthHelp,
 } from './reports';
+import { isReleased } from '../utils/releases';
 
 export const HELP_SECTIONS = [
   signingIn,
@@ -18,6 +20,7 @@ export const HELP_SECTIONS = [
   matchingRules,
   partyLedgers,
   autoFill,
+  debtorsHelp,
   invoicesHelp,
   notesHelp,
   transfersHelp,
@@ -29,7 +32,7 @@ export const HELP_SECTIONS = [
   users,
   auditLog,
   generalFaq,
-];
+].filter((s) => !s.path || isReleased(s.path));
 
 // Lower-case text of a section, for the search box.
 export function sectionText(s) {

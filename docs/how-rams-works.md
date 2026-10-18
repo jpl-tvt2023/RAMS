@@ -1,6 +1,6 @@
 # How RAMS works
 
-*Royal Mart Accounts (RAMS), explained without the technical words. Last updated 6 October 2026.*
+*Royal Mart Accounts (RAMS), explained without the technical words. Last updated 18 October 2026.*
 
 ---
 
@@ -8,7 +8,7 @@
 
 Royal Mart keeps its **accounts in Tally** and its **marketplace orders in ROMS** (the Royal Mart portal). Until now, the two never spoke to each other. Someone had to read an invoice number in Tally and type it into ROMS, and nobody could easily see which order had been invoiced, paid or credited.
 
-**RAMS is the bridge between them.** It reads the books from Tally, matches each ROMS order to the Tally invoice that billed it, and each return to the credit note that settled it. With your permission, it then writes Tally's invoice and credit-note numbers into ROMS. It also shows what every marketplace owes.
+**RAMS is the bridge between them.** It reads the books from Tally, matches each ROMS order to the Tally invoice that billed it, and each return to the credit note that settled it. With your permission, it then writes Tally's invoice and credit-note numbers into ROMS. Report screens, such as what every marketplace owes, follow one at a time.
 
 ```
    TALLY                      RAMS                         ROMS
@@ -18,7 +18,7 @@ Royal Mart keeps its **accounts in Tally** and its **marketplace orders in ROMS*
  Credit notes          matches orders to             (read only)
  Receipts              invoices and returns            
  Journals              to credit notes        ──►  Bill No + Bill Date,
-                       reports & exceptions        CN No + CN Date
+                       (reports to follow)         CN No + CN Date
    (only read)                                     (only these, only if
                                                     you switch it on)
 ```
@@ -29,7 +29,7 @@ Royal Mart keeps its **accounts in Tally** and its **marketplace orders in ROMS*
 |---|---|---|---|
 | **Tally** | The accounts: invoices, credit notes, receipts, journals | The accountant | **Only reads it.** RAMS can never change anything in Tally. |
 | **ROMS** | The orders portal: marketplace POs, dispatch (Builty), GRN, returns (RTV) | Operations staff | Reads the orders and returns. Writes only two pairs of fields, and only when switched on. |
-| **RAMS** | The bridge, plus the accounts screens | Accounts team, owners | Its own website: `royalmartaccounting.vercel.app` |
+| **RAMS** | The bridge; report screens follow one at a time | Accounts team, owners | Its own website: `royalmartaccounting.vercel.app` |
 
 ## 3. What RAMS will never do
 
@@ -54,9 +54,8 @@ Royal Mart keeps its **accounts in Tally** and its **marketplace orders in ROMS*
 - **Every minute:** it tells RAMS it's alive, and whether Tally is open.
 - **Every hour, in office hours** (Mon–Sat, 09:00–19:00; changeable in RAMS): it fetches only what changed in Tally since the last time. That takes seconds.
 - **Once after office hours:** a full check, which also catches anything deleted in Tally.
-- **On demand:** anyone allowed can press **Sync now** in RAMS.
 
-**If the office PC or Tally is off,** nothing is lost. RAMS keeps showing the last data it had, and **Sync health** says so. When the PC comes back, the Connector catches up with everything that changed.
+**If the office PC or Tally is off,** nothing is lost. RAMS keeps showing the last data it had, and the **Tally sync** card on the Dashboard says so. When the PC comes back, the Connector catches up with everything that changed.
 
 **After each sync, RAMS matches again,** and then auto-fill writes what's due (if it is switched on).
 
@@ -181,20 +180,27 @@ Checked on the real books (MH, HR, WB) and the ROMS test copy, October 2026:
 
 **To stop it:** set the field to Off. It stops at once.
 
-## 10. The accounts screens
+## 10. Reports: one screen at a time
 
-| Screen | What it shows |
+The report screens (what has been invoiced, what has been paid, and what is still owed) are delivered **one at a time**. We go through each one with you, adjust it to what you need, and only then switch it on in RAMS.
+
+**Debtors** is the first one (*Reports → Debtors*). It lists every sales invoice since 8 June, with a tab for each marketplace (All, Amazon, Blinkit and so on). For each invoice it shows:
+
+| Column | What it is |
 |---|---|
-| **Invoices** | Every sales invoice since 8 June: marketplace, PO, taxable value, GST, received, credit notes, TDS, outstanding, and days overdue |
-| **Credit & debit notes** | Each note, the invoice it settles, the order and the return |
-| **Stock transfers** | Sales between Roymax's own registrations, kept out of what customers owe |
-| **Receivables** | What each marketplace owes, per company or all together; how old it is (0–30, 31–60, 61–90, 90+ days); credit terms |
-| **Exceptions** | Everything that needs a person, and where to fix it |
-| **Sync health** | Whether the Connector and Tally are working, and every sync |
+| Invoice | The Tally invoice number, with its company and date |
+| Party | The party ledger it was billed to |
+| Internal PO no | ROMS's own PO id (for example B002) |
+| Vendor PO no | The marketplace's purchase order number |
+| Amount | The invoice total |
+| CN | The credit notes set against it in Tally. Click the amount to see each credit note: its number, date, amount and the ROMS return (RTV) it belongs to |
+| Outstanding | What is still owed after receipts, credit notes, TDS and adjustments, and how many days it is overdue |
 
-Every list can be filtered by company or shown for all companies together, and downloaded for Excel.
+It opens on **MH**, with all marketplaces and all statuses. You can switch to another company or to all companies together, and filter by Open, Overdue, Settled or No PO. You can search by invoice, party or either PO number, and download it for Excel.
 
-**One thing the receivables already show:** several marketplaces pay into a *head-office* ledger "On Account", not against the warehouse-ledger invoices. Their invoices therefore look unpaid in Tally's bill-wise view. RAMS shows that money separately, and a *net outstanding* that takes it off. Setting those receipts against invoices in Tally will make the invoice-level picture exact.
+Until the rest arrive, RAMS keeps working in the background: it copies the books, matches orders and returns, and writes the numbers into ROMS once you switch that on. Each report covers everything since 8 June, so nothing is missed by waiting.
+
+**Something to start on in Tally now:** several marketplaces pay into a *head-office* ledger "On Account", not against the warehouse-ledger invoices. In Tally's bill-wise view, those invoices therefore look unpaid. Setting those receipts against their invoices in Tally will make the figures exact when the reports arrive.
 
 ## 11. Who can do what
 
@@ -202,10 +208,10 @@ There are four roles. **Admin and Owner can always do everything**, and they dec
 
 | | Accountant (starting setup) | Viewer (starting setup) |
 |---|---|---|
-| See matching, auto-fill and reports | ✓ | ✓ |
+| See matching and auto-fill | ✓ | ✓ |
+| See Debtors (Reports) | ✓ | ✓ |
 | Run matching, confirm or reject links, map ledgers, change matching rules | ✓ | – |
 | Approve auto-fill writes | ✓ | – |
-| Change credit terms, press Sync now | ✓ | – |
 | Switch auto-fill modes, write over a different value in ROMS | – (Admin/Owner) | – |
 | Users, Audit Log, Roles & permissions | Never: Admin/Owner only | Never |
 
@@ -214,11 +220,11 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 ## 12. What you can change yourselves (no programmer needed)
 
 - **Which Tally companies sync, and the office hours**
+- **Which company the reports open on** (the star on *Admin → Tally companies*; MH for now)
 - **Every matching rule and check**, with a preview of the effect before saving
 - **Each vendor's handling:** match it, treat it as a stock transfer, or ignore it
 - **Which party ledger belongs to which marketplace**
 - **Auto-fill:** each field's mode, whether to rewrite short forms, and which Bill Date to keep
-- **Credit days** per marketplace, and when something counts as an exception
 - **What Accountants and Viewers may do**
 
 ## 13. Safety and privacy
@@ -241,7 +247,7 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 | 3–4 | The Connector and the copy of Tally's books | Done, live on the test setup |
 | 5 | Matching, with review screens and rules | Done, live on the test setup |
 | 6 | Auto-fill into ROMS | Done, being tried on the test setup |
-| 7 | The accounts screens (invoices, receivables, exceptions, sync health) | Built; to be reviewed |
+| 7 | The report screens | Delivered one at a time, each after you have reviewed it. Debtors is out; the rest follow |
 | 8 | Go-live: production database, Connector installed on the office PC, the trial weeks | Prepared (see *go-live.md*); needs the office PC and your go-ahead |
 
 **Still to be decided:** how to link Flipkart and Amazon stock transfers to their ROMS rows.

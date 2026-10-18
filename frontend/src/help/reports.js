@@ -1,6 +1,57 @@
-// Help: the Reports screens -- Invoices, Credit & debit notes, Stock
+// Help: the Reports screens -- Debtors, Invoices, Credit & debit notes, Stock
 // transfers, Receivables, Exceptions and Sync health.
 const SEE = 'Seeing it: "See the reports". Admin and Owner always can.';
+
+export const debtorsHelp = {
+  id: 'debtors',
+  path: '/reports/debtors',
+  area: 'Reports',
+  title: 'Debtors',
+  who: SEE,
+  summary: 'Each Tally sales invoice since RAMS started (8 June 2026), by marketplace: its internal and vendor PO numbers, the amount, the credit notes against it and what is still owed. RAMS works the figures out from Tally each time the page opens, so they are as fresh as the last sync. Stock transfers are left out.',
+  flows: [
+    {
+      title: 'See what a marketplace owes',
+      steps: [
+        'Reports → Debtors. It opens on the default company (MH to begin with). Choose another company, or All companies for the consolidated view.',
+        'Click a marketplace tab, for example Blinkit, or All for every marketplace. Each tab shows how many invoices it has.',
+        'Choose a status: Open for invoices still owed, Overdue for those past their credit days, Settled for those paid in full.',
+        'The line above the table adds up what the filters show: invoiced, credit notes, outstanding and overdue.',
+      ],
+    },
+    {
+      title: 'See an invoice’s credit notes',
+      steps: [
+        'In the CN column, click the amount. The CN numbers are under it.',
+        'A window lists each credit note: its number, date, type, the amount set against this invoice and, when there is one, the ROMS RTV row it was linked to.',
+      ],
+    },
+    {
+      title: 'Find invoices with no PO',
+      steps: [
+        'Choose No PO as the status. These invoices aren’t linked to a ROMS PO.',
+        'Usually the Buyer’s Order No is missing on the invoice in Tally. Once it is added and Tally syncs, the next match links it.',
+      ],
+    },
+    {
+      title: 'Find one invoice',
+      steps: ['Type the invoice number, the party, the internal PO no (for example B002) or the vendor PO no in the search box and press Enter.'],
+    },
+    {
+      title: 'Download it',
+      steps: ['Click Download CSV. It downloads every invoice the filters show, not just this page, for Excel.'],
+    },
+  ],
+  faq: [
+    { q: 'What is the difference between Internal PO no and Vendor PO no?', a: 'Internal PO no is ROMS’s own PO id (for example B002). Vendor PO no is the marketplace’s purchase order number, as typed in ROMS.' },
+    { q: 'What is the difference between Amount and Outstanding?', a: 'Amount is the invoice’s total. Outstanding is what is still owed after receipts, credit notes, TDS and other adjustments set against it in Tally.' },
+    { q: 'Which credit notes count in CN?', a: 'Every credit note entered "Agst Ref" against the invoice’s bill in Tally. A credit note entered On Account isn’t set against any invoice, so it doesn’t show here.' },
+    { q: 'What decides the marketplace?', a: 'The PO RAMS linked the invoice to. Without one, the party ledger’s mapping on Matching → Party ledgers, or RAMS’s suggestion for it. Invoices with neither are under Not known.' },
+    { q: 'When is an invoice overdue?', a: 'When it is still owed after its marketplace’s credit days (30 by default), counted from the invoice date.' },
+    { q: 'Which company does it open on?', a: 'The default company, MH to begin with. An Admin or Owner can change it on Admin → Tally companies by clicking the star on another company. Once you pick a company here, RAMS keeps your choice until you close the tab.' },
+    { q: 'Why does an invoice say "not bill-wise"?', a: 'Its party ledger isn’t kept bill-wise in Tally, so Tally has no bill to settle and RAMS can’t tell what is owed on it.' },
+  ],
+};
 
 export const invoicesHelp = {
   id: 'invoices',

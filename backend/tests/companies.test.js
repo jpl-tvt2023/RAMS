@@ -78,6 +78,40 @@ describe('PATCH /api/companies/:id', () => {
     expect((await patch(admin.token, 999999, { sync_enabled: true })).status).toBe(404);
   });
 
+  test('one company is the default the reports open on; making another the default moves it, audited', async () => {
+    const { rows: [was] } = await db.execute('SELECT id FROM tally_companies WHERE is_default = 1');
+    const a = await seen({ state: 'Gujarat' });
+    const b = await seen({ state: 'Goa' });
+    try {
+      expect((await patch(admin.token, a.id, { is_default: true })).status).toBe(400); // not synced yet
+      await patch(admin.token, a.id, { sync_enabled: true });
+      await patch(admin.token, b.id, { sync_enabled: true });
+      const res = await patch(admin.token, a.id, { is_default: true });
+      expect(res.status).toBe(200);
+      expect(res.body.is_default).toBe(true);
+      await patch(owner.token, b.id, { is_default: true });
+      const all = (await list(admin.token)).body;
+      expect(all.filter((c) => c.is_default).map((c) => c.id)).toEqual([b.id]);
+
+      const { rows: [audit] } = await db.execute({
+        sql: "SELECT description, changes FROM audit_logs WHERE entity_type = 'tally_company' AND entity_id = ? AND action_type = 'TALLY_COMPANY_DEFAULT'",
+        args: [b.id],
+      });
+      expect(audit.description).toBe(`${b.name} is now the default company for reports`);
+      expect(JSON.parse(audit.changes)).toEqual([{ field: 'is_default', old: 0, new: 1 }]);
+
+      expect((await patch(admin.token, b.id, { is_default: false })).status).toBe(400);
+      for (const who of ['accountant', 'viewer']) {
+        const { token } = await signIn(who);
+        expect((await patch(token, a.id, { is_default: true })).status).toBe(403);
+      }
+    } finally {
+      await db.execute({ sql: 'UPDATE tally_companies SET sync_enabled = 0 WHERE id IN (?, ?)', args: [a.id, b.id] });
+      await db.execute('UPDATE tally_companies SET is_default = 0');
+      if (was) await db.execute({ sql: 'UPDATE tally_companies SET is_default = 1 WHERE id = ?', args: [was.id] });
+    }
+  });
+
   test('the history drawer shows the trail to every role', async () => {
     const c = await seen();
     await patch(admin.token, c.id, { sync_enabled: true });

@@ -49,7 +49,7 @@ const CATALOG = [
   },
   {
     key: 'reports.view', area: 'Reports', label: 'See the reports',
-    description: 'Invoices, Credit & debit notes, Stock transfers, Receivables and Exceptions',
+    description: 'The report screens under Reports',
   },
   {
     key: 'reports.settings', area: 'Reports', label: 'Change credit terms',

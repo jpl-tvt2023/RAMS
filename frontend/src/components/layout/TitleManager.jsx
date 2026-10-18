@@ -17,6 +17,7 @@ const TITLES = [
   ['/matching/rules', 'Matching rules'],
   ['/matching/parties', 'Party ledgers'],
   ['/matching/autofill', 'Auto-fill'],
+  ['/reports/debtors', 'Debtors'],
   ['/reports/invoices', 'Invoices'],
   ['/reports/notes', 'Credit & debit notes'],
   ['/reports/transfers', 'Stock transfers'],

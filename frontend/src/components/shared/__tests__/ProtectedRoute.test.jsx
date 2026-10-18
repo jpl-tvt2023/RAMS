@@ -4,6 +4,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import ProtectedRoute from '../ProtectedRoute';
 import { ADMIN_ONLY } from '../../../utils/roles';
 import { useAuth } from '../../../context/AuthContext';
+import { HELD } from '../../../utils/releases';
 
 vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn() }));
 
@@ -17,6 +18,7 @@ function renderAt(path, user) {
         <Route path="/dashboard" element={<p>dashboard page</p>} />
         <Route path="/force-reset" element={<ProtectedRoute><p>set-password page</p></ProtectedRoute>} />
         <Route path="/admin/users" element={<ProtectedRoute roles={ADMIN_ONLY}><p>users page</p></ProtectedRoute>} />
+        {HELD.length > 0 && <Route path={HELD[0]} element={<ProtectedRoute><p>held page</p></ProtectedRoute>} />}
       </Routes>
     </MemoryRouter>,
   );
@@ -41,5 +43,10 @@ describe('ProtectedRoute', () => {
   test('an Owner can', () => {
     renderAt('/admin/users', { roles: ['Owner'], is_first_login: false });
     expect(screen.getByText('users page')).toBeInTheDocument();
+  });
+
+  test.runIf(HELD.length > 0)('a screen held for later delivery goes to the Dashboard, even for an Admin', () => {
+    renderAt(HELD[0], { roles: ['Admin'], is_first_login: false });
+    expect(screen.getByText('dashboard page')).toBeInTheDocument();
   });
 });

@@ -9,6 +9,9 @@ const getter = (path) => async (params) => {
   return data;
 };
 
+// company_id may be 'default' (the company set on Admin -> Tally companies).
+// { rows, total, page, page_size, totals, tabs: [{ vendor, count }], all, unknown, companies, company_id, as_of }
+export const getDebtors = getter('debtors');
 // { rows, total, page, page_size, totals, vendors, companies, as_of }
 export const getInvoices = getter('invoices');
 // { rows, total, page, page_size, totals, companies }

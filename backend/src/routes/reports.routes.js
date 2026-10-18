@@ -8,6 +8,7 @@ const c = require('../controllers/reports.controller');
 const view = requirePermission('reports.view');
 const settings = requirePermission('reports.settings');
 
+router.get('/debtors', auth, view, c.debtors);
 router.get('/invoices', auth, view, c.invoices);
 router.get('/notes', auth, view, c.notes);
 router.get('/transfers', auth, view, c.transfers);
