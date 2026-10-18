@@ -69,8 +69,8 @@ export const tallyCompanies = {
   path: '/admin/companies',
   area: 'Admin',
   title: 'Tally companies and the sync schedule',
-  who: 'Admin and Owner, and any role given "Turn company sync on or off" or "Change the sync schedule" on Roles & permissions.',
-  summary: 'Companies are created in Tally by the accountants. RAMS lists every company the Connector sees loaded in Tally; you choose which ones RAMS copies, and when.',
+  who: 'Admin and Owner, and any role given "Turn company sync on or off" or "Change the sync schedule" on Roles & permissions. The star (the default for reports) goes with "Turn company sync on or off".',
+  summary: 'Companies are created in Tally by the accountants. RAMS lists every company the Connector sees loaded in Tally; you choose which ones RAMS copies, and when, and which one the reports open on.',
   flows: [
     {
       title: 'Start syncing a company',
@@ -93,10 +93,19 @@ export const tallyCompanies = {
         'Save. The Connector picks the change up within a minute.',
       ],
     },
+    {
+      title: 'Choose the company the reports open on',
+      steps: [
+        'The company marked Default for reports is the one Reports → Debtors opens on (MH to begin with).',
+        'To change it, click the star on another company’s row. Only a company whose sync is on can be the default.',
+        'Everyone sees the new default the next time they open the report in a new tab. The change is recorded in the Audit Log.',
+      ],
+    },
   ],
   faq: [
     { q: 'A company appears twice.', a: 'It was re-created in Tally, which gives it a new identity. Turn the new one on and the old one off.' },
     { q: 'What is the short code?', a: 'How lists show the company (MH, HR, WB). Click the pencil icon to change it.' },
+    { q: 'Can the reports open on all companies?', a: 'Each person can choose All companies on the report itself. The default is always one company, so the star moves it rather than clearing it.' },
   ],
 };
 

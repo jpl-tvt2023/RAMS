@@ -49,11 +49,23 @@ const CATALOG = [
   },
   {
     key: 'reports.view', area: 'Reports', label: 'See the reports',
-    description: 'Invoices, Credit & debit notes, Stock transfers, Receivables and Exceptions',
+    description: 'The report screens under Reports',
   },
   {
     key: 'reports.settings', area: 'Reports', label: 'Change credit terms',
     description: 'Each marketplace\'s credit days, the default, and how long before something is an exception',
+  },
+  {
+    key: 'ledgers.view', area: 'Ledgers', label: 'See Ledgers',
+    description: 'Each party\'s day: the opening, the entries typed in RAMS, Tally\'s entries and the check between them',
+  },
+  {
+    key: 'ledgers.entry', area: 'Ledgers', label: 'Record ledger entries',
+    description: 'Add, change and remove a party\'s invoices, debit notes, credit notes and receipts on Ledgers',
+  },
+  {
+    key: 'ledgers.settings', area: 'Ledgers', label: 'Change ledger settings',
+    description: 'How many days either side may wait for the other, the amount tolerance, and the placeholder opening',
   },
   {
     key: 'sync.companies', area: 'Tally sync', label: 'Turn company sync on or off',

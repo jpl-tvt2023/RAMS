@@ -1,7 +1,8 @@
 import {
   LayoutDashboard, Settings, Users, ScrollText, Building2, Link2, ListChecks, SlidersHorizontal, BookUser, ShieldCheck, LifeBuoy, PenLine,
-  FileText, Receipt, ArrowLeftRight, Wallet, AlertTriangle, Activity, BarChart3,
+  FileText, Receipt, ArrowLeftRight, Wallet, AlertTriangle, Activity, BarChart3, IndianRupee, BookOpen,
 } from 'lucide-react';
+import { isReleased } from './releases';
 
 // The RAMS role set. MIRRORED in backend/src/middleware/rbac.js and in
 // migration 002's CHECK -- change all three together; utils/__tests__/roles.test.js
@@ -38,6 +39,9 @@ export const PERM = {
   AUTOFILL_SETTINGS: 'autofill.settings',
   REPORTS_VIEW: 'reports.view',
   REPORTS_SETTINGS: 'reports.settings',
+  LEDGERS_VIEW: 'ledgers.view',
+  LEDGERS_ENTRY: 'ledgers.entry',
+  LEDGERS_SETTINGS: 'ledgers.settings',
   SYNC_COMPANIES: 'sync.companies',
   SYNC_SCHEDULE: 'sync.schedule',
   SYNC_RUN: 'sync.run',
@@ -48,10 +52,14 @@ export const PERM = {
  * roles | permission } or a GROUP { label, icon, children: [leaf, ...] }; a
  * group with no child the user may see disappears. `permission` (a key, or a
  * list where any one is enough) follows Admin -> Roles & permissions; `roles`
- * is fixed. The Phase 1 screens join here as each is built, each with a Help
- * section (src/help).
+ * is fixed. Each screen comes with a Help section (src/help). A screen still
+ * held (utils/releases.js) is left out, and a group left empty with it.
  */
-export const NAV = [
+const withoutHeld = (entries) => entries
+  .map((e) => (e.children ? { ...e, children: e.children.filter((c) => isReleased(c.path)) } : e))
+  .filter((e) => (e.children ? e.children.length > 0 : isReleased(e.path)));
+
+export const NAV = withoutHeld([
   {
     label: 'Dashboard',
     path: '/dashboard',
@@ -97,6 +105,9 @@ export const NAV = [
     icon: BarChart3,
     children: [
       {
+        label: 'Debtors', path: '/reports/debtors', icon: IndianRupee, description: 'What each invoice still owes, by marketplace', permission: PERM.REPORTS_VIEW,
+      },
+      {
         label: 'Invoices', path: '/reports/invoices', icon: FileText, description: 'Every Tally sales invoice, what settled it and what is owed', permission: PERM.REPORTS_VIEW,
       },
       {
@@ -115,6 +126,13 @@ export const NAV = [
         label: 'Sync health', path: '/sync', icon: Activity, description: 'The Connector, Tally, each company and every sync run', roles: ALL_ROLES,
       },
     ],
+  },
+  {
+    label: 'Ledgers',
+    path: '/ledgers',
+    icon: BookOpen,
+    description: 'A party’s day, entered here and checked against Tally',
+    permission: PERM.LEDGERS_VIEW,
   },
   {
     label: 'Admin',
@@ -156,4 +174,4 @@ export const NAV = [
     icon: LifeBuoy,
     roles: ALL_ROLES,
   },
-];
+]);

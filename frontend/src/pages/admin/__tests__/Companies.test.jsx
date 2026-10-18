@@ -59,12 +59,30 @@ describe('Tally companies page', () => {
     expect(companiesApi.updateCompany).toHaveBeenCalledWith(1, { code: 'MH1' });
   });
 
+  test('the star makes a synced company the default the reports open on', async () => {
+    companiesApi.listCompanies.mockResolvedValue([
+      row({ is_default: true }),
+      row({ id: 2, guid: 'b1', name: 'Roymax Products LLP ( Haryana )', code: 'HR' }),
+      row({ id: 3, guid: 'c1', name: 'Test Company', code: 'T1', sync_enabled: false }),
+    ]);
+    companiesApi.updateCompany.mockResolvedValue({});
+    renderWithProviders(<Companies />, { user: ADMIN });
+    const mh = (await screen.findByText('Roymax Products LLP ( Maharashtra )')).closest('tr');
+    expect(within(mh).getByText('Default for reports')).toBeInTheDocument();
+    expect(within(mh).queryByRole('button', { name: /default for reports/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Make Test Company the default for reports' })).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Make Roymax Products LLP ( Haryana ) the default for reports' }));
+    expect(companiesApi.updateCompany).toHaveBeenCalledWith(2, { is_default: true });
+  });
+
   test('buttons follow the permissions: a Viewer only looks; an Accountant granted the schedule may edit only that', async () => {
     companiesApi.listCompanies.mockResolvedValue([row()]);
     renderWithProviders(<Companies />, { user: VIEWER });
     expect(await screen.findByText('Roymax Products LLP ( Maharashtra )')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Turn sync/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Edit code for/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /default for reports/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Edit$/ })).not.toBeInTheDocument();
   });
 

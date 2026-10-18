@@ -4,11 +4,11 @@ const {
   loadBook, loadSettings, receivables: receivablesOf, daysBetween,
 } = require('../books/book');
 
-// Reports: Invoices, Credit & debit notes, Stock transfers, Receivables and
-// Exceptions, worked out at read time from the Tally copy (src/books/book.js).
-// Every list filters by company (or all companies, consolidated) and pages.
-// Seeing them is reports.view; credit terms and exception days are
-// reports.settings (audited).
+// Reports: Debtors, Invoices, Credit & debit notes, Stock transfers,
+// Receivables and Exceptions, worked out at read time from the Tally copy
+// (src/books/book.js). Every list filters by company (or all companies,
+// consolidated) and pages. Seeing them is reports.view; credit terms and
+// exception days are reports.settings (audited).
 
 const PAGE_SIZE = 50;
 const PAGE_SIZE_MAX = 10000; // a CSV download asks for everything at once
@@ -28,12 +28,92 @@ const paged = (list, q, extra = {}) => {
     rows: list.slice((page - 1) * pageSize, page * pageSize), total: list.length, page, page_size: pageSize, ...extra,
   };
 };
-const companyOf = (q) => (q.company_id ? Number(q.company_id) : null);
+// company_id=default is the company set as the default on Admin -> Tally
+// companies (all companies when none is).
+const companyOf = (q, book) => {
+  if (q.company_id === 'default') return book?.companies.find((c) => c.is_default)?.id ?? null;
+  return q.company_id ? Number(q.company_id) : null;
+};
 const matches = (q, ...values) => {
   const s = String(q || '').trim().toLowerCase();
   return !s || values.some((v) => v != null && String(v).toLowerCase().includes(s));
 };
 const sum = (list, k) => list.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+
+// ------------------------------------------------------------ debtors
+
+// GET /api/reports/debtors?company_id|default&vendor&status&q&page&page_size --
+// each invoice with its internal (ROMS) and vendor PO numbers, total, credit
+// notes and what is still owed, a tab per marketplace. vendor '-' = no
+// marketplace known. Stock transfers are left out.
+async function debtors(req, res, next) {
+  try {
+    const q = req.query;
+    if (q.status && !INVOICE_STATUSES.includes(q.status)) throw fail(400, 'Unknown status');
+    const [book, active] = await Promise.all([loadBook(db), rowsOf('SELECT name FROM roms_vendors WHERE is_active = 1')]);
+    const companyId = companyOf(q, book);
+    const base = book.invoices.filter((i) => !i.internal
+      && (!companyId || i.company_id === companyId)
+      && (!q.status || (q.status === 'no_po' ? !i.pos.length : i.status === q.status))
+      && matches(q.q, i.number, i.party, ...i.pos, ...i.vendor_pos));
+
+    // The tabs count everything the other filters let through.
+    const counts = new Map(active.map((v) => [v.name, 0]));
+    let unknown = 0;
+    for (const i of base) {
+      if (i.vendor) counts.set(i.vendor, (counts.get(i.vendor) || 0) + 1);
+      else unknown += 1;
+    }
+    const tabs = [...counts].map(([vendor, count]) => ({ vendor, count })).sort((a, b) => a.vendor.localeCompare(b.vendor));
+
+    const list = base
+      .filter((i) => !q.vendor || (q.vendor === '-' ? !i.vendor : i.vendor === q.vendor))
+      .sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number));
+    const totals = {
+      invoices: list.length,
+      total_paise: sum(list, 'total_paise'),
+      credit_notes_paise: sum(list, 'credit_notes_paise'),
+      outstanding_paise: list.reduce((a, i) => a + Math.max(0, i.outstanding_paise || 0), 0),
+      overdue_paise: list.filter((i) => i.status === 'overdue').reduce((a, i) => a + i.outstanding_paise, 0),
+    };
+    const page = paged(list, q, {
+      totals, tabs, unknown, all: base.length, companies: book.companies, company_id: companyId, as_of: book.today,
+    });
+
+    // The RTV row each credit note on this page was linked to, if any.
+    const cnsOf = (i) => i.settled_by.filter((s) => s.as === 'credit_notes');
+    const guids = [...new Set(page.rows.flatMap((i) => cnsOf(i).map((s) => s.guid)))];
+    const rtvOf = new Map();
+    if (guids.length) {
+      const links = await rowsOf(`SELECT d.company_id, d.voucher_guid, t.rtv_no FROM doc_links d
+                                    JOIN roms_rtv t ON t.id = CAST(d.target_id AS INTEGER)
+                                   WHERE d.target_kind = 'rtv' AND d.status IN ('auto','confirmed')
+                                     AND d.voucher_guid IN (${guids.map(() => '?').join(',')})`, guids);
+      for (const l of links) rtvOf.set(`${Number(l.company_id)}|${l.voucher_guid}`, l.rtv_no);
+    }
+    page.rows = page.rows.map((i) => ({
+      company_id: i.company_id,
+      company: i.company,
+      guid: i.guid,
+      number: i.number,
+      date: i.date,
+      party: i.party,
+      vendor: i.vendor,
+      pos: i.pos,
+      vendor_pos: i.vendor_pos,
+      total_paise: i.total_paise,
+      credit_notes_paise: i.credit_notes_paise,
+      credit_notes: cnsOf(i).map((s) => ({
+        guid: s.guid, number: s.number, date: s.date, voucher_type: s.voucher_type, amount_paise: s.amount_paise, rtv_no: rtvOf.get(`${i.company_id}|${s.guid}`) || null,
+      })),
+      outstanding_paise: i.outstanding_paise,
+      status: i.status,
+      due_date: i.due_date,
+      overdue_days: i.overdue_days,
+    }));
+    res.json(page);
+  } catch (err) { sendError(res, next, err); }
+}
 
 // ------------------------------------------------------------ invoices
 
@@ -334,5 +414,5 @@ async function updateTerms(req, res, next) {
 }
 
 module.exports = {
-  invoices, notes, transfers, receivables, exceptions, getSettings, updateSettings, updateTerms,
+  debtors, invoices, notes, transfers, receivables, exceptions, getSettings, updateSettings, updateTerms,
 };

@@ -27,8 +27,8 @@ export const ADMIN = { id: 1, name: 'Keshav', username: 'admin', roles: ['Admin'
 export const ACCOUNTANT = {
   id: 3, name: 'Asha', username: 'asha', roles: ['Accountant'],
   permissions: ['matching.view', 'matching.run', 'matching.review', 'matching.rules', 'matching.parties', 'autofill.view', 'autofill.approve',
-    'reports.view', 'reports.settings', 'sync.run'],
+    'reports.view', 'reports.settings', 'ledgers.view', 'ledgers.entry', 'sync.run'],
 };
 export const VIEWER = {
-  id: 4, name: 'Vik', username: 'vik', roles: ['Viewer'], permissions: ['matching.view', 'autofill.view', 'reports.view'],
+  id: 4, name: 'Vik', username: 'vik', roles: ['Viewer'], permissions: ['matching.view', 'autofill.view', 'reports.view', 'ledgers.view'],
 };

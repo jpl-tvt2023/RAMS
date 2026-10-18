@@ -72,7 +72,7 @@ function groupChains(groups) {
 }
 
 async function loadBook(client, { today = todayIst() } = {}) {
-  const companies = await rowsOf(client, 'SELECT id, code, name FROM tally_companies WHERE sync_enabled = 1');
+  const companies = await rowsOf(client, 'SELECT id, code, name, is_default FROM tally_companies WHERE sync_enabled = 1');
   const ids = companies.map((c) => Number(c.id));
   const inCompanies = ids.length ? `IN (${ids.join(',')})` : 'IN (NULL)';
   const live = `v.deleted_at IS NULL AND v.is_cancelled = 0 AND v.is_optional = 0 AND v.company_id ${inCompanies} AND v.date >= ?`;
@@ -89,7 +89,7 @@ async function loadBook(client, { today = todayIst() } = {}) {
     rowsOf(client, `SELECT company_id, name, parent, reserved_name FROM tally_groups WHERE deleted_at IS NULL AND company_id ${inCompanies}`),
     rowsOf(client, `SELECT company_id, guid, name, parent FROM tally_ledgers WHERE deleted_at IS NULL AND company_id ${inCompanies}`),
     rowsOf(client, 'SELECT company_id, ledger_guid, kind, vendor, source, suggested_vendor FROM party_ledgers'),
-    rowsOf(client, `SELECT d.target_id AS po_id, d.company_id, d.voucher_guid, p.vendor FROM doc_links d LEFT JOIN roms_pos p ON p.po_id = d.target_id
+    rowsOf(client, `SELECT d.target_id AS po_id, d.company_id, d.voucher_guid, p.vendor, p.vendor_po_id FROM doc_links d LEFT JOIN roms_pos p ON p.po_id = d.target_id
                      WHERE d.target_kind = 'po' AND d.status IN ('auto','confirmed')`),
     rowsOf(client, "SELECT po_id, outcome FROM match_results WHERE target_kind = 'po'"),
   ]);
@@ -107,7 +107,7 @@ async function loadBook(client, { today = todayIst() } = {}) {
   for (const l of links) {
     const k = `${Number(l.company_id)}|${l.voucher_guid}`;
     if (!posOf.has(k)) posOf.set(k, []);
-    if (outcomeOf.get(l.po_id) === 'linked') posOf.get(k).push({ po_id: l.po_id, vendor: l.vendor });
+    if (outcomeOf.get(l.po_id) === 'linked') posOf.get(k).push({ po_id: l.po_id, vendor: l.vendor, vendor_po_id: l.vendor_po_id });
   }
 
   const byId = new Map(vouchers.map((v) => [Number(v.id), v]));
@@ -179,7 +179,7 @@ async function loadBook(client, { today = todayIst() } = {}) {
           const field = bt === 'Receipt' ? 'received' : bt === 'Credit Note' ? 'credit_notes' : bt === 'Journal' && isTdsJournal.has(Number(a.voucher.id)) ? 'tds' : 'adjustments';
           settled[field] += a.amount;
           settledBy.push({
-            base_type: bt, voucher_type: a.voucher.voucher_type, number: a.voucher.number, date: a.voucher.date, amount_paise: a.amount, as: field,
+            guid: a.voucher.guid, base_type: bt, voucher_type: a.voucher.voucher_type, number: a.voucher.number, date: a.voucher.date, amount_paise: a.amount, as: field,
           });
         }
       }
@@ -211,6 +211,7 @@ async function loadBook(client, { today = todayIst() } = {}) {
       vendor_from: vendorFrom,
       internal,
       pos: pos.map((p) => p.po_id),
+      vendor_pos: [...new Set(pos.map((p) => String(p.vendor_po_id || '').trim()).filter(Boolean))],
       bills: names,
       total_paise: total,
       taxable_paise: taxable,
@@ -241,7 +242,7 @@ async function loadBook(client, { today = todayIst() } = {}) {
   }
 
   return {
-    today, settings, companies: companies.map((c) => ({ id: Number(c.id), code: c.code, name: c.name })), invoices, unallocated, vouchers, bills, byId,
+    today, settings, companies: companies.map((c) => ({ id: Number(c.id), code: c.code, name: c.name, is_default: Boolean(c.is_default) })), invoices, unallocated, vouchers, bills, byId,
   };
 }
 

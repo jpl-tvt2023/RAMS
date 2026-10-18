@@ -15,12 +15,14 @@ import MatchReview from './pages/matching/MatchReview';
 import MatchingRules from './pages/matching/MatchingRules';
 import PartyLedgers from './pages/matching/PartyLedgers';
 import AutoFill from './pages/matching/AutoFill';
+import Debtors from './pages/reports/Debtors';
 import Invoices from './pages/reports/Invoices';
 import Notes from './pages/reports/Notes';
 import Transfers from './pages/reports/Transfers';
 import Receivables from './pages/reports/Receivables';
 import Exceptions from './pages/reports/Exceptions';
 import SyncHealth from './pages/reports/SyncHealth';
+import Ledgers from './pages/ledgers/Ledgers';
 import Help from './pages/Help';
 import { ALL_ROLES, ADMIN_ONLY, PERM } from './utils/roles';
 
@@ -53,11 +55,13 @@ export default function App() {
           <Route path="/matching/rules" element={<ProtectedRoute permission={PERM.MATCHING_VIEW}><MatchingRules /></ProtectedRoute>} />
           <Route path="/matching/parties" element={<ProtectedRoute permission={PERM.MATCHING_VIEW}><PartyLedgers /></ProtectedRoute>} />
           <Route path="/matching/autofill" element={<ProtectedRoute permission={PERM.AUTOFILL_VIEW}><AutoFill /></ProtectedRoute>} />
+          <Route path="/reports/debtors" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Debtors /></ProtectedRoute>} />
           <Route path="/reports/invoices" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Invoices /></ProtectedRoute>} />
           <Route path="/reports/notes" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Notes /></ProtectedRoute>} />
           <Route path="/reports/transfers" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Transfers /></ProtectedRoute>} />
           <Route path="/reports/receivables" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Receivables /></ProtectedRoute>} />
           <Route path="/reports/exceptions" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Exceptions /></ProtectedRoute>} />
+          <Route path="/ledgers" element={<ProtectedRoute permission={PERM.LEDGERS_VIEW}><Ledgers /></ProtectedRoute>} />
           <Route path="/sync" element={<ProtectedRoute roles={ALL_ROLES}><SyncHealth /></ProtectedRoute>} />
           <Route path="/help" element={<ProtectedRoute roles={ALL_ROLES}><Help /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

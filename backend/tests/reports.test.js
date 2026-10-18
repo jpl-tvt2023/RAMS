@@ -14,7 +14,7 @@ const { groupChains, receivables } = require('../src/books/book');
 // filters on this suite's company.
 const get = (token, path) => bearer(request(app).get(`/api/reports${path}`), token);
 
-let admin; let accountant; let viewer; let agent; let roms; let company; let q;
+let admin; let accountant; let viewer; let agent; let roms; let company; let q; let oldDefault;
 
 const party = 'RP BLINK COMMERCE (PUNE)';
 const lines = (amount, extra = []) => [
@@ -104,11 +104,55 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (oldDefault !== undefined) { // the Debtors default-company test moved it
+    await db.execute('UPDATE tally_companies SET is_default = 0');
+    if (oldDefault) await db.execute({ sql: 'UPDATE tally_companies SET is_default = 1 WHERE id = ?', args: [oldDefault] });
+  }
   delete process.env.ROMS_API_URL;
   delete process.env.ROMS_INTEGRATION_TOKEN;
   await roms.close();
   await db.execute('DELETE FROM sync_requests WHERE done_at IS NULL');
   await db.execute("UPDATE report_settings SET default_credit_days = 30, exception_days = 15 WHERE id = 1");
+});
+
+describe('Debtors', () => {
+  test('each invoice with its internal and vendor PO numbers, total, credit notes and what is still owed', async () => {
+    const res = await get(viewer.token, `/debtors?${q}&page_size=100`);
+    expect(res.status).toBe(200);
+    const by = Object.fromEntries(res.body.rows.map((r) => [r.number, r]));
+    expect(by['901/RP/26-27']).toMatchObject({
+      vendor: 'Blinkit', pos: ['RP1'], vendor_pos: ['RPPO-1'], total_paise: 1000000, credit_notes_paise: 100000, outstanding_paise: 490000,
+      credit_notes: [expect.objectContaining({ number: '1501', voucher_type: 'Credit Note', date: '2026-07-20', amount_paise: 100000, rtv_no: null })],
+    });
+    expect(by['902/RP/26-27']).toMatchObject({ pos: [], vendor_pos: [], credit_notes: [], outstanding_paise: 500000 });
+    expect(by['904/RP/26-27']).toBeUndefined(); // a stock transfer
+    expect(res.body.totals).toMatchObject({ invoices: 3, total_paise: 1700000, credit_notes_paise: 100000, outstanding_paise: 990000 });
+  });
+
+  test('a tab per marketplace, counted before the marketplace filter', async () => {
+    const res = await get(viewer.token, `/debtors?${q}&vendor=Blinkit&status=no_po`);
+    expect(res.body.tabs).toContainEqual({ vendor: 'Blinkit', count: 2 });
+    expect(res.body).toMatchObject({ all: 2, unknown: 0 });
+    expect(res.body.rows.map((r) => r.number).sort()).toEqual(['902/RP/26-27', '903/RP/26-27']);
+    expect((await get(viewer.token, `/debtors?${q}&vendor=-`)).body.rows).toEqual([]);
+  });
+
+  test('search by internal or vendor PO number; an unknown status is refused', async () => {
+    expect((await get(viewer.token, `/debtors?${q}&q=RPPO-1`)).body.rows.map((r) => r.number)).toEqual(['901/RP/26-27']);
+    expect((await get(viewer.token, `/debtors?${q}&q=RP1`)).body.rows.map((r) => r.number)).toEqual(['901/RP/26-27']);
+    expect((await get(viewer.token, `/debtors?${q}&status=paid`)).status).toBe(400);
+  });
+
+  test('company_id=default opens on the company set as the default on Tally companies', async () => {
+    const { rows: [was] } = await db.execute('SELECT id FROM tally_companies WHERE is_default = 1');
+    oldDefault = was ? Number(was.id) : null;
+    expect((await bearer(request(app).patch(`/api/companies/${company.id}`), admin.token).send({ is_default: true })).status).toBe(200);
+    const res = await get(viewer.token, '/debtors?company_id=default');
+    expect(res.body.company_id).toBe(company.id);
+    expect(res.body.companies.find((c) => c.id === company.id).is_default).toBe(true);
+    expect(res.body.rows.every((r) => r.company_id === company.id)).toBe(true);
+    expect((await get(viewer.token, '/debtors?company_id=')).body.company_id).toBeNull();
+  });
 });
 
 describe('Invoices', () => {
