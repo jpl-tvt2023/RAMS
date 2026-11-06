@@ -6,8 +6,11 @@
 // amounts the other way round (negative is a debit), so a voucher's effect on
 // the party is minus the sum of its lines on the party ledger.
 //
-//   starting balance  the party's balance at the start of RAMS_SYNC_FROM:
-//                     loaded by a script (ledger_openings), else the
+//   starting balance  the party's balance at the start of RAMS_SYNC_FROM,
+//                     from the first of: Tally's closing balance (read by
+//                     the Connector at the end of each sync, as at the end of
+//                     the sync window) less every mirrored voucher up to it,
+//                     a figure loaded by a script (ledger_openings), the
 //                     placeholder in ledger_settings (10,000 rupees)
 //   opening on D      starting balance + every mirrored voucher on the party
 //                     dated before D. With a placeholder only the level is a
@@ -235,8 +238,29 @@ async function partyEntries(client, companyId, ledgerGuid) {
      ORDER BY e.date, e.id`, [companyId, ledgerGuid]);
 }
 
-// The balance at the start of RAMS_SYNC_FROM: loaded, else the placeholder.
-async function startingBalance(client, companyId, ledgerGuid, settings) {
+// The party's balance in Tally, if the company's latest run that ended ok
+// sent one: then it covers exactly the vouchers RAMS holds. A voucher deleted
+// in Tally since the last end-of-day check is the exception -- it moves the
+// level (not the check) until that check marks it.
+async function tallyBalanceOf(client, companyId, ledgerGuid) {
+  const [r] = await rowsOf(client, `
+    SELECT closing_paise, as_of, pulled_at FROM tally_ledger_balances
+     WHERE company_id = ? AND ledger_guid = ?
+       AND run_id = (SELECT MAX(id) FROM tally_sync_runs WHERE company_id = ? AND status = 'ok')`, [companyId, ledgerGuid, companyId]);
+  return r ?? null;
+}
+
+// The balance at the start of RAMS_SYNC_FROM: Tally's balance less the
+// party's mirrored vouchers up to its date, else loaded, else the
+// placeholder. `vouchers` is partyVouchers().
+async function startingBalance(client, companyId, ledgerGuid, settings, vouchers) {
+  const t = await tallyBalanceOf(client, companyId, ledgerGuid);
+  if (t) {
+    const since = vouchers.reduce((a, v) => (v.date <= t.as_of ? a + v.effect_paise : a), 0);
+    return {
+      paise: -n(t.closing_paise) - since, source: 'tally', loaded_at: t.pulled_at, as_of: t.as_of,
+    };
+  }
   const [r] = await rowsOf(client, 'SELECT amount_paise, loaded_at FROM ledger_openings WHERE company_id = ? AND ledger_guid = ?', [companyId, ledgerGuid]);
   if (r) return { paise: n(r.amount_paise), source: 'loaded', loaded_at: r.loaded_at };
   return { paise: settings.default_opening_paise, source: 'placeholder', loaded_at: null };
@@ -260,12 +284,12 @@ async function dayOf(client, {
   const party = await partyOf(client, companyId, ledgerGuid);
   if (!party) return null;
   const settings = await loadSettings(client);
-  const [vouchers, entries, start, asOf] = await Promise.all([
+  const [vouchers, entries, asOf] = await Promise.all([
     partyVouchers(client, companyId, party.name),
     partyEntries(client, companyId, ledgerGuid),
-    startingBalance(client, companyId, ledgerGuid, settings),
     asOfFor(client, companyId),
   ]);
+  const start = await startingBalance(client, companyId, ledgerGuid, settings, vouchers);
   const opening = openingOn(start, vouchers, date);
   const startedOn = entries[0]?.date ?? null;
   return {
@@ -274,7 +298,9 @@ async function dayOf(client, {
     today,
     sync_from: SYNC_FROM,
     as_of: asOf,
-    start: { paise: start.paise, source: start.source, loaded_at: start.loaded_at },
+    start: {
+      paise: start.paise, source: start.source, loaded_at: start.loaded_at, as_of: start.as_of ?? null,
+    },
     opening_paise: opening,
     started_on: startedOn,
     settings: { grace_days: settings.grace_days, amount_tolerance_paise: settings.amount_tolerance_paise },
@@ -294,11 +320,11 @@ async function flagsOf(client, companyId, { today = todayIst() } = {}) {
   for (const { ledger_guid: guid } of tracked) {
     const party = await partyOf(client, companyId, guid);
     if (!party) continue;
-    const [vouchers, entries, start] = await Promise.all([
+    const [vouchers, entries] = await Promise.all([
       partyVouchers(client, companyId, party.name),
       partyEntries(client, companyId, guid),
-      startingBalance(client, companyId, guid, settings),
     ]);
+    const start = await startingBalance(client, companyId, guid, settings, vouchers);
     const startedOn = entries[0]?.date ?? null;
     const dates = [...new Set([...entries.map((e) => e.date), ...vouchers.map((v) => v.date)])]
       .filter((d) => startedOn && d >= startedOn && d <= today)

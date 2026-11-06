@@ -271,6 +271,16 @@ function voucherListFrom(tree) {
   })).filter((v) => v.guid);
 }
 
+// Every ledger's closing balance: { guid, name, closing } in rupees, Tally's
+// way round (negative is a debit). Tally leaves a nil balance empty.
+function balancesFrom(tree) {
+  return findAll(tree, 'LEDGER').map((l) => ({
+    guid: txt(l.GUID),
+    name: field(l, 'NAME') || names(l)[0] || '',
+    closing: num(l.CLOSINGBALANCE) ?? 0,
+  })).filter((b) => b.guid);
+}
+
 // The licence check (requests.js sysInfoRequest): { educational, licensed },
 // each true / false / null when Tally left it blank. Educational mode also
 // gives itself away by swapping the 15th it was asked to echo.
@@ -287,5 +297,5 @@ function sysInfoFrom(tree, { probeDay = 15 } = {}) {
 module.exports = {
   GSTIN_RE, panOf, BASE_TYPES, BLANKISH, present,
   companiesFrom, groupsFrom, voucherTypesFrom, ledgersFrom, stockItemsFrom,
-  baseTypeResolver, groupResolver, voucherFrom, vouchersFrom, docFieldsOf, voucherListFrom, sysInfoFrom,
+  baseTypeResolver, groupResolver, voucherFrom, vouchersFrom, docFieldsOf, voucherListFrom, balancesFrom, sysInfoFrom,
 };

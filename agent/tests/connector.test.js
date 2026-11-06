@@ -290,7 +290,8 @@ describe('sync --dry-run', () => {
         kind: 'backfill', syncFrom: '2026-04-01', today: '2026-10-05',
       });
       expect(result.ok).toBe(true);
-      expect(fs.readdirSync(outDir).sort()).toEqual(['mh-masters.json', 'mh-reconcile.json', 'mh-start.json', 'mh-vouchers.jsonl']);
+      expect(fs.readdirSync(outDir).sort()).toEqual(['mh-balances.json', 'mh-masters.json', 'mh-reconcile.json', 'mh-start.json', 'mh-vouchers.jsonl']);
+      expect(JSON.parse(fs.readFileSync(path.join(outDir, 'mh-balances.json'), 'utf8'))).toMatchObject({ asOf: '2027-03-31', ledgers: expect.any(Array) });
       const vouchers = fs.readFileSync(path.join(outDir, 'mh-vouchers.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
       expect(vouchers).toHaveLength(mh.vouchers.filter((v) => v.date >= '2026-04-01').length);
       expect(vouchers[0]).not.toHaveProperty('docFields');

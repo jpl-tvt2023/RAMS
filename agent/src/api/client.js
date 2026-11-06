@@ -61,6 +61,7 @@ function createApiClient({
     masters: (runId, body) => post(`/runs/${runId}/masters`, body),
     vouchers: (runId, vouchers) => post(`/runs/${runId}/vouchers`, { vouchers }),
     reconcile: (runId, body) => post(`/runs/${runId}/reconcile`, body),
+    balances: (runId, body) => post(`/runs/${runId}/balances`, body),
     // The matching run a heartbeat asked for (RAMS reads ROMS and matches).
     // One already running there is fine: it is the same work.
     async match() {

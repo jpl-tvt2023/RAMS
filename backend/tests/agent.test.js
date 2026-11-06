@@ -312,6 +312,48 @@ describe('POST /api/agent/runs/:id/reconcile', () => {
   });
 });
 
+describe('POST /api/agent/runs/:id/balances', () => {
+  const balancesOf = (companyId) => all('SELECT ledger_guid, as_of, closing_paise, run_id FROM tally_ledger_balances WHERE company_id = ? ORDER BY ledger_guid', [companyId]);
+
+  test("stores each ledger's closing in paise, and the next list replaces this company's only", async () => {
+    const [c, other] = await enabledCompanies(agent, admin, [tallyCompany(), tallyCompany()]);
+    const otherRun = await startRun(agent, other.id, 'backfill');
+    await agentPost(agent.token, `/runs/${otherRun}/balances`, { asOf: '2027-03-31', ledgers: [{ guid: 'O1', closing: 5 }] });
+
+    let run = await startRun(agent, c.id, 'backfill');
+    const res = await agentPost(agent.token, `/runs/${run}/balances`, {
+      asOf: '2027-03-31',
+      ledgers: [{ guid: 'L1', closing: -1180.5 }, { guid: 'L2', closing: '250.25' }, { guid: 'L3', closing: 0 }],
+    });
+    expect(res.body).toEqual({ stored: 3 });
+    expect(await balancesOf(c.id)).toEqual([
+      { ledger_guid: 'L1', as_of: '2027-03-31', closing_paise: -118050, run_id: run },
+      { ledger_guid: 'L2', as_of: '2027-03-31', closing_paise: 25025, run_id: run },
+      { ledger_guid: 'L3', as_of: '2027-03-31', closing_paise: 0, run_id: run },
+    ]);
+    await agentPost(agent.token, `/runs/${run}/reconcile`, { from: '2026-07-01', to: '2026-07-31', vouchers: [] });
+    await agentPost(agent.token, `/runs/${run}/finish`, { ok: true, backfillDone: true });
+
+    // A ledger gone from Tally's list is gone from RAMS's.
+    run = await startRun(agent, c.id, 'light');
+    await agentPost(agent.token, `/runs/${run}/balances`, { asOf: '2027-03-31', ledgers: [{ guid: 'L2', closing: 300 }] });
+    expect(await balancesOf(c.id)).toEqual([{ ledger_guid: 'L2', as_of: '2027-03-31', closing_paise: 30000, run_id: run }]);
+    expect(await balancesOf(other.id)).toHaveLength(1);
+  });
+
+  test('refuses a bad date, an empty list, a ledger without its GUID or balance, and a finished run', async () => {
+    const [c] = await enabledCompanies(agent, admin, [tallyCompany()]);
+    const run = await startRun(agent, c.id, 'backfill');
+    const send = (body) => agentPost(agent.token, `/runs/${run}/balances`, body);
+    expect((await send({ asOf: '31-03-2027', ledgers: [{ guid: 'L1', closing: 1 }] })).status).toBe(400);
+    expect((await send({ asOf: '2027-03-31', ledgers: [] })).status).toBe(400);
+    expect((await send({ asOf: '2027-03-31', ledgers: [{ closing: 1 }] })).status).toBe(400);
+    expect((await send({ asOf: '2027-03-31', ledgers: [{ guid: 'L1', closing: 'Dr' }] })).status).toBe(400);
+    await agentPost(agent.token, `/runs/${run}/finish`, { ok: false });
+    expect((await send({ asOf: '2027-03-31', ledgers: [{ guid: 'L1', closing: 1 }] })).status).toBe(409);
+  });
+});
+
 describe('POST /api/agent/runs/:id/finish', () => {
   test('the watermarks move only when a run ends ok, to the counters it started with', async () => {
     const [c] = await enabledCompanies(agent, admin, [tallyCompany()]);
