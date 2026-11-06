@@ -25,9 +25,10 @@ function syntheticAnswer(dataset, body) {
   if (dataset.failWhen && dataset.failWhen(d)) return xml.errorXml(`Mock Tally was told to fail ${d.id} ${d.from}…${d.to}`);
   if (/^collection$/i.test(d.type) && /compan/i.test(d.id)) return xml.companiesXml(dataset.companies);
   if (/^rams sysinfo$/i.test(d.id)) return xml.sysInfoXml(dataset.companies, { educational: Boolean(dataset.educational), from: d.from });
-  if (!/^(list of accounts|daybook|day book|rams vouchers|rams changed vouchers|rams voucher list)$/i.test(d.id)) return UNKNOWN;
+  if (!/^(list of accounts|daybook|day book|rams vouchers|rams changed vouchers|rams voucher list|rams ledger balances)$/i.test(d.id)) return UNKNOWN;
   const company = dataset.companies.find((c) => c.name.toLowerCase() === d.company.toLowerCase());
   if (!company) return xml.errorXml(`Could not set 'SVCurrentCompany' to '${d.company}'`);
+  if (/^rams ledger balances$/i.test(d.id)) return xml.balancesXml(company, d.to);
   // The voucher collections hold the same VOUCHER objects as a Day Book.
   return /list of accounts/i.test(d.id)
     ? xml.mastersXml(company, d.accountType)

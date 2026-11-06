@@ -11,11 +11,17 @@
 //             month, so an interrupted backfill resumes after it
 //   resync    the same from the start, after a restore or a rename
 //
+// Every kind ends with Tally's closing balance of each ledger as at the end of
+// the window, which the Ledgers page starts each party's balance from. Not
+// getting them is logged, never a failed sync.
+//
 // RAMS moves the watermarks only when the run finishes ok, to the counters
 // Tally had when it started (backend controllers/agent.controller.js).
 const { periods, parseIso } = require('../util');
 const { baseTypeResolver } = require('../tally/normalize');
-const { pullMasters, pullPeriod, pullVoucherList } = require('../tally/pull');
+const {
+  pullMasters, pullPeriod, pullVoucherList, pullBalances,
+} = require('../tally/pull');
 
 // An AlterID gap above this is fetched month by month: one big filtered
 // request was ~2x slower on TallyPrime 7.1 (2,307 vouchers: 141 s vs 77 s).
@@ -49,7 +55,9 @@ async function syncCompany({
   if (!KINDS.includes(kind)) throw new Error(`Unknown sync kind ${kind}`);
   const window = syncWindow(syncFrom, today);
   const label = company.code || company.name;
-  const counts = { vouchers: 0, skipped: 0, deleted: 0, masters: 0, months: 0, repulled: 0 };
+  const counts = {
+    vouchers: 0, skipped: 0, deleted: 0, masters: 0, months: 0, repulled: 0, balances: 0,
+  };
   const errors = [];
 
   const started = await api.startRun({ company_id: company.id, kind, altVchId: live.altVchId, altMstId: live.altMstId });
@@ -113,6 +121,19 @@ async function syncCompany({
     counts.months += 1;
   };
 
+  // Last, so they cover every voucher this run stored. RAMS uses them only
+  // from a run that ended ok.
+  const balances = async () => {
+    try {
+      const list = await pullBalances(tally, live, { from: window.from, asOf: window.to });
+      const res = await api.balances(runId, { asOf: window.to, ledgers: list });
+      counts.balances = res.stored || 0;
+    } catch (e) {
+      if (e.code === 'UNREACHABLE') throw e;
+      log(`${label}: ledger balances not read (${e.message}); Ledgers opens on the placeholder until a sync brings them`);
+    }
+  };
+
   try {
     if (kind === 'light' || kind === 'heavy') {
       if (live.altVchId < sync.altVchId || live.altMstId < sync.altMstId) {
@@ -138,11 +159,13 @@ async function syncCompany({
       }
     }
 
+    if (!errors.length) await balances();
+
     const ok = errors.length === 0;
     const backfillDone = ok && (kind === 'backfill' || kind === 'resync');
     const fin = await api.finish(runId, { ok, errors, backfillDone });
     log(`${label}: ${kind} sync ${ok ? 'finished' : 'FAILED'} — ${counts.vouchers} vouchers stored, `
-      + `${counts.deleted} deleted, ${counts.masters} masters${errors.length ? `; ${errors.join('; ')}` : ''}`);
+      + `${counts.deleted} deleted, ${counts.masters} masters, ${counts.balances} balances${errors.length ? `; ${errors.join('; ')}` : ''}`);
     return { ok, runId, kind, counts, errors, sync: fin.sync };
   } catch (e) {
     errors.push(e.message);

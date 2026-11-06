@@ -27,18 +27,16 @@ This takes RAMS from the test setup to production, step by step. It also covers 
 4. **The Flipkart / Amazon stock-transfer linking key** is still open.
    - Until it's decided, those vendors stay *Stock transfer — not matched* (Matching rules → Vendors).
 5. **Vercel region (done):** both projects are set to Mumbai (bom1).
-6. **Ledgers: where the real opening balances come from.** Until they are loaded, each party starts on a **₹10,000 placeholder** on 8 June 2026, carried forward by Tally's vouchers. The screen marks it *Placeholder, not from Tally*. The day's check doesn't depend on it.
-   - Decide the source: Tally's party balances as at 7 June 2026, or a sheet.
-   - The maintainer then loads them with a script into `ledger_openings`. That script isn't written yet.
    - RAMS production runs there since the M7 deploy (PR #9, 2026-10-06).
    - ROMS production moves there on its next production deploy.
+6. **Ledgers openings (settled):** Connector 0.6.0 reads every ledger's balance from Tally at the end of each sync (migration 017 holds them), and Ledgers starts each party from it. The ₹10,000 placeholder is used only when a sync couldn't read the balances, for example while the office PC still runs Connector 0.5.0.
 
 ## 1. The production database for RAMS (you, then maintainer)
 
 1. **You:** create the Turso database `royalmart-rams` in the `royalmart` org, region `aws-ap-south-1` (Mumbai), and make a token for it.
 2. **Maintainer:**
    1. In `backend/.env`, set `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` to it. **Check the URL twice:** `npm run migrate` writes to whatever it points at.
-   2. `npm run migrate`, which applies 001–016.
+   2. `npm run migrate`, which applies 001–017.
    3. `RAMS_ADMIN_USERNAME=… RAMS_ADMIN_PASSWORD='…' npm run bootstrap-admin`. It creates the first Admin, who changes the password at first sign-in.
    4. `npm run agent-token -- --name "Office PC"`. It prints the Connector token **once**; hand it to you privately.
 3. **You:** in Vercel (RAMS project → Environment Variables, **Production**):
@@ -75,6 +73,7 @@ Until step 2 is done, ROMS production answers RAMS with "The integration is not 
    4. Check it with `C:\RAMS\Connector\rams-connector.cmd status`. Every company should show, and the **Tally sync** card on RAMS's Dashboard should say *Connector online*.
 4. **In RAMS:** Admin → Tally companies. Turn sync **on** for MH, HR and WB. The first backfill runs after office hours (about 5 minutes for MH).
    - Then click the **star** on MH, so Reports → Debtors opens on it. A fresh database has no default company until this is done, and the report opens on all companies instead.
+   - After that first sync, open **Ledgers** on any party: its opening should say *From Tally*, not *Placeholder*.
 5. **Stop the dev PC's Connector**, so two Connectors don't sync the same books.
 
 Logs are in `C:\ProgramData\RAMS\logs`. To remove the Connector, run `uninstall-service.ps1`.

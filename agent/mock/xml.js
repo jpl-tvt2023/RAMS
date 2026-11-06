@@ -130,6 +130,25 @@ function dayBookXml(company, from, to, { afterAlterId = null } = {}) {
   return envelope(messages(inRange.map((v) => voucherXml(v, company))));
 }
 
+// Every ledger's closing balance as at `to`, Tally's way round: its opening
+// plus every line on it in vouchers dated up to then, cancelled ones aside.
+// A nil balance is left empty, as Tally leaves it.
+function balancesXml(company, to) {
+  const bal = new Map(company.ledgers.map((l) => [l.name, l.opening || 0]));
+  const add = (ledger, amount) => { if (bal.has(ledger)) bal.set(ledger, bal.get(ledger) + amount); };
+  for (const v of company.vouchers) {
+    if (v.cancelled || (to && v.date > to)) continue;
+    for (const l of v.ledgerLines) add(l.ledger, l.amount);
+    for (const i of v.items) add(i.ledger, i.amount);
+  }
+  const rows = company.ledgers.map((l, i) => {
+    const b = Math.round(bal.get(l.name) * 100) / 100;
+    return `<LEDGER NAME="${esc(l.name)}" RESERVEDNAME=""><GUID TYPE="String">ledger-${i}</GUID>`
+      + `<CLOSINGBALANCE TYPE="Amount">${b ? amt(b) : ''}</CLOSINGBALANCE>${nameList([l.name])}</LEDGER>`;
+  }).join('');
+  return envelope(`<COLLECTION>${rows}</COLLECTION>`);
+}
+
 // The licence check report: one ROW per loaded company. Educational mode
 // echoes the 1st instead of the 15th it was asked for, as TallyPrime 7.1 does.
 function sysInfoXml(companies, { educational = false, from = '' } = {}) {
@@ -141,4 +160,6 @@ function sysInfoXml(companies, { educational = false, from = '' } = {}) {
   return `<RAMSSYSINFO>${rows}</RAMSSYSINFO>`;
 }
 
-module.exports = { companiesXml, mastersXml, dayBookXml, sysInfoXml, errorXml, voucherXml };
+module.exports = {
+  companiesXml, mastersXml, dayBookXml, balancesXml, sysInfoXml, errorXml, voucherXml,
+};

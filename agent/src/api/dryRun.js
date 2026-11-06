@@ -5,6 +5,7 @@
 //   <code>-masters.json   the master lists
 //   <code>-vouchers.jsonl one voucher per line
 //   <code>-reconcile.json each month's GUID list
+//   <code>-balances.json  every ledger's closing balance
 const fs = require('fs');
 const path = require('path');
 const { writeJson, slugify } = require('../util');
@@ -48,6 +49,10 @@ function createDryRunApi({ outDir, names = new Map() }) {
       writeJson(file(runId, 'reconcile.json'), all);
       counts.get(runId).months += 1;
       return { deleted: 0, missing: 0, stale: 0 };
+    },
+    async balances(runId, body) {
+      writeJson(file(runId, 'balances.json'), body);
+      return { stored: body.ledgers.length };
     },
     async finish() { return { sync: null }; },
   };

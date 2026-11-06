@@ -18,6 +18,8 @@
 //   changed     The same, filtered to vouchers altered after an AlterID: the
 //               light sync.
 //   list        GUID, AlterID and date only: the end-of-day deletion check.
+//   balances    Collection export of every ledger's closing balance as at a
+//               date, which the Ledgers page starts each party's balance from.
 //   sysinfo     A tiny report of Tally's licence mode, for the heartbeat.
 const { parseXml, findAll, txt } = require('./parse');
 
@@ -142,6 +144,21 @@ function voucherListRequest({ company, from, to }) {
   });
 }
 
+// Every ledger's closing balance as at `to`. Checked on TallyPrime 7.1 against
+// MH's 865 ledgers (under 0.1 s): a party ledger's figure is the same whatever
+// `from` is, and equals its balance at an earlier date plus its vouchers since.
+// An income or expense ledger's is only the period's total.
+const BALANCES_COLLECTION = 'RAMS Ledger Balances';
+function ledgerBalancesRequest({ company, from, to }) {
+  return envelope({
+    type: 'Collection',
+    id: BALANCES_COLLECTION,
+    vars: { SVCURRENTCOMPANY: company, SVFROMDATE: from, SVTODATE: to },
+    tdl: `<COLLECTION NAME="${BALANCES_COLLECTION}" ISMODIFY="No"><TYPE>Ledger</TYPE>`
+      + '<FETCH>Name, GUID, ClosingBalance</FETCH></COLLECTION>',
+  });
+}
+
 // The heartbeat's licence check: one row per loaded company carrying Tally's
 // licence flags, and SVFROMDATE echoed back. Educational mode swaps the 15th
 // for a date it accepts, which tells it apart even where the flags are blank.
@@ -208,6 +225,7 @@ function describeRequest(xml) {
 
 module.exports = {
   tallyDateArg, isoFromTally, envelope, companiesRequest, mastersRequest, vouchersRequest, eduSafeRange,
-  changedVouchersRequest, voucherListRequest, sysInfoRequest, describeRequest,
-  MASTER_TYPES, COMPANY_COLLECTION, VOUCHER_COLLECTION, CHANGED_COLLECTION, LIST_COLLECTION, SYSINFO_REPORT, SYSINFO_PROBE_DAY,
+  changedVouchersRequest, voucherListRequest, ledgerBalancesRequest, sysInfoRequest, describeRequest,
+  MASTER_TYPES, COMPANY_COLLECTION, VOUCHER_COLLECTION, CHANGED_COLLECTION, LIST_COLLECTION, BALANCES_COLLECTION,
+  SYSINFO_REPORT, SYSINFO_PROBE_DAY,
 };

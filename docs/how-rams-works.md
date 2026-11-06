@@ -79,6 +79,7 @@ RAMS keeps a copy of the books of **MH, HR and WB** from **8 June 2026** (when R
 | Ledger name, alias and group (for example *Sundry Debtors*, *Sales Accounts*, *Duties & Taxes*) | To know which ledgers are customers, which are sales and which are GST |
 | Ledger GSTIN and state | To tell which marketplace a party ledger belongs to, and which ledgers are Roymax's own registrations |
 | Bill-wise on/off | To know whether Tally tracks a party's invoices one by one |
+| Each ledger's closing balance | To start each party's balance on *Ledgers* from Tally's own figure |
 
 ### Stock items and voucher types
 
@@ -224,11 +225,10 @@ The day as a whole says **Matches Tally**, **Waiting for Tally** or **Differs fr
 
 **What you enter stays in RAMS.** It is never sent to Tally. The accountant posts in Tally as always, and RAMS compares the two.
 
-**The opening balance, for now.** RAMS's copy of Tally starts on 8 June 2026, and each party's balance on that day isn't loaded yet.
-- So every party starts at a **placeholder of ₹10,000** on 8 June. Tally's real vouchers since then carry it forward, so each day opens where Tally's closing of the day before left off.
-- The screen marks it *Placeholder, not from Tally*.
-- The day's check is exact anyway: it compares the entries with Tally's vouchers, and the difference between the two closings doesn't depend on the opening.
-- The real balances will be loaded later, once we agree where they come from.
+**The opening balance comes from Tally.** Each time the Connector reads Tally, it also reads every ledger's balance. From that, RAMS works out the party's balance at the start of any day, so each day opens on what Tally shows for the party that morning. The screen marks it *From Tally*.
+- We checked this on your real books (the copy of 24 October). For 44 Blinkit, Instamart and Zepto ledgers, Tally's balance at 31 March, less the vouchers since 1 August, gave exactly Tally's own balance for 31 July, to the paisa.
+- If a sync ever can't read the balances (for example, while the office PC still runs an older Connector), a party starts at a **placeholder of ₹10,000** on 8 June instead. Tally's real vouchers carry it forward, and the screen marks it *Placeholder, not from Tally*. The next sync that reads the balances puts the real figure back.
+- The day's check doesn't depend on the opening either way: it compares the entries with Tally's vouchers.
 
 **To decide together:**
 - **Head-office ledgers.** Marketplaces often pay into a head-office ledger, so the warehouse parties show invoices and credit notes but no receipts. On the real data, the Blinkit warehouse ledgers have no receipts at all. Map each head-office ledger to its marketplace on *Matching → Party ledgers*, so receipts can be entered against it.
@@ -285,7 +285,7 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 | 5 | Matching, with review screens and rules | Done, live on the test setup |
 | 6 | Auto-fill into ROMS | Done, being tried on the test setup |
 | 7 | The report screens | Delivered one at a time, each after you have reviewed it. Debtors is out; the rest follow |
-| – | Ledgers: a party's day, entered in RAMS and checked against Tally | Built and tested; goes on the test setup after your review. Openings are a ₹10,000 placeholder until the real balances are loaded |
+| – | Ledgers: a party's day, entered in RAMS and checked against Tally | On the website. Opening balances from Tally: built and tested, and go on the test setup after your review |
 | 8 | Go-live: production database, Connector installed on the office PC, the trial weeks | Prepared (see *go-live.md*); needs the office PC and your go-ahead |
 
 **Still to be decided:** how to link Flipkart and Amazon stock transfers to their ROMS rows.

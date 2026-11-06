@@ -13,7 +13,7 @@ const { checkDay, sameNumber, sameReference } = require('../src/ledgers/ledger')
 // July 2026, long past the grace days, so nothing here is still waiting.
 const api = (method, token, path) => bearer(request(app)[method](`/api/ledgers${path}`), token);
 
-let admin; let accountant; let viewer; let company; let q;
+let admin; let accountant; let viewer; let agent; let company; let q;
 
 const party = 'LG BLINK COMMERCE (MUMBAI M12)';
 const partyGuid = 'LGL1';
@@ -44,7 +44,7 @@ const ids = {};
 
 beforeAll(async () => {
   [admin, accountant, viewer] = await Promise.all([signIn('admin'), signIn('accountant'), signIn('viewer')]);
-  const agent = await newAgent('Ledgers suite PC');
+  agent = await newAgent('Ledgers suite PC');
   [company] = await enabledCompanies(agent, admin, [tallyCompany({ state: 'Maharashtra' })]);
   q = `company_id=${company.id}`;
   const run = await startRun(agent, company.id, 'backfill');
@@ -181,6 +181,34 @@ describe('The day', () => {
     expect(body.start).toMatchObject({ paise: 0, source: 'placeholder' });
     expect(body.opening_paise).toBe(500000);
     await api('put', admin.token, '/settings').send({ default_opening_paise: 1000000 });
+  });
+
+  test('Tally’s balance from the latest good sync wins; a later sync without one falls back', async () => {
+    // One light sync, with or without Tally's balances.
+    const sync = async (balance) => {
+      const run = await startRun(agent, company.id, 'light');
+      if (balance != null) {
+        await agentPost(agent.token, `/runs/${run}/balances`, {
+          asOf: '2027-03-31', ledgers: [{ guid: partyGuid, closing: balance }, { guid: 'LGL2', closing: 0 }],
+        });
+      }
+      await agentPost(agent.token, `/runs/${run}/finish`, { ok: true });
+    };
+    await db.execute({ sql: 'INSERT INTO ledger_openings (company_id, ledger_guid, amount_paise) VALUES (?, ?, 2000000)', args: [company.id, partyGuid] });
+
+    // ₹16,375 owed at 31 Mar (a debit, so negative in Tally), less the
+    // party's ₹4,030 of vouchers since 8 Jun: ₹12,345 on 8 Jun.
+    await sync(-16375);
+    let { body } = await dayOf(viewer.token);
+    expect(body.start).toMatchObject({ paise: 1234500, source: 'tally', as_of: '2027-03-31' });
+    expect(body.opening_paise).toBe(1734500); // + the ₹5,000 invoice of 1 Jul
+    expect(body.difference_paise).toBe(95000); // the check doesn't move with the opening
+
+    // An older Connector, or Tally refusing the balances: the loaded figure.
+    await sync(null);
+    ({ body } = await dayOf(viewer.token));
+    expect(body.start).toMatchObject({ paise: 2000000, source: 'loaded', as_of: null });
+    await db.execute({ sql: 'DELETE FROM ledger_openings WHERE company_id = ? AND ledger_guid = ?', args: [company.id, partyGuid] });
   });
 
   test('dates outside the copy and unknown parties are refused', async () => {

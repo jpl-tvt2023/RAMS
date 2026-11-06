@@ -93,6 +93,9 @@ function Summary({ day }) {
         {day.start.source === 'placeholder' && (
           <p className="text-xs text-gray-500 mt-1">{formatRupees(day.start.paise, { decimals: 0 })} on {formatDay(day.sync_from)}, carried forward by Tally’s vouchers since.</p>
         )}
+        {day.start.source === 'tally' && (
+          <p className="text-xs text-gray-500 mt-1">Worked out from the party’s balance in Tally at the last sync.</p>
+        )}
       </div>
       <div className={card}>
         <p className="text-xs text-gray-500">Closing by RAMS</p>

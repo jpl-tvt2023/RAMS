@@ -111,6 +111,17 @@ describe('Ledgers', () => {
     expect(within(rowOf('J1')).getByText('Not entered here yet')).toBeInTheDocument();
   });
 
+  test('an opening from Tally says so, without the placeholder’s note', async () => {
+    ledgers.getLedgerDay.mockResolvedValue({ ...DAY, start: { paise: 1234500, source: 'tally', loaded_at: '2026-11-02 18:30:00', as_of: '2027-03-31' } });
+    const user = userEvent.setup();
+    renderWithProviders(<Ledgers />, { user: VIEWER });
+    await openParty(user);
+    expect(screen.getByText('From Tally')).toBeInTheDocument();
+    expect(screen.getByText(/balance in Tally at the last sync/)).toBeInTheDocument();
+    expect(screen.queryByText('Placeholder, not from Tally')).toBeNull();
+    expect(screen.queryByText(/carried forward/)).toBeNull();
+  });
+
   test('a Viewer sees the day but can’t add, change or remove', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Ledgers />, { user: VIEWER });

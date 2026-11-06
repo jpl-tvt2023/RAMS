@@ -118,7 +118,8 @@ function buildDataset() {
     stockItems: STOCK_ITEMS,
     ledgers: [
       ...COMMON_LEDGERS,
-      { name: ZEPTO, parent: 'Marketplaces', gstin: '27AAJCK8213B1Z5', state: 'Maharashtra' },
+      // owed since before the books in this file begin (Tally's way round)
+      { name: ZEPTO, parent: 'Marketplaces', gstin: '27AAJCK8213B1Z5', state: 'Maharashtra', opening: -1500 },
       { name: INSTAMART, parent: 'Marketplaces', gstin: '27AAICS4785M1ZW', state: 'Maharashtra' },
       { name: NOW, parent: 'Sundry Debtors', gstin: '27AAGCC9876D1ZQ', state: 'Maharashtra' },
       { name: HR_BRANCH, parent: 'Branch / Divisions', gstin: GSTIN.HR, state: 'Haryana' }, // internal by PAN

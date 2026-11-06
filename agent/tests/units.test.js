@@ -3,11 +3,13 @@ const {
   exactKey, normKey, compactKey, splitRefs, serialOf, withoutLabel, mask, howTyped, DocIndex,
 } = require('../src/docno');
 const {
-  tallyDateArg, isoFromTally, companiesRequest, mastersRequest, vouchersRequest, eduSafeRange, describeRequest, VOUCHER_COLLECTION,
+  tallyDateArg, isoFromTally, companiesRequest, mastersRequest, vouchersRequest, ledgerBalancesRequest, eduSafeRange, describeRequest,
+  VOUCHER_COLLECTION, BALANCES_COLLECTION,
 } = require('../src/tally/requests');
 const {
-  baseTypeResolver, groupResolver, ledgersFrom, voucherFrom, GSTIN_RE, panOf,
+  baseTypeResolver, groupResolver, ledgersFrom, voucherFrom, balancesFrom, GSTIN_RE, panOf,
 } = require('../src/tally/normalize');
+const { pullBalances } = require('../src/tally/pull');
 const { periods, fyOf, previousFyStart, readEnvFile } = require('../src/util');
 const { parseArgs } = require('../src/cli');
 const xml = require('../mock/xml');
@@ -100,13 +102,27 @@ describe('requests', () => {
 
   test('every request is an export and reads back to what it asks for', () => {
     const company = 'Roymax & Sons <MH>';
-    for (const r of [companiesRequest(), mastersRequest({ company, accountType: 'Ledgers' }), vouchersRequest({ company, from: '2026-04-01', to: '2026-04-30' })]) {
+    const balances = ledgerBalancesRequest({ company, from: '2026-06-01', to: '2027-03-31' });
+    for (const r of [companiesRequest(), mastersRequest({ company, accountType: 'Ledgers' }), vouchersRequest({ company, from: '2026-04-01', to: '2026-04-30' }), balances]) {
       expect(r).toContain('<TALLYREQUEST>Export</TALLYREQUEST>');
       expect(r).not.toMatch(/Import|Create|Alter|Delete/i);
     }
+    expect(balances).toContain('ISMODIFY="No"');
     expect(describeRequest(mastersRequest({ company, accountType: 'Ledgers' }))).toMatchObject({ id: 'List of Accounts', company, accountType: 'Ledgers' });
     expect(describeRequest(vouchersRequest({ company, from: '2026-04-01', to: '2026-04-30' }))).toMatchObject({ type: 'Collection', id: VOUCHER_COLLECTION, company, from: '2026-04-01', to: '2026-04-30' });
+    expect(describeRequest(balances)).toMatchObject({ type: 'Collection', id: BALANCES_COLLECTION, company, from: '2026-06-01', to: '2027-03-31' });
     expect(describeRequest(companiesRequest()).type).toBe('Collection');
+  });
+
+  test('ledger balances are read only as at a date Educational mode keeps, and an empty answer is refused', async () => {
+    const company = { name: 'Roymax MH' };
+    await expect(pullBalances(null, company, { from: '2026-06-08', asOf: '2027-03-30' })).rejects.toThrow(/1st, 2nd or 31st/);
+    const asked = [];
+    const client = (data) => ({ post: async (request) => { asked.push(describeRequest(request)); return { tree: parseXml(`<ENVELOPE><BODY><DATA><COLLECTION>${data}</COLLECTION></DATA></BODY></ENVELOPE>`) }; } });
+    await expect(pullBalances(client(''), company, { from: '2026-06-08', asOf: '2027-03-31' })).rejects.toThrow(/no ledgers/);
+    const list = await pullBalances(client('<LEDGER NAME="A"><GUID>g1</GUID><CLOSINGBALANCE>-5.00</CLOSINGBALANCE></LEDGER>'), company, { from: '2026-06-08', asOf: '2027-03-31' });
+    expect(list).toEqual([{ guid: 'g1', name: 'A', closing: -5 }]);
+    expect(asked[1]).toMatchObject({ from: '2026-06-01', to: '2027-03-31' }); // the start widened, the date kept
   });
 
   test('periods are widened to dates Educational mode accepts (1st, 2nd, 31st)', () => {
@@ -118,6 +134,19 @@ describe('requests', () => {
 });
 
 describe('normalize', () => {
+  test('ledger balances: rupees, negative for a debit, an empty (nil) balance as 0', () => {
+    const mh = buildDataset().companies.find((c) => c.code === 'MH');
+    const list = balancesFrom(parseXml(xml.balancesXml(mh, '2027-03-31')));
+    expect(list).toHaveLength(mh.ledgers.length);
+    const zepto = mh.ledgers.findIndex((l) => l.opening);
+    expect(list[zepto]).toMatchObject({ guid: `ledger-${zepto}`, name: mh.ledgers[zepto].name });
+    expect(list[zepto].closing).toBeLessThan(0); // Zepto owes Roymax
+    const bank = mh.ledgers.findIndex((l) => l.name === 'HDFC Bank');
+    expect(list.find((b) => b.guid === `ledger-${bank}`).closing).toBe(-7000); // Zepto's receipt, a debit
+    const unused = mh.ledgers.findIndex((l) => l.name === 'Input IGST');
+    expect(list.find((b) => b.guid === `ledger-${unused}`).closing).toBe(0);
+  });
+
   test('base types: custom → custom → reserved, and a guess without masters', () => {
     const base = baseTypeResolver([
       { name: 'Sales', parent: 'Sales', reserved: 'Sales' },

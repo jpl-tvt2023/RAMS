@@ -8,11 +8,12 @@
 // Tally ignored the period altogether: it is reported as `stray`.
 const { findAll } = require('./parse');
 const {
-  companiesRequest, mastersRequest, vouchersRequest, changedVouchersRequest, voucherListRequest,
+  companiesRequest, mastersRequest, vouchersRequest, changedVouchersRequest, voucherListRequest, ledgerBalancesRequest,
   sysInfoRequest, eduSafeRange, describeRequest, MASTER_TYPES, SYSINFO_PROBE_DAY,
 } = require('./requests');
 const {
-  companiesFrom, groupsFrom, ledgersFrom, stockItemsFrom, voucherTypesFrom, voucherFrom, voucherListFrom, sysInfoFrom,
+  companiesFrom, groupsFrom, ledgersFrom, stockItemsFrom, voucherTypesFrom, voucherFrom, voucherListFrom, balancesFrom,
+  sysInfoFrom,
 } = require('./normalize');
 
 const MASTER_PARSERS = {
@@ -105,6 +106,20 @@ async function pullVoucherList(client, company, p) {
   return all.filter((v) => v.date && v.date >= p.from && v.date <= p.to);
 }
 
+// Every ledger's closing balance as at `asOf`: [{ guid, name, closing }].
+// Educational mode would silently swap a date it doesn't accept, so asOf must
+// be one it does (the sync window ends on 31 March). An answer with no ledger
+// at all -- Tally still loading the company -- is an error, not a list.
+async function pullBalances(client, company, { from, asOf }) {
+  if (eduSafeRange(asOf, asOf).to !== asOf) throw new Error(`Ledger balances can only be read as at the 1st, 2nd or 31st, not ${asOf}`);
+  const res = await client.post(ledgerBalancesRequest({ company: company.name, from: eduSafeRange(from, asOf).from, to: asOf }), {
+    label: `${company.name}: ledger balances at ${asOf}`,
+  });
+  const list = balancesFrom(res.tree);
+  if (!list.length) throw new Error(`Tally listed no ledgers for ${company.name}`);
+  return list;
+}
+
 // Tally's licence mode: { educational, licensed } (true / false / null).
 async function pullSysInfo(client, { today }) {
   const res = await client.post(sysInfoRequest({ today }), { label: 'licence check' });
@@ -112,5 +127,5 @@ async function pullSysInfo(client, { today }) {
 }
 
 module.exports = {
-  listCompanies, pullMasters, pullPeriod, pullVoucherList, pullSysInfo, MASTER_PARSERS,
+  listCompanies, pullMasters, pullPeriod, pullVoucherList, pullBalances, pullSysInfo, MASTER_PARSERS,
 };

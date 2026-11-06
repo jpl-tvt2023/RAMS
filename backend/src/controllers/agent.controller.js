@@ -15,6 +15,7 @@ const { sendAutofill, autofillDue, lastAutofill } = require('../matching/autofil
 //   POST /runs/:id/masters          complete master lists
 //   POST /runs/:id/vouchers         up to 250 vouchers
 //   POST /runs/:id/reconcile        a period's full GUID list from Tally
+//   POST /runs/:id/balances         every ledger's closing balance, last
 //   POST /runs/:id/finish           {ok, errors, backfillDone}
 //   POST /match                     the matching run a heartbeat asked for
 //   POST /autofill                  one round of auto-fill into ROMS, asked
@@ -573,6 +574,43 @@ async function reconcile(req, res, next) {
   } catch (err) { sendError(res, next, err); }
 }
 
+// --------------------------------------------------------------- balances
+
+// POST /api/agent/runs/:id/balances { asOf, ledgers: [{guid, closing}] }
+// Every ledger's closing balance in Tally as at asOf (the end of the sync
+// window), in rupees, Tally's way round (negative is a debit). The list is
+// COMPLETE, so it replaces the company's last one. The Ledgers page uses it
+// only while it comes from the company's latest run that ended ok.
+async function balances(req, res, next) {
+  try {
+    const run = await openRun(req);
+    const { asOf, ledgers: list } = req.body || {};
+    if (!ISO.test(asOf || '')) throw bad('asOf must be YYYY-MM-DD');
+    if (!Array.isArray(list) || !list.length) throw bad('ledgers must be a list with at least one ledger');
+    if (list.length > MAX_LIST) throw bad(`At most ${MAX_LIST} ledgers at a time`);
+
+    const closing = new Map();
+    for (const l of list) {
+      const guid = text(l && l.guid, 100);
+      if (!guid) throw bad('Every ledger needs a GUID');
+      const p = paise(l.closing);
+      if (p == null) throw bad(`Ledger ${guid} has no closing balance`);
+      closing.set(guid, p);
+    }
+
+    const stmts = [{ sql: 'DELETE FROM tally_ledger_balances WHERE company_id = ?', args: [run.company_id] }];
+    for (const part of chunks([...closing], 200)) {
+      stmts.push({
+        sql: `INSERT INTO tally_ledger_balances (company_id, ledger_guid, as_of, closing_paise, run_id)
+              VALUES ${part.map(() => '(?, ?, ?, ?, ?)').join(', ')}`,
+        args: part.flatMap(([guid, p]) => [run.company_id, guid, asOf, p, run.id]),
+      });
+    }
+    await db.batch(stmts, 'write');
+    res.json({ stored: closing.size });
+  } catch (err) { sendError(res, next, err); }
+}
+
 // ----------------------------------------------------------------- finish
 
 // POST /api/agent/runs/:id/finish { ok, errors?, backfillDone? }
@@ -644,5 +682,5 @@ async function autofill(req, res, next) {
 }
 
 module.exports = {
-  heartbeat, startRun, masters, vouchers, reconcile, finish, match, autofill, MAX_VOUCHERS,
+  heartbeat, startRun, masters, vouchers, reconcile, balances, finish, match, autofill, MAX_VOUCHERS,
 };

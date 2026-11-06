@@ -1,7 +1,7 @@
 # RAMS Connector
 
 Reads TallyPrime over its local XML port (`127.0.0.1:9000`) and **never writes to it**. Every request is an `Export`. It does two jobs:
-- **Sync (M3):** keeps RAMS's copy of the Tally books current. It runs a light sync hourly in office hours, an end-of-day check, and a backfill from ROMS go-live.
+- **Sync (M3):** keeps RAMS's copy of the Tally books current. It runs a light sync hourly in office hours, an end-of-day check, and a backfill from ROMS go-live. Each sync ends with every ledger's balance (0.6.0).
 - **Starting matching (M5) and auto-fill (M6):** RAMS on Vercel has no clock of its own.
   - When a heartbeat reply asks for a match (`commands: [{ type: 'match' }]`), the Connector calls `POST /api/agent/match`, and RAMS reads ROMS and matches.
   - When it asks for auto-fill (`{ type: 'autofill' }`, or the match answers `autofill_due`), the Connector calls `POST /api/agent/autofill` again while RAMS answers `more`, up to 20 rounds a cycle. RAMS writes into ROMS by each field's mode.
@@ -52,6 +52,7 @@ Reads TallyPrime over its local XML port (`127.0.0.1:9000`) and **never writes t
   - month by month from the sync start (RAMS's `RAMS_SYNC_FROM`, ROMS go-live by default) to 31 March of this financial year
   - each month is pushed, then reconciled; RAMS records it, so an interrupted backfill resumes after the last finished month
   - a resync is the same from scratch; it runs after a restored backup (counters went backward) or a ledger/item rename
+- **Ledger balances (0.6.0):** every run then reads each ledger's closing balance as at 31 March (one Ledger collection, under 0.1 s for MH) and sends it to RAMS, which starts each party on *Ledgers* from it. If Tally refuses, the run still finishes ok, the log says so, and Ledgers falls back to its placeholder until a run brings them.
 - **Watermarks:** they live in RAMS and move only when a run finishes ok, to the counters Tally had when it started. Anything altered during a run is fetched next time.
 - **Educational mode:** periods are widened to the 1st, 2nd or 31st and trimmed (`eduSafeRange`), and the heartbeat reports the licence mode.
 

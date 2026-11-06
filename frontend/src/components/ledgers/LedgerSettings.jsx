@@ -60,7 +60,7 @@ export default function LedgerSettings({ syncFrom, onClose, onSaved }) {
           <label className="block text-sm">
             <span className="font-medium text-gray-700">Placeholder opening (₹)</span>
             <input aria-label="Placeholder opening" value={form.opening} onChange={(e) => setForm({ ...form, opening: e.target.value })} inputMode="decimal" className={`${inputCls} mt-1`} />
-            <span className="text-xs text-gray-500">A party whose real balance isn’t loaded yet starts on this on {formatDay(syncFrom)}. Tally’s vouchers since then carry it forward.</span>
+            <span className="text-xs text-gray-500">Used only when the last sync couldn’t read a party’s balance from Tally: the party then starts on this on {formatDay(syncFrom)}, and Tally’s vouchers since carry it forward.</span>
           </label>
           {s?.updated_at && <p className="text-xs text-gray-400">Last changed by {s.updated_by_name || 'someone'} on {formatDateTime(s.updated_at)}</p>}
           <div className="flex justify-end gap-2">

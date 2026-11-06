@@ -6,7 +6,8 @@ const { createTallyClient } = require('../src/tally/client');
 const { listCompanies } = require('../src/tally/pull');
 const { createApiClient } = require('../src/api/client');
 const { syncCompany, syncWindow } = require('../src/sync');
-const { startRams, startMockTally, hasBackend } = require('./helpers/rams');
+const path = require('path');
+const { startRams, startMockTally, hasBackend, BACKEND } = require('./helpers/rams');
 
 const describeIf = hasBackend ? describe : describe.skip;
 if (!hasBackend) console.warn('backend/node_modules is missing: run `npm install` in backend/ to run the sync suites');
@@ -26,13 +27,13 @@ async function heartbeat() {
 }
 
 // One sync of `code` (MH / HR / WB) as the run loop would start it.
-async function sync(code, kind) {
+async function sync(code, kind, log) {
   const guid = `company-${code.toLowerCase()}`;
   const { live, reply } = await heartbeat();
   const company = reply.companies.find((c) => c.guid === guid);
   return syncCompany({
     tally, api, company, live: live.find((c) => c.guid === guid), kind,
-    syncFrom: reply.settings.syncFrom, today: TODAY, batchSize: 5,
+    syncFrom: reply.settings.syncFrom, today: TODAY, batchSize: 5, log,
   });
 }
 
@@ -204,5 +205,49 @@ describeIf('sync: mock Tally -> RAMS', () => {
       syncFrom: reply.settings.syncFrom, today: TODAY,
     })).rejects.toThrow(/RAMS did not answer/);
     expect(mock.requests.length).toBe(before);
+  });
+
+  // What the Ledgers page starts a MH party from (backend ledgers/ledger.js).
+  const startOf = async (ledger) => {
+    const { loadSettings, partyVouchers, startingBalance } = require(path.join(BACKEND, 'src', 'ledgers', 'ledger'));
+    const mh = books.company('MH');
+    const id = await companyId('MH');
+    const vouchers = await partyVouchers(rams.db, id, ledger.name);
+    return startingBalance(rams.db, id, `ledger-${mh.ledgers.indexOf(ledger)}`, await loadSettings(rams.db), vouchers);
+  };
+
+  test("each sync ends with Tally's ledger balances, from which RAMS works out a party's balance on the sync start", async () => {
+    const mh = books.company('MH');
+    const before = mock.requests.length;
+    const result = await sync('MH', 'light');
+    expect(result.counts.balances).toBe(mh.ledgers.length);
+    const asked = mock.requests.slice(before).filter((r) => /ledger balances/i.test(r.id));
+    expect(asked).toEqual([expect.objectContaining({ company: mh.name, from: '2026-04-01', to: '2027-03-31' })]);
+
+    // Zepto's opening and its invoice of March 2026 are before the window, so
+    // RAMS holds neither -- yet its starting balance has both.
+    const zepto = mh.ledgers.find((l) => l.opening);
+    const before1Apr = mh.vouchers.filter((v) => !v.cancelled && v.date < '2026-04-01')
+      .flatMap((v) => v.ledgerLines).filter((l) => l.ledger === zepto.name)
+      .reduce((sum, l) => sum + l.amount, zepto.opening);
+    expect(await startOf(zepto)).toMatchObject({ source: 'tally', as_of: '2027-03-31', paise: Math.round(-before1Apr * 100) });
+  });
+
+  test('Tally refusing the balances is logged, not a failed sync, and Ledgers falls back until a sync brings them', async () => {
+    const zepto = books.company('MH').ledgers.find((l) => l.opening);
+    const logs = [];
+    books.dataset.failWhen = (d) => /ledger balances/i.test(d.id);
+    let result;
+    try {
+      result = await sync('MH', 'light', (m) => logs.push(m));
+    } finally {
+      books.dataset.failWhen = null;
+    }
+    expect(result).toMatchObject({ ok: true, counts: expect.objectContaining({ balances: 0 }) });
+    expect(logs.join('\n')).toMatch(/ledger balances not read/);
+    expect((await startOf(zepto)).source).toBe('placeholder');
+
+    expect((await sync('MH', 'light')).counts.balances).toBeGreaterThan(0);
+    expect((await startOf(zepto)).source).toBe('tally');
   });
 });
