@@ -22,14 +22,17 @@ Reads TallyPrime over its local XML port (`127.0.0.1:9000`) and **never writes t
 
 ### Installing on the office PC (M8)
 
-1. `npm run package` builds `dist/rams-connector/` (production dependencies only, plus `rams-connector.cmd`).
-2. Copy that folder to the office PC. It needs Node 20+ installed there.
-3. On that PC, signed in as the user who runs Tally, run `install-service.ps1`:
-   - it copies the Connector to `C:\RAMS\Connector`
-   - it creates `%ProgramData%\RAMS\connector.json` from the template, for the token
-   - it adds the scheduled task **RAMS Connector**, which starts at sign-in and restarts if it stops
+1. `npm run package` builds `dist/rams-connector/`: production dependencies only, `rams-connector.cmd`, and `runtime\node.exe` (the Node it was packaged with, so the office PC needs no Node install).
+2. Copy that folder to the office PC (zipped is fine: unzip it there).
+3. On that PC, signed in as the user who runs Tally, double-click **Setup RAMS Connector**. Its window (`setup.ps1`):
+   - checks that Tally answers and which companies are open, and says how to fix it if not (TallyPrime's Client/Server configuration, port 9000)
+   - checks the Connector code with RAMS (`check`), before saving it in `%ProgramData%\RAMS\connector.json`, so a wrong code never replaces a good one
+   - runs `install-service.ps1`: copies the Connector to `C:\RAMS\Connector` and adds the scheduled task **RAMS Connector**, which starts at sign-in in a hidden window and restarts if it stops
+   - the first time, loads all of Tally into RAMS (`sync --kind resync`), then starts the task
 
-`uninstall-service.ps1` removes the task. The step-by-step rollout is `docs/go-live.md`.
+   Running it again checks the connection, or takes a new code. `install-service.ps1` can still be run by hand.
+
+`uninstall-service.ps1` removes the task and stops the Connector. The step-by-step rollout is `docs/go-live.md`.
 
 ### Commands
 
@@ -39,6 +42,7 @@ Reads TallyPrime over its local XML port (`127.0.0.1:9000`) and **never writes t
 | `sync [--company MH] [--kind light\|heavy\|backfill\|resync]` | One sync now, then exit. Without `--kind` it does what is due. |
 | `sync --dry-run [--from YYYY-MM-DD] [--out DIR]` | A backfill written to files instead of RAMS. Nothing is sent. |
 | `status` | What RAMS knows (watermarks, backfill) next to Tally's counters now, the last matching run, and each auto-fill mode with its last round. |
+| `check` | One line of JSON for the setup window: whether Tally answers and which companies are open, whether RAMS accepts the token (`TOKEN_REJECTED`, `UNREACHABLE`), and which companies RAMS syncs. Always exits 0. |
 
 ### How a sync works
 - **Light:**

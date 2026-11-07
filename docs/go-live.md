@@ -2,6 +2,8 @@
 
 This takes RAMS from the test setup to production, step by step. It also covers installing the Connector on the office PC and the trial weeks before auto-fill writes to ROMS on its own.
 
+For the day itself, `go-live-cheatsheet.md` has the same steps as commands and clicks, plus the reset of a production database that began as a copy of the test one. `demo-cheatsheet.md` is the running order for showing the client.
+
 **Who does what:**
 - **You** do every step that touches production, the office PC or a secret.
 - **I** (or whoever maintains RAMS) do the steps marked *maintainer*. None of them changes production until you've done your part.
@@ -39,7 +41,7 @@ This takes RAMS from the test setup to production, step by step. It also covers 
    1. In `backend/.env`, set `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` to it. **Check the URL twice:** `npm run migrate` writes to whatever it points at.
    2. `npm run migrate`, which applies 001–018.
    3. `RAMS_ADMIN_USERNAME=… RAMS_ADMIN_PASSWORD='…' npm run bootstrap-admin`. It creates the first Admin, who changes the password at first sign-in.
-   4. `npm run agent-token -- --name "Office PC"`. It prints the Connector token **once**; hand it to you privately.
+   4. `npm run agent-token -- --name "Office PC" --rotate`. It prints the Connector token **once**; hand it to you privately. `--rotate` retires every other token first, such as one copied over with a test database.
 3. **You:** in Vercel (RAMS project → Environment Variables, **Production**):
    - Set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` to the production database.
    - Set new `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET`. This signs everyone out of the test setup.
@@ -60,26 +62,24 @@ Until step 2 is done, ROMS production answers RAMS with "The integration is not 
 
 ## 3. The Connector on the office PC (you, at the PC)
 
-1. Install **Node.js 20 LTS** from nodejs.org, if it isn't there.
-2. **Maintainer:** `npm run package` in `agent/`, then copy the folder `agent/dist/rams-connector` to the office PC (USB stick or shared drive).
+1. **Maintainer:** `npm run package` in `agent/`, zip the folder `agent/dist/rams-connector` and copy it to the office PC (USB stick, shared drive or remote session). It carries its own Node.js, so nothing else needs installing.
+2. **In RAMS:** Admin → Tally companies. Turn sync **on** for MH, HR and WB, so the first load includes them. A fresh database lists them only after the Connector has checked in once: in that case run Setup, turn them on, then run Setup again with the load box ticked.
 3. **You:** on the office PC, signed in as the Windows user who runs Tally:
-   1. In TallyPrime: F1 → Settings → Connectivity. Set it to act as *Server* (or *Both*), port **9000**.
-   2. Open the three companies (MH, HR, WB) in Tally.
-   3. In the copied folder, right-click **install-service.ps1** → *Run with PowerShell*. Or run, in PowerShell:
-      ```
-      powershell -ExecutionPolicy Bypass -File .\install-service.ps1
-      ```
-      - The first time, it opens `C:\ProgramData\RAMS\connector.json`. Paste in the Connector token (from step 1), set `apiUrl` to `https://accounting.theroyalmart.co.in`, save, and run the script again.
-      - It copies itself to `C:\RAMS\Connector`, adds the task **RAMS Connector** (it starts when you sign in, and restarts if it stops) and starts it.
-   4. Check it with `C:\RAMS\Connector\rams-connector.cmd status`. Every company should show, and the **Tally sync** card on RAMS's Dashboard should say *Connector online*.
-4. **In RAMS:** Admin → Tally companies. Turn sync **on** for MH, HR and WB. The first backfill runs after office hours (about 5 minutes for MH).
-   - Then click the **star** on MH, so Reports → Debtors opens on it. A fresh database has no default company until this is done, and the report opens on all companies instead.
-   - After that first sync, open **Ledgers** on a Zepto party: its opening should say *From Tally*, not *Placeholder*.
-   - After the first end-of-day run, Matching → Party ledgers should show no "State differs" on *Flipkart India Private Limited - Bengalore* (it reads Karnataka now).
-   - Check the Connector's version in `status`: it must be **0.7.0**.
-5. **Stop the dev PC's Connector**, so two Connectors don't sync the same books.
+   1. Open TallyPrime and the three companies (MH, HR, WB).
+   2. Unzip the folder (right-click → *Extract All*) and double-click **Setup RAMS Connector**.
+   3. Paste the Connector token (from step 1) into *Connector code*, leave **Load all of Tally into RAMS now** ticked, and click **Connect**.
+      - It checks that Tally answers and lists the open companies. If Tally doesn't answer, it says what to set in TallyPrime (F1 → Settings → Connectivity → Client/Server configuration: *TallyPrime acts as* Both, port **9000**). Then click *Try again*.
+      - It checks the code with RAMS before saving it. A wrong code is refused and nothing is saved.
+      - It installs the Connector in `C:\RAMS\Connector` with the task **RAMS Connector** (it starts when you sign in, in a hidden window, and restarts if it stops), loads Tally into RAMS (a few minutes for MH; Tally stays usable), and starts it.
+   4. When every line is ticked, RAMS's Dashboard **Tally sync** card says *Connector online* within a minute.
+4. **In RAMS:**
+   - Click the **star** on MH, so Reports → Debtors opens on it. A fresh database has no default company until this is done, and the report opens on all companies instead.
+   - Open **Ledgers** on a Zepto party: its opening should say *From Tally*, not *Placeholder*.
+   - Matching → Party ledgers should show no "State differs" on *Flipkart India Private Limited - Bengalore* (it reads Karnataka now).
+   - `C:\RAMS\Connector\rams-connector.cmd status` on the office PC shows the version: it must be **0.7.1**.
+5. **Stop the dev PC's Connector** if it points at the production site, so two Connectors don't sync the same books. One that feeds the test site can keep running.
 
-Logs are in `C:\ProgramData\RAMS\logs`. To remove the Connector, run `uninstall-service.ps1`.
+Running Setup again later checks the connection, or takes a new code. Logs are in `C:\ProgramData\RAMS\logs`. To remove the Connector, run `uninstall-service.ps1`. To install by hand instead, `install-service.ps1` still works (it needs `connector.json` filled in first).
 
 ## 4. The trial weeks (auto-fill)
 
