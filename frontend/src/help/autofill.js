@@ -56,6 +56,8 @@ export const autoFill = {
     },
   ],
   faq: [
+    { q: 'What do the colours mean?', a: 'Red: refused by ROMS. Amber: needs a person. Purple: in the approval step, waiting for approval or approved. Green: written next, automatically. Blue: preview only. Grey: auto-fill is off. The legend under the table says the same.' },
+    { q: 'Why is a narration highlighted in yellow?', a: 'Tally has no narration on that record, and the narration check (Admin → Tally companies) says it needs one. Ask the accountant to add it in Tally; it shows after the next sync.' },
     { q: 'Will RAMS overwrite what staff typed?', a: 'Only a number staff typed in another form of the same invoice number, like 607 or 0607 for 607/RM/26-27 (you can turn even that off). Anything else is left for a person. And if staff change a field after RAMS read it, ROMS refuses RAMS’s write.' },
     { q: 'Which Bill Date is written?', a: 'The invoice date in Tally, unless the setting on the Bill No card says to keep a Bill Date staff typed.' },
     { q: 'Why did ROMS refuse a write?', a: 'ROMS checks every write the way it checks a person’s: the PO may be deleted, the RTV row closed, the Bill No already on another PO, or someone changed the field meanwhile. The Refused by ROMS tab gives ROMS’s reason.' },

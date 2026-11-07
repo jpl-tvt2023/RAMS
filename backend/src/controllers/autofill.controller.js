@@ -4,6 +4,7 @@ const {
   DEFAULTS, loadSettings, loadRow, shape, toColumns, validate,
 } = require('../services/autofillSettings');
 const { romsSettings } = require('../services/romsClient');
+const { loadNarrationRule, narrationOf } = require('../services/narration');
 const {
   planAutofill, sendAutofill, approve: approveItems, retry: retryItem, overwrite: overwriteItem, actionOf,
 } = require('../matching/autofill');
@@ -113,15 +114,20 @@ async function summary(req, res, next) {
 const ITEM_SELECT = `
   SELECT i.target_kind, i.target_id, i.po_id, i.field, i.kind, i.expected, i.expected_date, i.value, i.date, i.state, i.reason,
          i.dry, i.tries, i.tried_at, i.approved_at, i.created_at, i.updated_at, u.name AS approved_by_name,
-         c.code AS company, r.vendor, r.method, r.voucher_number, r.voucher_date, p.vendor_po_id, t.rtv_no
+         c.code AS company, r.vendor, r.method, r.voucher_number, r.voucher_date, p.vendor_po_id, t.rtv_no,
+         tv.narration AS v_narration, tv.base_type AS v_base_type, tv.date AS v_date
     FROM autofill_items i
     LEFT JOIN users u ON u.id = i.approved_by
     LEFT JOIN tally_companies c ON c.id = i.company_id
     LEFT JOIN match_results r ON r.target_kind = i.target_kind AND r.target_id = i.target_id
+    LEFT JOIN tally_vouchers tv ON tv.company_id = r.company_id AND tv.guid = r.voucher_guid
     LEFT JOIN roms_pos p ON p.po_id = i.po_id
     LEFT JOIN roms_rtv t ON i.target_kind = 'rtv' AND t.id = CAST(i.target_id AS INTEGER)`;
 
-const shapeItem = (r) => ({
+// rule: the narration check, for the Tally voucher the value comes from.
+const shapeItem = (r, rule) => ({
+  voucher_number: r.voucher_number || null,
+  ...(r.v_base_type ? narrationOf(rule, { narration: r.v_narration, base_type: r.v_base_type, date: r.v_date }) : { narration: null, narration_missing: false }),
   kind: r.target_kind,
   id: r.target_id,
   po_id: r.po_id,
@@ -170,7 +176,10 @@ async function items(req, res, next) {
       rowsOf(`${base} ORDER BY i.created_at, i.po_id, i.target_id LIMIT ? OFFSET ?`, [...args, pageSize, offset]),
       rowsOf(`SELECT COUNT(*) AS total FROM (${base})`, args),
     ]);
-    res.json({ rows: rows.map(shapeItem), total: Number(total), page, page_size: pageSize });
+    const rule = await loadNarrationRule(db);
+    res.json({
+      rows: rows.map((r) => shapeItem(r, rule)), total: Number(total), page, page_size: pageSize,
+    });
   } catch (err) { next(err); }
 }
 

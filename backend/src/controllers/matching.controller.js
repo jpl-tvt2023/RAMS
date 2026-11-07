@@ -5,6 +5,8 @@ const {
 } = require('../services/matchSettings');
 const { refreshState } = require('../services/romsRefs');
 const { runMatching, rematch, previewMatching } = require('../matching/run');
+const { loadNarrationRule, narrationOf, narrationLookup } = require('../services/narration');
+const { statesOf } = require('../utils/gstStates');
 
 // Matching -> Match review, Matching rules and Party ledgers. Who may do what
 // is the matching.* permissions (routes/matching.routes.js). Every change is
@@ -93,6 +95,7 @@ async function summary(req, res, next) {
 const RESULT_SELECT = `
   SELECT r.target_kind, r.target_id, r.po_id, r.outcome, r.reason, r.method, r.vendor, r.company_id, c.code AS company,
          r.voucher_guid, r.voucher_number, r.voucher_date, r.detail, r.fill, r.outcome_since, r.updated_at,
+         tv.narration AS v_narration, tv.base_type AS v_base_type, tv.date AS v_date,
          p.vendor_po_id, p.bill_no, p.bill_date, p.po_date, p.status AS po_status, p.party_name, p.city,
          t.rtv_no, t.cn_number, t.cn_date, t.status AS rtv_status,
          ai.state AS af_state, ai.reason AS af_reason, ai.dry AS af_dry, ai.kind AS af_kind,
@@ -100,12 +103,18 @@ const RESULT_SELECT = `
              AND e.result = 'applied' ORDER BY e.id DESC LIMIT 1) AS af_written_at
     FROM match_results r
     LEFT JOIN tally_companies c ON c.id = r.company_id
+    LEFT JOIN tally_vouchers tv ON tv.company_id = r.company_id AND tv.guid = r.voucher_guid
     LEFT JOIN roms_pos p ON p.po_id = r.po_id
     LEFT JOIN roms_rtv t ON r.target_kind = 'rtv' AND t.id = CAST(r.target_id AS INTEGER)
     LEFT JOIN autofill_items ai ON ai.target_kind = r.target_kind AND ai.target_id = r.target_id`;
 
-function shapeResult(r, { full = false } = {}) {
+// The linked voucher's narration is read from Tally's copy now, not from the
+// snapshot in match_results.detail.
+function shapeResult(r, { full = false, rule } = {}) {
   const detail = parse(r.detail, {});
+  const narration = r.voucher_guid && r.v_base_type
+    ? narrationOf(rule, { narration: r.v_narration, base_type: r.v_base_type, date: r.v_date })
+    : { narration: null, narration_missing: false };
   const out = {
     kind: r.target_kind,
     id: r.target_id,
@@ -119,6 +128,7 @@ function shapeResult(r, { full = false } = {}) {
     voucher_guid: r.voucher_guid,
     voucher_number: r.voucher_number,
     voucher_date: r.voucher_date,
+    ...narration,
     fill: parse(r.fill, null),
     // Where auto-fill is with this row: the open item's state, or when RAMS
     // last wrote it into ROMS.
@@ -145,6 +155,15 @@ function shapeResult(r, { full = false } = {}) {
     out.checks = detail.checks || [];
     out.candidates = detail.candidates || [];
   }
+  return out;
+}
+
+// A result in full, each candidate with its narration.
+async function fullResult(row) {
+  const rule = await loadNarrationRule(db);
+  const out = shapeResult(row, { full: true, rule });
+  const narrationFor = await narrationLookup(db, out.candidates.map((c) => [c.company_id, c.guid]), rule);
+  out.candidates = out.candidates.map((c) => ({ ...c, ...narrationFor(c.company_id, c.guid) }));
   return out;
 }
 
@@ -176,7 +195,10 @@ async function results(req, res, next) {
         [...args, pageSize, (page - 1) * pageSize]),
       rowsOf(`SELECT COUNT(*) AS total FROM (${base})`, args),
     ]);
-    res.json({ rows: rows.map((r) => shapeResult(r)), total: Number(total), page, page_size: pageSize });
+    const rule = await loadNarrationRule(db);
+    res.json({
+      rows: rows.map((r) => shapeResult(r, { rule })), total: Number(total), page, page_size: pageSize,
+    });
   } catch (err) { next(err); }
 }
 
@@ -192,7 +214,7 @@ async function loadResult(kind, id) {
 async function result(req, res, next) {
   try {
     const row = await loadResult(req.params.kind, req.params.id);
-    const out = shapeResult(row, { full: true });
+    const out = await fullResult(row);
     const [lines, rtvRows, links] = await Promise.all([
       rowsOf('SELECT line_no, item_code, qty, sku_code FROM roms_po_lines WHERE po_id = ? ORDER BY line_no', [row.po_id]),
       rowsOf(`SELECT t.id, t.rtv_no, t.cn_number, t.status, r.outcome, r.reason, r.voucher_number FROM roms_rtv t
@@ -283,7 +305,7 @@ async function decide(req, res, next, action) {
     });
     await rematch(db);
     const fresh = await loadResult(kind, id);
-    res.json(shapeResult(fresh, { full: true }));
+    res.json(await fullResult(fresh));
   } catch (err) { sendError(res, next, err); }
 }
 
@@ -300,14 +322,19 @@ async function searchVouchers(req, res, next) {
     const q = String(req.query.q || '').trim();
     if (q.length < 2) return res.json({ rows: [] });
     const rows = await rowsOf(
-      `SELECT v.company_id, c.code AS company, v.guid, v.number, v.date, v.party, v.voucher_type, v.total_paise
+      `SELECT v.company_id, c.code AS company, v.guid, v.number, v.date, v.party, v.voucher_type, v.base_type, v.narration, v.total_paise
          FROM tally_vouchers v JOIN tally_companies c ON c.id = v.company_id
         WHERE v.deleted_at IS NULL AND c.sync_enabled = 1 AND v.base_type = ? AND v.is_cancelled = 0
           AND (v.number LIKE ? OR v.party LIKE ?)
         ORDER BY v.date DESC LIMIT 20`,
       [kind === 'po' ? 'Sales' : 'Credit Note', `%${q}%`, `%${q}%`],
     );
-    res.json({ rows: rows.map((r) => ({ ...r, company_id: Number(r.company_id), total_paise: r.total_paise == null ? null : Number(r.total_paise) })) });
+    const rule = await loadNarrationRule(db);
+    res.json({
+      rows: rows.map((r) => ({
+        ...r, ...narrationOf(rule, r), company_id: Number(r.company_id), total_paise: r.total_paise == null ? null : Number(r.total_paise),
+      })),
+    });
   } catch (err) { next(err); }
 }
 
@@ -452,7 +479,7 @@ async function partyLedgers(req, res, next) {
       LEFT JOIN users u ON u.id = pl.updated_by
      WHERE ${where.join(' AND ')}`;
     const [rows, [{ total }], [{ suggestions }]] = await Promise.all([
-      rowsOf(`SELECT l.company_id, c.code AS company, l.guid, l.name, l.gstin, vc.n AS vouchers,
+      rowsOf(`SELECT l.company_id, c.code AS company, l.guid, l.name, l.gstin, l.state, vc.n AS vouchers,
                      pl.kind, pl.vendor, pl.source, pl.suggested_vendor, COALESCE(pl.suggested_votes, 0) AS suggested_votes,
                      pl.updated_at, u.name AS updated_by_name
               ${base} ORDER BY (pl.kind IS NULL) DESC, COALESCE(pl.suggested_votes, 0) DESC, vc.n DESC, l.name LIMIT ? OFFSET ?`,
@@ -462,7 +489,11 @@ async function partyLedgers(req, res, next) {
                WHERE c.sync_enabled = 1 AND pl.kind IS NULL AND pl.suggested_vendor IS NOT NULL`),
     ]);
     res.json({
-      rows: rows.map((r) => ({ ...r, company_id: Number(r.company_id), vouchers: Number(r.vouchers), suggested_votes: Number(r.suggested_votes) })),
+      // Both readings of the state, so a ledger whose Tally state and GSTIN
+      // disagree is flagged.
+      rows: rows.map(({ state, ...r }) => ({
+        ...r, ...statesOf({ state, gstin: r.gstin }), company_id: Number(r.company_id), vouchers: Number(r.vouchers), suggested_votes: Number(r.suggested_votes),
+      })),
       total: Number(total), page, page_size: pageSize, suggestions_waiting: Number(suggestions),
     });
   } catch (err) { next(err); }

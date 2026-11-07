@@ -209,11 +209,11 @@ describeIf('sync: mock Tally -> RAMS', () => {
 
   // What the Ledgers page starts a MH party from (backend ledgers/ledger.js).
   const startOf = async (ledger) => {
-    const { loadSettings, partyVouchers, startingBalance } = require(path.join(BACKEND, 'src', 'ledgers', 'ledger'));
+    const { startingBalanceOf } = require(path.join(BACKEND, 'src', 'ledgers', 'ledger'));
     const mh = books.company('MH');
-    const id = await companyId('MH');
-    const vouchers = await partyVouchers(rams.db, id, ledger.name);
-    return startingBalance(rams.db, id, `ledger-${mh.ledgers.indexOf(ledger)}`, await loadSettings(rams.db), vouchers);
+    return startingBalanceOf(rams.db, {
+      companyId: await companyId('MH'), ledgerGuid: `ledger-${mh.ledgers.indexOf(ledger)}`, ledgerName: ledger.name,
+    });
   };
 
   test("each sync ends with Tally's ledger balances, from which RAMS works out a party's balance on the sync start", async () => {

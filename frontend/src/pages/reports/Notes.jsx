@@ -9,6 +9,8 @@ import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
 import { formatDay, formatDateTime, formatRupees } from '../../utils/formatters';
 import { downloadCsv, rupeesForCsv } from '../../utils/csv';
+import Narration from '../../components/shared/Narration';
+import { narrationForCsv } from '../../utils/highlights';
 
 // Reports -> Credit & debit notes: each Tally CN and DN, the invoices it
 // settles (Agst Ref), their PO, the RTV row it was linked to, and whether its
@@ -37,7 +39,7 @@ export default function Notes() {
     try {
       const all = await getNotes({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page_size: 10000 });
       downloadCsv('rams-credit-debit-notes.csv', [
-        ['Company', (r) => r.company], ['Type', (r) => (r.type === 'cn' ? 'Credit note' : 'Debit note')], ['Number', (r) => r.number], ['Date', (r) => r.date],
+        ['Company', (r) => r.company], ['Type', (r) => (r.type === 'cn' ? 'Credit note' : 'Debit note')], ['Number', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForCsv],
         ['Party', (r) => r.party], ['Against', (r) => r.against.join(' ')], ['PO', (r) => r.pos.join(' ')], ['RTV', (r) => r.rtv?.rtv_no || ''],
         ['Amount', (r) => rupeesForCsv(r.amount_paise)],
       ], all.rows);
@@ -78,6 +80,7 @@ export default function Notes() {
             <td className={`${td} whitespace-nowrap`}>
               <Badge color={r.type === 'cn' ? 'blue' : 'purple'}>{r.type === 'cn' ? 'CN' : 'DN'}</Badge> <span className="font-medium">{r.number}</span>
               <p className="text-xs text-gray-400">{r.company} · {formatDay(r.date)}</p>
+              <Narration text={r.narration} missing={r.narration_missing} className="mt-0.5 whitespace-normal" />
             </td>
             <td className={`${td} max-w-[16rem]`}>{r.party}{r.vendor && <p className="text-xs text-gray-400">{r.vendor}</p>}</td>
             <td className={td}>

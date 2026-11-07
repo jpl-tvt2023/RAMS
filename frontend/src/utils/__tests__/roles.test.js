@@ -28,7 +28,8 @@ describe('the RAMS role set', () => {
       expect(by(label).roles).toBe(ADMIN_ONLY);
       expect(by(label).permission).toBeUndefined();
     }
-    expect(by('Tally companies').permission).toEqual([PERM.SYNC_COMPANIES, PERM.SYNC_SCHEDULE]);
+    expect(by('Tally companies').permission).toEqual([PERM.SYNC_COMPANIES, PERM.SYNC_SCHEDULE, PERM.NARRATION_SETTINGS]);
+    expect(by('Credit terms').permission).toBe(PERM.REPORTS_SETTINGS);
   });
 
   test('the Matching pages follow "See matching", and Auto-fill "See auto-fill"', () => {

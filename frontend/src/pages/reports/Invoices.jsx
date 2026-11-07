@@ -11,6 +11,8 @@ import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
 import { formatDay, formatRupees } from '../../utils/formatters';
 import { downloadCsv, rupeesForCsv } from '../../utils/csv';
+import Narration from '../../components/shared/Narration';
+import { narrationForCsv } from '../../utils/highlights';
 
 // Reports -> Invoices: every Tally sales invoice since RAMS started, with its
 // marketplace, PO, what settled it and what is still owed. Stock transfers are
@@ -39,7 +41,7 @@ export default function Invoices() {
     try {
       const all = await getInvoices({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page_size: 10000 });
       downloadCsv('rams-invoices.csv', [
-        ['Company', (r) => r.company], ['Invoice', (r) => r.number], ['Date', (r) => r.date], ['Party', (r) => r.party],
+        ['Company', (r) => r.company], ['Invoice', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForCsv], ['Party', (r) => r.party],
         ['Marketplace', (r) => r.vendor || ''], ['PO', (r) => r.pos.join(' ')], ['Taxable', (r) => rupeesForCsv(r.taxable_paise)],
         ['GST', (r) => rupeesForCsv(r.gst_paise)], ['Total', (r) => rupeesForCsv(r.total_paise)], ['Received', (r) => rupeesForCsv(r.received_paise)],
         ['Credit notes', (r) => rupeesForCsv(r.credit_notes_paise)], ['TDS', (r) => rupeesForCsv(r.tds_paise)], ['Adjustments', (r) => rupeesForCsv(r.adjustments_paise)],
@@ -101,7 +103,7 @@ export default function Invoices() {
       >
         {view.rows.map((r) => (
           <tr key={r.guid} className="border-b border-gray-100 align-top">
-            <td className={`${td} whitespace-nowrap`}><span className="font-medium">{r.number}</span><p className="text-xs text-gray-400">{r.company} · {formatDay(r.date)}</p></td>
+            <td className={`${td} whitespace-nowrap`}><span className="font-medium">{r.number}</span><p className="text-xs text-gray-400">{r.company} · {formatDay(r.date)}</p><Narration text={r.narration} missing={r.narration_missing} className="mt-0.5 whitespace-normal" /></td>
             <td className={`${td} max-w-[16rem]`}>{r.party}</td>
             <td className={td}>
               {r.vendor || <span className="text-gray-400">not known</span>}

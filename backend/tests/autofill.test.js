@@ -111,7 +111,9 @@ describe('Off — the starting point', () => {
 
     const items = await itemsOf(viewer.token);
     const by = Object.fromEntries(items.map((i) => [i.id, i]));
-    expect(by.AF1).toMatchObject({ write_kind: 'replace', expected: '701', value: '701/AF/26-27', date: '2026-07-01', state: 'to_check' });
+    expect(by.AF1).toMatchObject({
+      write_kind: 'replace', expected: '701', value: '701/AF/26-27', date: '2026-07-01', state: 'to_check', voucher_number: '701/AF/26-27', narration_missing: false,
+    });
     expect(by.AF2).toMatchObject({ write_kind: 'fill', expected: null, value: '702/AF/26-27' });
     expect(by.AF3).toMatchObject({ write_kind: 'date', expected: '703/AF/26-27', expected_date: '2026-07-05', date: '2026-07-01' });
     expect(by.AF4).toBeUndefined(); // needs review, not linked

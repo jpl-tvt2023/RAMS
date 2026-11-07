@@ -121,6 +121,9 @@ describe('running a match', () => {
 
     const detail = await resultOf(viewer.token, 'po', 'MT3');
     expect(detail.candidates.map((c) => c.number)).toEqual(['MT1219/RM/26-27']);
+    // Each candidate carries its narration, read from Tally's copy now.
+    expect(detail.candidates[0]).toHaveProperty('narration_missing', false);
+    expect(detail).toHaveProperty('narration_missing');
     expect(detail.lines).toEqual([expect.objectContaining({ item_code: '10192283', sku_code: 'WB003' })]);
     expect(detail.rtv_rows).toEqual([expect.objectContaining({ rtv_no: expect.any(String) })].slice(0, detail.rtv_rows.length));
   });
@@ -128,6 +131,9 @@ describe('running a match', () => {
   test('lists filter by status, reason, vendor and a search', async () => {
     const review = await get(viewer.token, '/results?kind=po&outcome=review&q=MT');
     expect(review.body.rows.map((r) => r.id)).toEqual(['MT3']);
+    const linked = (await get(viewer.token, '/results?kind=po&outcome=linked&q=MT')).body.rows;
+    expect(linked.every((r) => typeof r.narration_missing === 'boolean')).toBe(true);
+    expect(linked.some((r) => r.narration)).toBe(true);
     const search = await get(viewer.token, '/results?kind=po&q=MT602');
     expect(search.body.rows.map((r) => r.id)).toEqual(['MT2']);
     const byVendor = await get(viewer.token, '/results?kind=po&vendor=Flipkart&q=MT');
@@ -223,7 +229,9 @@ describe('people decide', () => {
 
   test('vouchers can be searched to pick one that is not a candidate', async () => {
     const res = await get(viewer.token, '/vouchers?kind=po&q=MT1819');
-    expect(res.body.rows).toEqual([expect.objectContaining({ number: 'MT1819/RM/26-27', company: 'HR' })]);
+    expect(res.body.rows).toEqual([expect.objectContaining({
+      number: 'MT1819/RM/26-27', company: 'HR', narration: expect.any(String), narration_missing: false,
+    })]);
   });
 });
 

@@ -4,15 +4,29 @@ import userEvent from '@testing-library/user-event';
 import Companies from '../Companies';
 import { renderWithProviders, ADMIN, VIEWER } from '../../../test/renderWithProviders';
 import * as companiesApi from '../../../api/companies.api';
+import * as settingsApi from '../../../api/settings.api';
 
 vi.mock('../../../api/companies.api', () => ({ listCompanies: vi.fn(), updateCompany: vi.fn() }));
 vi.mock('../../../api/audit.api', () => ({ getEntityHistory: vi.fn().mockResolvedValue([]) }));
+const NARRATION = {
+  types: null,
+  required_from: '2026-06-08',
+  sync_from: '2026-06-08',
+  base_types: [
+    { base_type: 'Sales', total: 1191, without: 1191, without_from: 1191, required: true },
+    { base_type: 'Receipt', total: 407, without: 387, without_from: 387, required: true },
+  ],
+  updated_at: null,
+  updated_by_name: null,
+};
 vi.mock('../../../api/settings.api', () => ({
   getSyncSchedule: vi.fn().mockResolvedValue({
     office_days: [1, 2, 3, 4, 5, 6], office_start: '09:00', office_end: '20:00', light_every_minutes: 60,
     heavy_after: '19:30', backfill_in_office_hours: false, updated_at: null, updated_by_name: null,
   }),
   updateSyncSchedule: vi.fn(),
+  getNarrationRule: vi.fn(),
+  updateNarrationRule: vi.fn(),
 }));
 
 const row = (overrides) => ({
@@ -23,7 +37,10 @@ const row = (overrides) => ({
 });
 
 describe('Tally companies page', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    settingsApi.getNarrationRule.mockResolvedValue(NARRATION);
+  });
 
   test('lists the companies the Connector has seen, and turns sync on after a confirm', async () => {
     companiesApi.listCompanies.mockResolvedValue([
@@ -92,5 +109,29 @@ describe('Tally companies page', () => {
     expect(await screen.findByText('Roymax Products LLP ( Maharashtra )')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /Edit/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Turn sync/ })).not.toBeInTheDocument();
+  });
+
+  test('the narration check: what is highlighted today, and an Admin narrows it', async () => {
+    companiesApi.listCompanies.mockResolvedValue([row()]);
+    settingsApi.getNarrationRule.mockResolvedValue(NARRATION);
+    settingsApi.updateNarrationRule.mockResolvedValue({ ...NARRATION, types: ['Receipt'] });
+    renderWithProviders(<Companies />, { user: ADMIN });
+    const panel = (await screen.findByRole('heading', { name: /Narration check/ })).closest('section');
+    expect(await within(panel).findByText('any voucher type')).toBeInTheDocument();
+    expect(within(panel).getByText('1,578')).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole('button', { name: /Edit/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Narration check' });
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Sales' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    expect(settingsApi.updateNarrationRule).toHaveBeenCalledWith({ types: ['Receipt'], required_from: '2026-06-08' });
+  });
+
+  test('the narration check is read-only without its permission', async () => {
+    companiesApi.listCompanies.mockResolvedValue([row()]);
+    settingsApi.getNarrationRule.mockResolvedValue(NARRATION);
+    renderWithProviders(<Companies />, { user: VIEWER });
+    const panel = (await screen.findByRole('heading', { name: /Narration check/ })).closest('section');
+    await within(panel).findByText('any voucher type');
+    expect(within(panel).queryByRole('button', { name: /Edit/ })).not.toBeInTheDocument();
   });
 });

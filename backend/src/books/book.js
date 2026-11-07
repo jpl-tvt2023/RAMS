@@ -35,6 +35,10 @@ const addDays = (iso, days) => {
   return d.toISOString().slice(0, 10);
 };
 const bucketOf = (age) => BUCKETS.find((b) => age <= b.max).key;
+// TDS the party deducted: a Journal with a line on a TDS ledger (TDS
+// Receivable (FY 2026-27), say). Ledgers uses the same rule for its TDS column.
+const TDS_LEDGER = /\bTDS\b/i;
+const isTdsJournal = (baseType, ledgers) => baseType === 'Journal' && ledgers.some((l) => TDS_LEDGER.test(l));
 
 async function loadSettings(client) {
   const [{ rows: [s] }, { rows: terms }] = await Promise.all([
@@ -117,8 +121,8 @@ async function loadBook(client, { today = todayIst() } = {}) {
     if (!linesOf.has(k)) linesOf.set(k, []);
     linesOf.get(k).push(l);
   }
-  const isTdsJournal = new Set([...linesOf.entries()]
-    .filter(([id, ls]) => byId.get(id)?.base_type === 'Journal' && ls.some((l) => /\bTDS\b/i.test(l.ledger)))
+  const tdsJournals = new Set([...linesOf.entries()]
+    .filter(([id, ls]) => isTdsJournal(byId.get(id)?.base_type, ls.map((l) => l.ledger)))
     .map(([id]) => id));
 
   // Every allocation, by bill: company | party ledger | bill name.
@@ -176,7 +180,7 @@ async function loadBook(client, { today = todayIst() } = {}) {
           balance += a.amount;
           if (Number(a.voucher.id) === id) continue;
           const bt = a.voucher.base_type;
-          const field = bt === 'Receipt' ? 'received' : bt === 'Credit Note' ? 'credit_notes' : bt === 'Journal' && isTdsJournal.has(Number(a.voucher.id)) ? 'tds' : 'adjustments';
+          const field = bt === 'Receipt' ? 'received' : bt === 'Credit Note' ? 'credit_notes' : bt === 'Journal' && tdsJournals.has(Number(a.voucher.id)) ? 'tds' : 'adjustments';
           settled[field] += a.amount;
           settledBy.push({
             guid: a.voucher.guid, base_type: bt, voucher_type: a.voucher.voucher_type, number: a.voucher.number, date: a.voucher.date, amount_paise: a.amount, as: field,
@@ -292,5 +296,5 @@ function receivables(book, { companyId = null } = {}) {
 }
 
 module.exports = {
-  loadBook, loadSettings, receivables, groupChains, BUCKETS, daysBetween, addDays,
+  loadBook, loadSettings, receivables, groupChains, BUCKETS, daysBetween, addDays, isTdsJournal, TDS_LEDGER,
 };

@@ -70,6 +70,9 @@ describe('Match review', () => {
     expect(api.listResults).toHaveBeenCalledWith(expect.objectContaining({ kind: 'po', outcome: 'review' }));
     expect(screen.getByText('687')).toBeInTheDocument();
     expect(screen.getByText(/ROMS read/)).toBeInTheDocument();
+    // The legend: one meaning per colour, from the badges' own map.
+    const legend = screen.getByRole('note', { name: 'What the colours mean' });
+    for (const label of ['Linked', 'Needs review', 'Waiting for Tally', 'Not matched', 'No narration']) expect(within(legend).getByText(label)).toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /687 Linked/ }));

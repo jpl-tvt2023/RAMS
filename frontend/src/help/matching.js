@@ -44,6 +44,8 @@ export const matchReview = {
     },
   ],
   faq: [
+    { q: 'What do the colours mean?', a: 'Green: Linked. Amber: Needs review. Grey: Waiting for Tally. Blue: Not matched, on purpose. The legend under the table says the same, and a yellow highlight is a Tally invoice with no narration.' },
+    { q: 'Why is a narration highlighted in yellow?', a: 'Tally has no narration on that record, and the narration check (Admin → Tally companies) says it needs one. Ask the accountant to add it in Tally; it shows after the next sync.' },
     { q: 'Will RAMS change anything in ROMS?', a: 'Only through auto-fill, and only the Bill No + Bill Date of a linked PO and the CN No + CN Date of a linked RTV row. Each field is Off until an Admin switches it on, on Matching → Auto-fill.' },
     { q: 'Why is a PO "Waiting for Tally" when it was dispatched?', a: 'The accountant hasn’t entered its invoice in Tally yet, or the invoice’s Buyer’s Order No is missing or different. Once the invoice is in Tally, the next match links it.' },
     { q: 'What does "Bill No differs" mean?', a: 'The Buyer’s Order No points at one invoice, but the Bill No typed in ROMS is a different number. Usually a typing mistake in ROMS, or an invoice that was cancelled and re-issued. Pick the right invoice.' },
@@ -120,6 +122,7 @@ export const partyLedgers = {
     },
   ],
   faq: [
+    { q: 'What does “State differs” mean?', a: 'The ledger’s state in Tally and the state of its GSTIN disagree (the first two digits of a GSTIN are its state). The GSTIN’s state is shown under it. Correct the ledger’s state in Tally; RAMS picks it up after the next end-of-day check.' },
     { q: 'What does "From GSTIN" mean?', a: 'The ledger’s GSTIN carries Roymax’s own PAN, so RAMS knows it is one of our registrations. If that is wrong (a supplier saved with our GSTIN by mistake), fix the GSTIN in Tally, or map the ledger by hand.' },
     { q: 'What happens when a ledger is mapped to another marketplace?', a: 'An invoice billed to it can’t be linked to this marketplace’s PO without a person: the PO goes to Needs review.' },
   ],
@@ -133,6 +136,7 @@ export const generalFaq = {
   summary: 'Questions that come up across RAMS.',
   flows: [],
   faq: [
+    { q: 'Why is a narration highlighted in yellow?', a: 'Tally has no narration on that record, and the narration check (Admin → Tally companies) says it needs one. Ask the accountant to add it in Tally; it shows after the next sync.' },
     { q: 'Where does RAMS get its data?', a: 'From Tally, through the RAMS Connector on the office PC, which only reads Tally and never changes it. And from ROMS, which RAMS reads to find the POs and RTV rows.' },
     { q: 'Why can’t I see a page or a button?', a: 'Your role isn’t allowed to use it. An Admin or Owner decides what each role may do on Admin → Roles & permissions.' },
     { q: 'Something looks wrong in RAMS.', a: 'Check the Dashboard first: if the Connector is offline or Tally isn’t answering, RAMS shows the last data it had. Otherwise tell an Admin, with the PO or invoice number.' },

@@ -13,6 +13,7 @@ const TITLES = [
   ['/admin/audit-log', 'Audit Log'],
   ['/admin/companies', 'Tally companies'],
   ['/admin/permissions', 'Roles & permissions'],
+  ['/admin/credit-terms', 'Credit terms'],
   ['/matching', 'Match review'],
   ['/matching/rules', 'Matching rules'],
   ['/matching/parties', 'Party ledgers'],

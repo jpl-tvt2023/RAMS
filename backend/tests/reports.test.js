@@ -227,7 +227,9 @@ describe('settings, permissions and Sync now', () => {
     const res = await bearer(request(app).put('/api/reports/settings'), accountant.token).send({ exception_days: 5 });
     expect(res.status).toBe(200);
     expect(res.body.settings).toMatchObject({ exception_days: 5, default_credit_days: 30 });
-    expect(res.body.terms).toEqual(expect.arrayContaining([{ vendor: 'Scootsy', credit_days: 5, updated_at: null, updated_by_name: null }]));
+    expect(res.body.terms).toEqual(expect.arrayContaining([{
+      vendor: 'Scootsy', credit_days: 5, transfer: false, updated_at: null, updated_by_name: null,
+    }]));
     const { rows: [audit] } = await db.execute("SELECT * FROM audit_logs WHERE action_type = 'REPORT_SETTINGS_UPDATE' ORDER BY id DESC LIMIT 1");
     expect(JSON.parse(audit.changes)).toEqual([{ field: 'exception_days', old: 15, new: 5 }]);
     expect((await bearer(request(app).put('/api/reports/settings'), accountant.token).send({ exception_days: 0 })).status).toBe(400);
@@ -248,6 +250,40 @@ describe('settings, permissions and Sync now', () => {
     await agentPost(agent.token, `/runs/${run}/finish`, { ok: true });
     const runs = await bearer(request(app).get(`/api/sync/runs?company_id=${company.id}`), viewer.token);
     expect(runs.body.rows[0]).toMatchObject({ id: run, kind: 'light', status: 'ok' });
+  });
+});
+
+describe('narrations and the credit terms preview', () => {
+  test('each invoice and its credit notes carry their narration, and a missing one is flagged', async () => {
+    await db.execute({ sql: "UPDATE tally_vouchers SET narration = NULL WHERE company_id = ? AND guid = 'rp-902'", args: [company.id] });
+    const { body } = await get(viewer.token, `/debtors?${q}&page_size=100`);
+    const byNumber = Object.fromEntries(body.rows.map((r) => [r.number, r]));
+    expect(byNumber['901/RP/26-27']).toMatchObject({ narration: 'PO P4588464', narration_missing: false });
+    expect(byNumber['901/RP/26-27'].credit_notes[0]).toMatchObject({ narration: 'PO P4588464', narration_missing: false });
+    expect(byNumber['902/RP/26-27']).toMatchObject({ narration: null, narration_missing: true });
+    const invoices = await get(viewer.token, `/invoices?${q}&page_size=100`);
+    const inv = invoices.body.rows.find((r) => r.number === '901/RP/26-27');
+    expect(inv.settled_by.every((s) => 'narration_missing' in s)).toBe(true);
+    const notes = await get(viewer.token, `/notes?${q}`);
+    expect(notes.body.rows[0]).toHaveProperty('narration_missing', false);
+  });
+
+  test('a change to credit days is previewed before it is saved; nothing is written', async () => {
+    const preview = (token, query) => get(token, `/terms/preview?${query}`);
+    const res = await preview(accountant.token, 'vendor=Blinkit&credit_days=365');
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ vendor: 'Blinkit', credit_days: 365, effective_days: 365 });
+    expect(res.body.open_invoices).toBeGreaterThan(0);
+    expect(res.body.overdue_after).toBe(0); // nothing here is a year old
+    expect(res.body.stop_overdue).toBe(res.body.overdue_now);
+    const back = await preview(accountant.token, 'vendor=Blinkit&credit_days=');
+    expect(back.body).toMatchObject({ credit_days: null, effective_days: 30, become_overdue: 0, stop_overdue: 0 });
+    expect((await preview(accountant.token, 'credit_days=10')).body).toMatchObject({ vendor: null, effective_days: 10 });
+    expect((await preview(accountant.token, 'credit_days=')).status).toBe(400);
+    expect((await preview(accountant.token, 'vendor=Blinkit&credit_days=400')).status).toBe(400);
+    expect((await preview(viewer.token, 'vendor=Blinkit&credit_days=5')).status).toBe(403);
+    const { rows } = await db.execute("SELECT credit_days FROM vendor_terms WHERE vendor = 'Blinkit'");
+    expect(rows).toHaveLength(0);
   });
 });
 

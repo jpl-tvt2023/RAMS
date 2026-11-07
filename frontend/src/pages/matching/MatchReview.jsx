@@ -6,6 +6,8 @@ import AppShell from '../../components/layout/AppShell';
 import Button from '../../components/ui/Button';
 import Pagination, { loadPersistedPageSize, persistPageSize } from '../../components/ui/Pagination';
 import HelpLink from '../../components/shared/HelpLink';
+import Narration from '../../components/shared/Narration';
+import Legend from '../../components/shared/Legend';
 import MatchDetail, { OutcomeBadge } from '../../components/matching/MatchDetail';
 import { getMatchingSummary, listResults, runMatching } from '../../api/matching.api';
 import { getAutofillSummary } from '../../api/autofill.api';
@@ -28,6 +30,10 @@ const TILE_COLORS = {
   waiting: 'border-gray-200 bg-gray-50 text-gray-700',
   not_matched: 'border-blue-200 bg-blue-50 text-blue-800',
 };
+// The status colours, from the same map the badges use.
+const OUTCOME_LEGEND = Object.entries(OUTCOMES).map(([key, o]) => ({
+  key, color: o.color, label: o.label, help: o.help,
+}));
 const DEFAULT_FILTERS = { kind: 'po', outcome: 'review', reason: '', vendor: '', company_id: '', q: '' };
 
 function RomsLine({ summary }) {
@@ -238,6 +244,7 @@ export default function MatchReview() {
                       <>
                         <span className="font-medium">{r.voucher_number}</span>
                         <p className="text-xs text-gray-400">{r.company} · {formatDay(r.voucher_date)}</p>
+                        <Narration text={r.narration} missing={r.narration_missing} className="mt-0.5 whitespace-normal" />
                       </>
                     ) : <span className="text-gray-400">—</span>}
                   </td>
@@ -262,6 +269,7 @@ export default function MatchReview() {
             <EmptyState summary={summary} filters={filters} />
           )}
         </div>
+        <Legend items={OUTCOME_LEGEND} withNarration className="px-4 py-2 border-t border-gray-100" />
         <Pagination
           page={page}
           pageSize={pageSize}

@@ -77,7 +77,7 @@ RAMS keeps a copy of the books of **MH, HR and WB** from **8 June 2026** (when R
 | In Tally | Why RAMS needs it |
 |---|---|
 | Ledger name, alias and group (for example *Sundry Debtors*, *Sales Accounts*, *Duties & Taxes*) | To know which ledgers are customers, which are sales and which are GST |
-| Ledger GSTIN and state | To tell which marketplace a party ledger belongs to, and which ledgers are Roymax's own registrations |
+| Ledger GSTIN and state (the latest dated entry) | To tell which marketplace a party ledger belongs to and which ledgers are Roymax's own registrations, and to filter *Ledgers* by state |
 | Bill-wise on/off | To know whether Tally tracks a party's invoices one by one |
 | Each ledger's closing balance | To start each party's balance on *Ledgers* from Tally's own figure |
 
@@ -96,7 +96,7 @@ RAMS keeps a copy of the books of **MH, HR and WB** from **8 June 2026** (when R
 | **Order details → Buyer's Order No** | **The main link to ROMS:** the marketplace PO number typed on the invoice finds the ROMS order |
 | Party ledger, party GSTIN | Which customer and marketplace the invoice is for |
 | Reference no and date | The supplier's invoice number, on purchases |
-| Narration (first 300 characters) | Shown when explaining a voucher |
+| Narration (up to 2,000 characters) | Shown next to the voucher on every screen; a voucher without one is highlighted |
 | Cancelled / optional flags | Cancelled and optional vouchers are ignored |
 | Total amount | Invoiced value |
 | Ledger lines (ledger, amount, debit or credit) | Taxable value, GST, and TDS on journals |
@@ -203,37 +203,60 @@ Until the rest arrive, RAMS keeps working in the background: it copies the books
 
 **Something to start on in Tally now:** several marketplaces pay into a *head-office* ledger "On Account", not against the warehouse-ledger invoices. In Tally's bill-wise view, those invoices therefore look unpaid. Setting those receipts against their invoices in Tally will make the figures exact when the reports arrive.
 
-## 11. Ledgers: a party's day, checked against Tally
+## 11. Ledgers: the bill-to-bill statement
 
-**Ledgers** has its own item in the top bar. It is where your team records each party's day, and RAMS checks it against Tally.
+**Ledgers** has its own item in the top bar. It shows the statement of each party of the marketplaces that **pay bill to bill**: **Minutes, Now and Zepto** to begin with. Blinkit and Scootsy say *coming soon*, while their format is worked out.
 
-1. Choose the **marketplace** (for example Blinkit), then one of its **parties** (for example BLINK COMMERCE PVT LTD(MUMBAI M12)), then the **day** (today, to begin with).
-2. RAMS shows the party's **opening balance** on that day.
-3. Your team enters that day's **invoices, debit notes, credit notes and receipts** for the party: what it is, its number and the amount. A receipt can carry its bank reference (UTR).
-4. RAMS works out the **closing balance**, and checks every entry against Tally's vouchers for that party and day.
+1. Choose the **company** (or all), the **marketplace** (or all), the **states** and the **parties** (each can be *All*). Nothing is chosen until you choose it.
+2. Choose the **dates**. It starts on this month to date.
+3. RAMS shows one row per party:
 
-| On screen | What it means |
+| Opening | Invoice | DN | CN | TDS | Journal / Adjustment | Receipt | Closing |
+|---|---|---|---|---|---|---|---|
+| 100 | +10 | −2 | −3 | −0.1 | +2 | −5 | 101.9 |
+
+**Every figure comes from Tally.** The invoices and receipts are not typed in RAMS any more. Opening plus the six columns is the closing, which is Tally's own balance at the end of the range and the next range's opening.
+
+| Column | From Tally |
 |---|---|
-| **In Tally** | Tally has the same voucher, on the same day, for the same amount (₹1 slack for rounding) |
-| **Amount differs** | Tally has it, for a different amount |
-| **Different day** | Tally has the same number within a week, on another date |
-| **Not in Tally yet** | Not in Tally, but Tally may not be written up yet. This lasts 2 days, a setting you can change |
-| **Not in Tally** | Still missing after those days |
-| **Only in Tally** | Tally has a voucher on the party that nobody entered here, a journal or TDS for example |
+| Invoice | Sales vouchers |
+| DN | Credit notes booked for a debit note the marketplace raised on you (for example FKIDN51463346) |
+| CN | Your other credit notes (for example the monthly discount) |
+| TDS | Journals on a TDS ledger (TDS Receivable) |
+| Journal / Adjustment | Every other voucher, such as discount round-offs |
+| Receipt | Receipts. One receipt for several warehouses counts each warehouse's own part |
 
-The day as a whole says **Matches Tally**, **Waiting for Tally** or **Differs from Tally by ₹…**, and shows RAMS's closing and Tally's side by side. Every day that differs is listed under *Needs attention* when you open Ledgers. A party is checked from the first day anyone enters something for it.
+**Debit and credit notes are also typed in RAMS**, from the marketplace's portal, and RAMS checks each one against Tally:
+- A **marketplace DN** is found by its number in a Tally credit note's narration, on any date: they are booked 6 to 46 days later. On your real books, each of the 16 DN numbers written in narrations finds exactly its own credit note.
+- **Our CN** is found by Tally's credit note number.
 
-**What you enter stays in RAMS.** It is never sent to Tally. The accountant posts in Tally as always, and RAMS compares the two.
+Each colour means one thing:
 
-**The opening balance comes from Tally.** Each time the Connector reads Tally, it also reads every ledger's balance. From that, RAMS works out the party's balance at the start of any day, so each day opens on what Tally shows for the party that morning. The screen marks it *From Tally*.
-- We checked this on your real books (the copy of 24 October). For 44 Blinkit, Instamart and Zepto ledgers, Tally's balance at 31 March, less the vouchers since 1 August, gave exactly Tally's own balance for 31 July, to the paisa.
-- If a sync ever can't read the balances (for example, while the office PC still runs an older Connector), a party starts at a **placeholder of ₹10,000** on 8 June instead. Tally's real vouchers carry it forward, and the screen marks it *Placeholder, not from Tally*. The next sync that reads the balances puts the real figure back.
-- The day's check doesn't depend on the opening either way: it compares the entries with Tally's vouchers.
+| Colour | Meaning |
+|---|---|
+| Green ✓ | Matches: RAMS and Tally agree |
+| Purple ≠ | Two sources disagree: an amount, a DN booked twice in Tally, or a party's state |
+| Blue ⚖ | Matched by amount only: Tally has a credit note for the same amount, but its narration doesn't name the DN |
+| Grey ⏳ | Waiting: not on the other side yet. A typed note waits up to 60 days for Tally; a Tally credit note waits 2 days to be typed (both are settings) |
+| Red ✗ | Missing: typed here but not in Tally, or in Tally but not typed here |
+| Yellow | No narration (see below) |
+
+Click a party to see the notes typed for it and every Tally voucher, with its narration and the running balance. *Needs attention* lists every party with something red or purple.
+
+**What you type stays in RAMS.** It is never sent to Tally.
+
+**The opening balance comes from Tally**, as before: each sync reads every ledger's balance. If a sync can't read it, the party starts on a placeholder of ₹10,000 on 8 June, carried forward by Tally's real vouchers.
+
+### Narrations, everywhere
+Every Tally record RAMS shows (on Ledgers, Debtors, Match review and Auto-fill, and on the report screens still to come) now shows its **narration**. A record without one is **highlighted in yellow**, so the accountants can add it in Tally. Today almost no invoice or receipt has a narration (362 of 362 invoices on Minutes, Now and Zepto), so a lot will be highlighted at first. Which voucher types need a narration, and from which date, is a setting on *Admin → Tally companies* (*Narration check*).
+
+### States: Tally's and the GSTIN's
+Each party has two states: the one on its ledger in Tally, and the one its GSTIN belongs to (the first two digits). Where they disagree, RAMS shows **State differs** so the ledger can be corrected in Tally. The *State* filter lists a party under both, so it is never hidden. On the 4 October copy, 15 ledgers in MH disagree: all say Maharashtra in Tally. RAMS used to read the oldest address of a ledger rather than the latest; the new Connector (0.7.0) reads the latest.
 
 **To decide together:**
-- **Head-office ledgers.** Marketplaces often pay into a head-office ledger, so the warehouse parties show invoices and credit notes but no receipts. On the real data, the Blinkit warehouse ledgers have no receipts at all. Map each head-office ledger to its marketplace on *Matching → Party ledgers*, so receipts can be entered against it.
-- **Journals and TDS.** Only four kinds of entry are made here, so Tally's journals and TDS show as *Only in Tally*. Should there be a fifth kind, or should some Tally voucher types count without an entry?
-- **Locking a checked day.** Should a day be locked once it is checked?
+- **Zepto's head-office ledgers.** Zepto pays into *ZEPTO PAYMENT* and *ZEPTO PVT LTD*, not each warehouse, so its warehouse rows show invoices but no receipts. Map those two ledgers to Zepto on *Matching → Party ledgers*. Three new Zepto dark stores (Coimbatore, Gurgaon Sohna, Hoogly) need mapping too.
+- **The 60-day booking window.** A DN typed here stays grey for up to 60 days before it turns red. Shorter, if you'd like the accountants nudged sooner.
+- **Narration volume.** Until narrations are written, most invoices and receipts are highlighted. The *Narration check* can narrow it.
 
 ## 12. Who can do what
 
@@ -244,8 +267,10 @@ There are four roles. **Admin and Owner can always do everything**, and they dec
 | See matching and auto-fill | ✓ | ✓ |
 | See Debtors (Reports) | ✓ | ✓ |
 | See Ledgers | ✓ | ✓ |
-| Enter, change and remove ledger entries | ✓ | – |
-| Change the ledger settings (days to wait, tolerance, placeholder opening) | – (Admin/Owner) | – |
+| Enter, change and remove debit and credit notes on Ledgers | ✓ | – |
+| Change the ledger settings (marketplaces, days to wait, tolerance, placeholder opening) | – (Admin/Owner) | – |
+| Change the credit days (*Admin → Credit terms*) | ✓ | – |
+| Change the narration check | – (Admin/Owner) | – |
 | Run matching, confirm or reject links, map ledgers, change matching rules | ✓ | – |
 | Approve auto-fill writes | ✓ | – |
 | Switch auto-fill modes, write over a different value in ROMS | – (Admin/Owner) | – |
@@ -261,7 +286,9 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 - **Each vendor's handling:** match it, treat it as a stock transfer, or ignore it
 - **Which party ledger belongs to which marketplace**
 - **Auto-fill:** each field's mode, whether to rewrite short forms, and which Bill Date to keep
-- **Ledgers:** how many days either side may wait for the other, the amount tolerance, and the placeholder opening
+- **Ledgers:** which marketplaces it covers, how long Tally may take to book a note, how long a credit note may wait to be typed, the amount tolerance and the placeholder opening
+- **Credit terms:** each marketplace's credit days and the default, on *Admin → Credit terms*, with a preview of what a change does before it is saved
+- **The narration check:** which voucher types need a narration, and from which date
 - **What Accountants and Viewers may do**
 
 ## 14. Safety and privacy
@@ -285,7 +312,7 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 | 5 | Matching, with review screens and rules | Done, live on the test setup |
 | 6 | Auto-fill into ROMS | Done, being tried on the test setup |
 | 7 | The report screens | Delivered one at a time, each after you have reviewed it. Debtors is out; the rest follow |
-| – | Ledgers: a party's day, entered in RAMS and checked against Tally | On the website. Opening balances from Tally: built and tested, and go on the test setup after your review |
+| – | Ledgers: the bill-to-bill statement for Minutes, Now and Zepto, with debit and credit notes checked against Tally; narrations and states everywhere; Credit terms | Built and tested; goes on the test setup after your review, with Connector 0.7.0 |
 | 8 | Go-live: production database, Connector installed on the office PC, the trial weeks | Prepared (see *go-live.md*); needs the office PC and your go-ahead |
 
 **Still to be decided:** how to link Flipkart and Amazon stock transfers to their ROMS rows.

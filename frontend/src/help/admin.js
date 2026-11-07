@@ -68,8 +68,8 @@ export const tallyCompanies = {
   id: 'tally-companies',
   path: '/admin/companies',
   area: 'Admin',
-  title: 'Tally companies and the sync schedule',
-  who: 'Admin and Owner, and any role given "Turn company sync on or off" or "Change the sync schedule" on Roles & permissions. The star (the default for reports) goes with "Turn company sync on or off".',
+  title: 'Tally companies, the sync schedule and the narration check',
+  who: 'Admin and Owner, and any role given "Turn company sync on or off", "Change the sync schedule" or "Change the narration check" on Roles & permissions. The star (the default for reports) goes with "Turn company sync on or off".',
   summary: 'Companies are created in Tally by the accountants. RAMS lists every company the Connector sees loaded in Tally; you choose which ones RAMS copies, and when, and which one the reports open on.',
   flows: [
     {
@@ -94,6 +94,15 @@ export const tallyCompanies = {
       ],
     },
     {
+      title: 'Choose which records need a narration',
+      steps: [
+        'The Narration check panel says which Tally records are highlighted when they have no narration, and how many that is today. To begin with it is every voucher type, from 8 June 2026.',
+        'Click Edit. The list shows each voucher type, how many records it has and how many have no narration.',
+        'Untick the types that don’t need one (for example Sales, if invoices never carry a narration), or move the From date to start later.',
+        'Click Save. Every screen that lists Tally records highlights only what the rule asks for. The change is in the Audit Log.',
+      ],
+    },
+    {
       title: 'Choose the company the reports open on',
       steps: [
         'The company marked Default for reports is the one Reports → Debtors opens on (MH to begin with).',
@@ -104,8 +113,56 @@ export const tallyCompanies = {
   ],
   faq: [
     { q: 'A company appears twice.', a: 'It was re-created in Tally, which gives it a new identity. Turn the new one on and the old one off.' },
+    { q: 'Does the narration check change Tally?', a: 'No. It only decides which records RAMS highlights. Records outside it still show their narration.' },
     { q: 'What is the short code?', a: 'How lists show the company (MH, HR, WB). Click the pencil icon to change it.' },
     { q: 'Can the reports open on all companies?', a: 'Each person can choose All companies on the report itself. The default is always one company, so the star moves it rather than clearing it.' },
+  ],
+};
+
+export const creditTerms = {
+  id: 'credit-terms',
+  path: '/admin/credit-terms',
+  area: 'Admin',
+  title: 'Credit terms',
+  who: 'Anyone with "Change credit terms": Admin and Owner always, Accountants by default. An Admin or Owner can give it to, or take it from, other roles on Roles & permissions.',
+  summary: 'How many days each marketplace has to pay an invoice. Debtors marks an invoice overdue once its days have passed. A marketplace without its own days uses the default. Each change shows what it would do before you save it.',
+  flows: [
+    {
+      title: 'Change a marketplace’s credit days',
+      steps: [
+        'Admin → Credit terms.',
+        'Click the pencil on the marketplace’s row.',
+        'Type the days. The box under it says what changes today, for example “Of Zepto’s 140 invoices still owed, 23 would become overdue”.',
+        'Click Save. Debtors uses the new days at once, and the change is in the Audit Log.',
+      ],
+    },
+    {
+      title: 'Go back to the default',
+      steps: [
+        'Click the pencil on the marketplace’s row.',
+        'Tick “Use the default”, check what it changes, and click Save.',
+      ],
+    },
+    {
+      title: 'Change the default',
+      steps: [
+        'Click Edit next to the default. It applies to every marketplace without its own days, and to invoices whose marketplace isn’t known.',
+        'Type the days, check what it changes, and click Save.',
+      ],
+    },
+    {
+      title: 'See who changed what',
+      steps: [
+        'Each row says who last changed it and when.',
+        'The clock next to the default shows its full history; every change is also in the Audit Log.',
+      ],
+    },
+  ],
+  faq: [
+    { q: 'What do the credit days decide?', a: 'When an invoice is overdue: its date plus the days. Debtors shows the due date and how many days overdue.' },
+    { q: 'What does “Default (30)” mean?', a: 'The marketplace has no days of its own, so it uses the default, 30 days to begin with.' },
+    { q: 'Why aren’t Flipkart and Amazon listed?', a: 'They are set to stock transfer on Matching rules: sales between our own registrations, so nothing is owed and nothing is overdue.' },
+    { q: 'Does the preview change anything?', a: 'No. Nothing is saved until you click Save.' },
   ],
 };
 

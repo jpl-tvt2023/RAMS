@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import AppShell from '../../components/layout/AppShell';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
+import { STATE_DIFFERS } from '../../utils/ledgerText';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Pagination, { loadPersistedPageSize, persistPageSize } from '../../components/ui/Pagination';
 import HelpLink from '../../components/shared/HelpLink';
@@ -21,7 +22,7 @@ import { PERM } from '../../utils/roles';
 const selectCls = 'px-3 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand/30 disabled:bg-gray-50';
 const SOURCE = {
   person: <Badge color="green">Confirmed</Badge>,
-  gstin: <Badge color="purple">From GSTIN</Badge>,
+  gstin: <Badge color="blue">From GSTIN</Badge>,
 };
 
 // The select's value for a row: 'vendor:Zepto', 'internal', 'other' or ''.
@@ -128,7 +129,7 @@ export default function PartyLedgers() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                {['Company', 'Ledger', 'GSTIN', 'Vouchers', 'Suggested', 'Maps to', ''].map((h) => (
+                {['Company', 'Ledger', 'GSTIN and state', 'Vouchers', 'Suggested', 'Maps to', ''].map((h) => (
                   <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -140,7 +141,15 @@ export default function PartyLedgers() {
                 <tr key={`${r.company_id}:${r.guid}`} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="px-4 py-3">{r.company}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{r.name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-gray-600">{r.gstin || '—'}</td>
+                  <td className="px-4 py-3">
+                    <span className="font-mono text-xs text-gray-600">{r.gstin || '—'}</span>
+                    {r.state && <p className="text-xs text-gray-500">{r.state}</p>}
+                    {r.state_differs && (
+                      <p className="mt-0.5" title="Tally’s state and the GSTIN’s disagree. Correct the ledger in Tally.">
+                        <Badge color={STATE_DIFFERS.color} icon={STATE_DIFFERS.icon}>State differs: Tally says {r.tally_state}</Badge>
+                      </p>
+                    )}
+                  </td>
                   <td className="px-4 py-3 tabular-nums">{r.vouchers.toLocaleString('en-IN')}</td>
                   <td className="px-4 py-3">
                     {r.suggested_vendor

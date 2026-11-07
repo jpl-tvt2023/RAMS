@@ -19,7 +19,7 @@ export const isReleased = (path) => !HELD.includes(path);
 // on Roles & permissions shows once any of them is released.
 export const PERM_SCREENS = {
   'reports.view': ['/reports/debtors', '/reports/invoices', '/reports/notes', '/reports/transfers', '/reports/receivables', '/reports/exceptions'],
-  'reports.settings': ['/reports/receivables'],
+  'reports.settings': ['/admin/credit-terms', '/reports/receivables'],
   'sync.run': ['/sync'],
   'ledgers.view': ['/ledgers'],
   'ledgers.entry': ['/ledgers'],

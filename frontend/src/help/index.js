@@ -5,7 +5,9 @@
 // (utils/__tests__/help.test.js), so a new screen can't ship without its guide.
 // A screen still held (utils/releases.js) has its section left out.
 import { signingIn, dashboard } from './gettingStarted';
-import { users, auditLog, tallyCompanies, rolesPermissions } from './admin';
+import {
+  users, auditLog, tallyCompanies, creditTerms, rolesPermissions,
+} from './admin';
 import { matchReview, matchingRules, partyLedgers, generalFaq } from './matching';
 import { autoFill } from './autofill';
 import {
@@ -30,6 +32,7 @@ export const HELP_SECTIONS = [
   syncHealthHelp,
   ledgersHelp,
   tallyCompanies,
+  creditTerms,
   rolesPermissions,
   users,
   auditLog,
