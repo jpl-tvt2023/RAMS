@@ -4,16 +4,23 @@ require('dotenv').config();
 // TURSO_AUTH_TOKEN and FRONTEND_URL are read straight from process.env by
 // db.js and app.js, so a remote DB with a blank token boots and then fails on
 // the first query.
-const required = [
-  'TURSO_DATABASE_URL',
-  'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET',
-];
-
-for (const key of required) {
-  if (!process.env[key]) {
-    console.error(`Missing required env variable: ${key}`);
-    process.exit(1);
+function exitIfMissing(keys) {
+  for (const key of keys) {
+    if (!process.env[key]) {
+      console.error(`Missing required env variable: ${key}`);
+      process.exit(1);
+    }
   }
+}
+
+// Every entry point needs the database.
+exitIfMissing(['TURSO_DATABASE_URL']);
+
+// Only the web server signs users in. app.js calls this first, so the API
+// still refuses to boot without the secrets, while the npm scripts (migrate,
+// agent-token, bootstrap-admin...) run with just the database in .env.
+function requireServerEnv() {
+  exitIfMissing(['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET']);
 }
 
 // The first day of Tally books RAMS mirrors: ROMS go-live by default. Changing
@@ -25,6 +32,7 @@ if (!/^\d{4}-\d{2}-\d{2}$/.test(SYNC_FROM)) {
 }
 
 module.exports = {
+  requireServerEnv,
   SYNC_FROM,
   PORT: process.env.PORT || 5001,
   NODE_ENV: process.env.NODE_ENV || 'development',
