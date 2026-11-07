@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Settings, Users, ScrollText, Building2, Link2, ListChecks, SlidersHorizontal, BookUser, ShieldCheck, LifeBuoy, PenLine,
-  FileText, Receipt, ArrowLeftRight, Wallet, AlertTriangle, Activity, BarChart3, IndianRupee, BookOpen,
+  FileText, Receipt, ArrowLeftRight, Wallet, AlertTriangle, Activity, BarChart3, IndianRupee, BookOpen, CalendarClock,
 } from 'lucide-react';
 import { isReleased } from './releases';
 
@@ -44,6 +44,7 @@ export const PERM = {
   LEDGERS_SETTINGS: 'ledgers.settings',
   SYNC_COMPANIES: 'sync.companies',
   SYNC_SCHEDULE: 'sync.schedule',
+  NARRATION_SETTINGS: 'narration.settings',
   SYNC_RUN: 'sync.run',
 };
 
@@ -131,7 +132,7 @@ export const NAV = withoutHeld([
     label: 'Ledgers',
     path: '/ledgers',
     icon: BookOpen,
-    description: 'A party’s day, entered here and checked against Tally',
+    description: 'Bill-to-bill statement per party, checked against Tally',
     permission: PERM.LEDGERS_VIEW,
   },
   {
@@ -149,8 +150,15 @@ export const NAV = withoutHeld([
         label: 'Tally companies',
         path: '/admin/companies',
         icon: Building2,
-        description: 'Which Tally companies RAMS syncs, and when',
-        permission: [PERM.SYNC_COMPANIES, PERM.SYNC_SCHEDULE],
+        description: 'Which Tally companies RAMS syncs, when, and the narration check',
+        permission: [PERM.SYNC_COMPANIES, PERM.SYNC_SCHEDULE, PERM.NARRATION_SETTINGS],
+      },
+      {
+        label: 'Credit terms',
+        path: '/admin/credit-terms',
+        icon: CalendarClock,
+        description: 'How many days each marketplace has to pay',
+        permission: PERM.REPORTS_SETTINGS,
       },
       {
         label: 'Roles & permissions',

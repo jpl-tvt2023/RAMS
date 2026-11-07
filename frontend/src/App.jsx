@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import UserManagement from './pages/admin/UserManagement';
 import AuditLog from './pages/admin/AuditLog';
 import Companies from './pages/admin/Companies';
+import CreditTerms from './pages/admin/CreditTerms';
 import Permissions from './pages/admin/Permissions';
 import MatchReview from './pages/matching/MatchReview';
 import MatchingRules from './pages/matching/MatchingRules';
@@ -49,7 +50,8 @@ export default function App() {
           <Route path="/dashboard" element={<ProtectedRoute roles={ALL_ROLES}><Dashboard /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute roles={ADMIN_ONLY}><UserManagement /></ProtectedRoute>} />
           <Route path="/admin/audit-log" element={<ProtectedRoute roles={ADMIN_ONLY}><AuditLog /></ProtectedRoute>} />
-          <Route path="/admin/companies" element={<ProtectedRoute permission={[PERM.SYNC_COMPANIES, PERM.SYNC_SCHEDULE]}><Companies /></ProtectedRoute>} />
+          <Route path="/admin/companies" element={<ProtectedRoute permission={[PERM.SYNC_COMPANIES, PERM.SYNC_SCHEDULE, PERM.NARRATION_SETTINGS]}><Companies /></ProtectedRoute>} />
+          <Route path="/admin/credit-terms" element={<ProtectedRoute permission={PERM.REPORTS_SETTINGS}><CreditTerms /></ProtectedRoute>} />
           <Route path="/admin/permissions" element={<ProtectedRoute roles={ADMIN_ONLY}><Permissions /></ProtectedRoute>} />
           <Route path="/matching" element={<ProtectedRoute permission={PERM.MATCHING_VIEW}><MatchReview /></ProtectedRoute>} />
           <Route path="/matching/rules" element={<ProtectedRoute permission={PERM.MATCHING_VIEW}><MatchingRules /></ProtectedRoute>} />

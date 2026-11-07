@@ -1,55 +1,131 @@
-// The words and colours the Ledgers page uses for what RAMS found, in one
-// place so the page and its Help say the same thing.
+// The words, colours and icons the Ledgers page uses for what RAMS found, in
+// one place so the badges, the statement's cells, the legend and the Help say
+// the same thing. One colour, one meaning: CHECK holds them, and a test fails
+// if a colour is used for two.
+import {
+  CircleCheck, EqualNot, Scale, Hourglass, CircleX,
+} from 'lucide-react';
 import { formatDay, formatRupees } from './formatters';
 
+// What can be typed here. Both take the balance down.
 export const KINDS = [
-  { key: 'invoice', label: 'Invoice', numberLabel: 'Invoice no', adds: true },
-  { key: 'debit_note', label: 'Debit note', numberLabel: 'Debit note no', adds: true },
-  { key: 'credit_note', label: 'Credit note', numberLabel: 'Credit note no', adds: false },
-  { key: 'receipt', label: 'Receipt', numberLabel: 'Receipt no (optional)', adds: false },
+  {
+    key: 'debit_note', label: 'Marketplace DN', long: 'marketplace debit note', numberLabel: 'DN number', placeholder: 'e.g. FKIDN51463346',
+  },
+  {
+    key: 'credit_note', label: 'Our CN', long: 'credit note', numberLabel: 'CN number (as in Tally)', placeholder: 'e.g. 709',
+  },
 ];
 export const KIND = Object.fromEntries(KINDS.map((k) => [k.key, k]));
 
-// An entry typed in RAMS, against Tally.
-export function entryStatus(e) {
+// The statement's columns, in order.
+export const COLUMNS = [
+  { key: 'invoice', label: 'Invoice' },
+  { key: 'dn', label: 'DN' },
+  { key: 'cn', label: 'CN' },
+  { key: 'tds', label: 'TDS' },
+  { key: 'journal', label: 'Journal / Adj' },
+  { key: 'receipt', label: 'Receipt' },
+];
+export const COLUMN = Object.fromEntries(COLUMNS.map((c) => [c.key, c]));
+
+// The meanings, each with its own colour.
+export const CHECK = {
+  match: {
+    color: 'green', icon: CircleCheck, label: 'Matches', help: 'What is typed here and Tally agree.',
+  },
+  differs: {
+    color: 'purple', icon: EqualNot, label: 'Differs', help: 'Two sources disagree: an amount, a DN booked twice in Tally, or a party’s state in Tally and in its GSTIN.',
+  },
+  by_amount: {
+    color: 'blue', icon: Scale, label: 'Matched by amount', help: 'Tally has a credit note for the same amount, but its narration doesn’t name the DN. Add the DN number to its narration in Tally.',
+  },
+  waiting: {
+    color: 'gray', icon: Hourglass, label: 'Waiting', help: 'Not on the other side yet, but still within the days allowed.',
+  },
+  missing: {
+    color: 'red', icon: CircleX, label: 'Missing', help: 'On one side only: typed here but not in Tally, or in Tally but not typed here.',
+  },
+};
+export const LEGEND = Object.entries(CHECK).map(([key, c]) => ({ key, ...c }));
+
+// Each status the backend sends, by meaning.
+const MEANING = {
+  in_tally: 'match',
+  entered: 'match',
+  amount_differs: 'differs',
+  booked_twice: 'differs',
+  by_amount: 'by_amount',
+  waiting: 'waiting',
+  missing: 'missing',
+  not_entered: 'missing',
+};
+const as = (status, label, detail) => ({ ...CHECK[MEANING[status]], meaning: MEANING[status], label, detail });
+const cnName = (t) => (t ? `${t.voucher_type === 'Credit Note' || !t.voucher_type ? 'CN' : t.voucher_type} ${t.number || ''}`.trim() : '');
+
+// A note typed here, against Tally.
+export function entryStatus(e, settings = {}) {
+  const t = e.tally;
   switch (e.status) {
-    case 'in_tally': return { color: 'green', label: 'In Tally', detail: e.tally?.number ? `${e.tally.voucher_type} ${e.tally.number}` : e.tally?.voucher_type };
-    case 'amount_differs': return { color: 'red', label: 'Amount differs', detail: `Tally has ${formatRupees(e.tally?.amount_paise)} on ${e.tally?.number || e.tally?.voucher_type}` };
-    case 'other_date': return { color: 'red', label: 'Different day', detail: `In Tally on ${formatDay(e.tally?.date)}` };
-    case 'waiting': return { color: 'amber', label: 'Not in Tally yet', detail: 'Tally may not be written up yet' };
-    case 'missing': return { color: 'red', label: 'Not in Tally', detail: 'No matching voucher in Tally' };
+    case 'in_tally': return as('in_tally', 'In Tally', t ? `${cnName(t)} on ${formatDay(t.date)}` : '');
+    case 'amount_differs': return as('amount_differs', 'Amount differs', t ? `Tally has ${formatRupees(t.amount_paise)} on ${cnName(t)}` : '');
+    case 'by_amount': return as('by_amount', 'Matched by amount', t ? `${cnName(t)} on ${formatDay(t.date)} has the same amount. Add ${e.number} to its narration in Tally.` : '');
+    case 'waiting': return as('waiting', 'Not in Tally yet', `Tally may take up to ${settings.match_window_days ?? 60} days to book it.`);
+    case 'missing': return as('missing', 'Not in Tally', 'No credit note in Tally names it or has its amount.');
     default: return { color: 'gray', label: e.status, detail: '' };
   }
 }
 
-// A Tally voucher nobody entered in RAMS for that day.
-export function tallyOnlyStatus(v) {
-  switch (v.status) {
-    case 'only_in_tally': return { color: 'red', label: 'Only in Tally', detail: 'Not entered in RAMS' };
-    case 'waiting': return { color: 'amber', label: 'Not entered here yet', detail: '' };
-    case 'other_date': return { color: 'red', label: 'Entered on another day', detail: `Entered in RAMS on ${formatDay(v.entered_on)}` };
-    case 'not_checked': return { color: 'gray', label: 'Not checked', detail: 'Before this party’s first entry' };
-    default: return { color: 'gray', label: v.status, detail: '' };
+// A Tally credit note, against the notes typed here. Not checked is plain
+// text, not a badge: it is no finding.
+export function noteStatus(note) {
+  if (!note) return null;
+  const typed = note.entries.map((e) => `${KIND[e.kind]?.label || e.kind} ${e.number}`).join(', ');
+  switch (note.status) {
+    case 'entered': return as('entered', 'Entered here', `as ${typed}`);
+    case 'amount_differs': return as('amount_differs', 'Amount differs', `Entered here as ${typed} for ${formatRupees(note.entries.reduce((a, e) => a + e.amount_paise, 0))}`);
+    case 'by_amount': return as('by_amount', 'Matched by amount', `to ${typed}`);
+    case 'booked_twice': return as('booked_twice', 'DN booked twice', note.also_on ? `Also on CN ${note.also_on.number} of ${formatDay(note.also_on.date)}` : '');
+    case 'waiting': return as('waiting', 'Not entered here yet', '');
+    case 'not_entered': return as('not_entered', 'Not entered here', note.named?.length ? `It names ${note.named.join(', ')}. Type that DN here.` : 'No DN or CN typed here pairs with it.');
+    case 'not_checked': return { color: null, label: 'Not checked', detail: 'Before this party’s first entry' };
+    default: return { color: 'gray', label: note.status, detail: '' };
   }
 }
 
-// The day as a whole.
-export function dayStatus(day) {
-  const diff = day.difference_paise;
-  switch (day.status) {
-    case 'matches': return { color: 'green', label: 'Matches Tally', detail: 'Every entry is in Tally, and Tally has nothing more.' };
-    case 'waiting': return { color: 'amber', label: 'Waiting for Tally', detail: `Something is not on both sides yet. Each side has ${day.settings?.grace_days} days to catch up before it is flagged.` };
-    case 'differs': return { color: 'red', label: `Differs from Tally by ${formatRupees(Math.abs(diff))}`, detail: diff > 0 ? 'RAMS’s closing is higher than Tally’s.' : diff < 0 ? 'RAMS’s closing is lower than Tally’s.' : 'The closings agree, but the entries don’t pair up.' };
-    case 'not_started': return { color: 'gray', label: 'Not checked', detail: day.started_on ? `This party is checked from its first entry, on ${formatDay(day.started_on)}.` : 'Nothing has been entered for this party yet. The check starts from its first entry.' };
-    case 'empty': return { color: 'gray', label: 'Nothing on this day', detail: 'No entry in RAMS and no voucher in Tally.' };
-    default: return { color: 'gray', label: day.status, detail: '' };
+// A statement cell's findings: icon-and-count chips by meaning, the cell's
+// tint (its most urgent colour) and the sentence for hovering.
+const COUNT_WORDS = {
+  missing: (n, k) => `${n} ${k} not in Tally`,
+  not_entered: (n) => `${n} in Tally not entered here`,
+  amount_differs: (n) => `${n} amount differs`,
+  booked_twice: (n) => `${n} DN booked twice`,
+  by_amount: (n) => `${n} matched by amount`,
+  waiting: (n) => `${n} waiting`,
+};
+const URGENCY = ['missing', 'differs', 'by_amount'];
+const TINT = { missing: 'bg-red-50', differs: 'bg-purple-50', by_amount: 'bg-blue-50' };
+
+export function cellFindings(counts = {}, kind = 'DN') {
+  const byMeaning = {};
+  for (const [status, n] of Object.entries(counts)) {
+    if (!n) continue;
+    const m = MEANING[status];
+    byMeaning[m] = (byMeaning[m] || 0) + n;
   }
+  const chips = ['missing', 'differs', 'by_amount', 'waiting'].filter((m) => byMeaning[m]).map((m) => ({ meaning: m, count: byMeaning[m], ...CHECK[m] }));
+  const worst = URGENCY.find((m) => byMeaning[m]);
+  const sentence = Object.entries(counts).filter(([, n]) => n).map(([s, n]) => COUNT_WORDS[s]?.(n, kind)).filter(Boolean).join(', ');
+  return { chips, tint: worst ? TINT[worst] : '', sentence };
 }
 
+export const STATE_DIFFERS = { ...CHECK.differs, label: 'State differs' };
+
+// Labels that only inform are grey.
 export const OPENING_SOURCE = {
-  tally: { color: 'green', label: 'From Tally' },
-  loaded: { color: 'blue', label: 'Loaded' },
-  placeholder: { color: 'amber', label: 'Placeholder, not from Tally' },
+  tally: { label: 'From Tally' },
+  loaded: { label: 'Loaded' },
+  placeholder: { label: 'Placeholder, not from Tally' },
 };
 
 // "1,180.50" / "₹1180.5" -> 118050 paise; null when it isn't a sum of money.
@@ -65,3 +141,6 @@ export function balance(paise) {
   if (paise === 0) return formatRupees(0);
   return `${formatRupees(Math.abs(paise))} ${paise > 0 ? 'Dr' : 'Cr'}`;
 }
+
+// "+₹100.00" / "−₹3.00" / "—" for a movement.
+export const signed = (effect) => (effect ? `${effect > 0 ? '+' : '−'}${formatRupees(Math.abs(effect))}` : '—');

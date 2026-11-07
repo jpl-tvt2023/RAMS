@@ -70,6 +70,8 @@ describe('Auto-fill', () => {
     expect(await screen.findByText('607 → 607/RM/26-27')).toBeInTheDocument();
     expect(screen.getByText(/^blank → 607\/RM\/26-27 · date blank → /)).toBeInTheDocument();
     expect(screen.getAllByText('Waiting for approval — ROMS would accept')).toHaveLength(2);
+    const legend = screen.getByRole('note', { name: 'What the colours mean' });
+    for (const label of ['Refused by ROMS', 'Needs a person', 'In the approval step', 'Preview', 'No narration']) expect(within(legend).getByText(label)).toBeInTheDocument();
     expect(api.listAutofillItems).toHaveBeenCalledWith(expect.objectContaining({ kind: 'po', state: 'to_check,checked,to_write' }));
     expect(screen.queryByRole('button', { name: /Approve/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Write now/ })).not.toBeInTheDocument();

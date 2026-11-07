@@ -25,6 +25,17 @@ export function itemStatus(state, mode) {
   return { label: 'Auto-fill is off', color: 'gray' };
 }
 
+// What each of itemStatus's colours means, for the Auto-fill page's legend --
+// kept next to itemStatus so the two change together.
+export const AUTOFILL_LEGEND = [
+  { key: 'refused', color: 'red', label: 'Refused by ROMS', help: 'ROMS turned the write down. The reason is on the Refused tab.' },
+  { key: 'person', color: 'amber', label: 'Needs a person', help: 'ROMS has a value that isn’t a way of writing Tally’s. A person decides.' },
+  { key: 'approval', color: 'purple', label: 'In the approval step', help: 'Waiting for a person to approve, or approved and about to be written.' },
+  { key: 'auto', color: 'green', label: 'Written next, automatically', help: 'Automatic mode writes it into ROMS on the next round.' },
+  { key: 'preview', color: 'blue', label: 'Preview', help: 'RAMS asks ROMS what would happen. Nothing is written.' },
+  { key: 'off', color: 'gray', label: 'Auto-fill is off', help: 'Nothing is sent to ROMS for this field.' },
+];
+
 // What a write does, in a line: "607 → 607/RM/26-27" and the date if it moves.
 export function changeText(row) {
   const from = row.expected ?? row.old_value ?? null;

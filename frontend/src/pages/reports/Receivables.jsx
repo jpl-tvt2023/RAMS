@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import ReportFrame, { ReportTable, td, num } from '../../components/reports/ReportFrame';
 import { HistoryButton } from '../../components/shared/HistoryDrawer';
 import {
-  getReceivables, getReportSettings, updateReportSettings, updateTerms,
+  getReceivables, getReportSettings, updateReportSettings,
 } from '../../api/reports.api';
 import { useAuth } from '../../context/AuthContext';
 import { useKeyedLoad } from '../../hooks/useKeyedLoad';
@@ -16,62 +16,44 @@ import { downloadCsv, rupeesForCsv } from '../../utils/csv';
 // Reports -> Receivables: per marketplace and company, what was invoiced, how
 // it was settled, what is still owed, how old it is, and money received On
 // Account (not yet set against an invoice in Tally). Stock transfers are left
-// out. The credit terms that decide "overdue" are set here.
+// out. The exception days are set here; the credit days on Admin -> Credit
+// terms.
 const r0 = (p) => formatRupees(p, { decimals: 0 });
 const inputCls = 'w-20 px-2 py-1 border border-gray-200 rounded-lg text-sm text-right disabled:bg-gray-50';
 
+// The exception days are set here. Credit days moved to Admin -> Credit
+// terms, so they have one place.
 function TermsPanel({ canEdit, onSaved }) {
   const [data, setData] = useState(null);
-  const [draft, setDraft] = useState({});
+  const [draft, setDraft] = useState(null);
   useEffect(() => {
-    getReportSettings().then(setData).catch(() => toast.error('Failed to load credit terms'));
+    getReportSettings().then(setData).catch(() => toast.error('Failed to load the report settings'));
   }, []);
   if (!data) return null;
 
-  const saveSetting = async (key, value) => {
+  const save = async (value) => {
     const v = Number(value);
-    if (!Number.isInteger(v) || v === data.settings[key]) return;
+    if (!Number.isInteger(v) || v === data.settings.exception_days) return;
     try {
-      setData(await updateReportSettings({ [key]: v }));
+      setData(await updateReportSettings({ exception_days: v }));
       toast.success('Saved');
       onSaved();
     } catch (err) { toast.error(err.response?.data?.message || 'Save failed'); }
   };
-  const saveTerm = async (vendor, value) => {
-    const days = value === '' ? null : Number(value);
-    const current = data.terms.find((t) => t.vendor === vendor)?.credit_days ?? null;
-    if (days === current || (days != null && !Number.isInteger(days))) return;
-    try {
-      setData(await updateTerms(vendor, days));
-      toast.success(`${vendor}: ${days == null ? 'the default' : `${days} days`}`);
-      onSaved();
-    } catch (err) { toast.error(err.response?.data?.message || 'Save failed'); }
-  };
-  const field = (key) => (draft[key] ?? String(data.settings[key]));
 
   return (
-    <section className="bg-white rounded-xl border border-gray-200 p-4 mt-4" aria-label="Credit terms">
+    <section className="bg-white rounded-xl border border-gray-200 p-4 mt-4" aria-label="Report settings">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-semibold text-gray-900">Credit terms</h2>
+        <h2 className="font-semibold text-gray-900">Exception days</h2>
         <HistoryButton entityType="report_settings" entityId={1} title="History — report settings" />
       </div>
-      <p className="text-sm text-gray-500 mt-1">An invoice is overdue once its credit days have passed. Leave a marketplace empty to use the default.</p>
-      <div className="flex flex-wrap gap-4 mt-3 text-sm">
-        <label className="flex items-center gap-2">Default
-          <input aria-label="Default credit days" className={inputCls} disabled={!canEdit} value={field('default_credit_days')}
-            onChange={(e) => setDraft((d) => ({ ...d, default_credit_days: e.target.value }))} onBlur={(e) => saveSetting('default_credit_days', e.target.value)} /> days
-        </label>
-        {data.terms.map((t) => (
-          <label key={t.vendor} className="flex items-center gap-2">{t.vendor}
-            <input aria-label={`${t.vendor} credit days`} className={inputCls} disabled={!canEdit} placeholder="default"
-              value={draft[t.vendor] ?? (t.credit_days == null ? '' : String(t.credit_days))}
-              onChange={(e) => setDraft((d) => ({ ...d, [t.vendor]: e.target.value }))} onBlur={(e) => saveTerm(t.vendor, e.target.value.trim())} />
-          </label>
-        ))}
-      </div>
+      <p className="text-sm text-gray-500 mt-1">
+        Each marketplace’s credit days are set on{' '}
+        {canEdit ? <Link to="/admin/credit-terms" className="text-brand hover:underline">Admin → Credit terms</Link> : 'Admin → Credit terms'}.
+      </p>
       <label className="flex items-center gap-2 text-sm mt-3">An invoice with no PO, or an RTV row with no credit note, is an exception after
-        <input aria-label="Exception days" className={inputCls} disabled={!canEdit} value={field('exception_days')}
-          onChange={(e) => setDraft((d) => ({ ...d, exception_days: e.target.value }))} onBlur={(e) => saveSetting('exception_days', e.target.value)} /> days
+        <input aria-label="Exception days" className={inputCls} disabled={!canEdit} value={draft ?? String(data.settings.exception_days)}
+          onChange={(e) => setDraft(e.target.value)} onBlur={(e) => save(e.target.value)} /> days
       </label>
     </section>
   );

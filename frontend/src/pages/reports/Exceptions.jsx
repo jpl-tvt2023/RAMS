@@ -7,6 +7,7 @@ import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
 import { reasonText } from '../../utils/matchReasons';
 import { formatDay, formatRupees } from '../../utils/formatters';
+import Narration from '../../components/shared/Narration';
 
 // Reports -> Exceptions: everything that needs a person, by kind, each saying
 // where it is fixed.
@@ -21,7 +22,12 @@ const KINDS = {
 
 function Row({ code, r }) {
   if (code === 'invoice_no_po') {
-    return <li>{r.number} · {r.company} · {formatDay(r.date)} · {r.party}{r.vendor ? ` (${r.vendor})` : ''} · {formatRupees(r.total_paise, { decimals: 0 })} · {r.age_days} days old</li>;
+    return (
+      <li>
+        {r.number} · {r.company} · {formatDay(r.date)} · {r.party}{r.vendor ? ` (${r.vendor})` : ''} · {formatRupees(r.total_paise, { decimals: 0 })} · {r.age_days} days old
+        <Narration text={r.narration} missing={r.narration_missing} className="mt-0.5" />
+      </li>
+    );
   }
   if (code === 'autofill_refused') {
     return <li>{r.kind === 'po' ? `PO ${r.po_id}` : `RTV ${r.rtv_no || r.id}`} · {r.value} · <span className="text-danger">{r.reason}</span>{r.dry ? ' (Preview)' : ''}</li>;
@@ -73,7 +79,7 @@ export default function Exceptions() {
               </section>
             );
           })}
-          <p className="text-xs text-gray-500">An invoice with no PO, or an RTV row with no credit note, counts after {data.exception_days} days (set under Credit terms on Receivables).</p>
+          <p className="text-xs text-gray-500">An invoice with no PO, or an RTV row with no credit note, counts after {data.exception_days} days (set on Receivables).</p>
         </div>
       )}
     </ReportFrame>

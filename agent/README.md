@@ -53,6 +53,7 @@ Reads TallyPrime over its local XML port (`127.0.0.1:9000`) and **never writes t
   - each month is pushed, then reconciled; RAMS records it, so an interrupted backfill resumes after the last finished month
   - a resync is the same from scratch; it runs after a restored backup (counters went backward) or a ledger/item rename
 - **Ledger balances (0.6.0):** every run then reads each ledger's closing balance as at 31 March (one Ledger collection, under 0.1 s for MH) and sends it to RAMS, which starts each party on *Ledgers* from it. If Tally refuses, the run still finishes ok, the log says so, and Ledgers falls back to its placeholder until a run brings them.
+- **Ledger state and GSTIN (0.7.0):** Tally keeps a ledger's address and GST registration as dated lists, oldest first. The Connector reads the latest entry applicable today, never a GST rate block (whose state reads "Any"), and tells RAMS it does (`ledgerReading: 2`), so RAMS stores the corrected values even though Tally's AlterID hasn't moved. Narrations are kept up to 2,000 characters (was 300).
 - **Watermarks:** they live in RAMS and move only when a run finishes ok, to the counters Tally had when it started. Anything altered during a run is fetched next time.
 - **Educational mode:** periods are widened to the 1st, 2nd or 31st and trimmed (`eduSafeRange`), and the heartbeat reports the licence mode.
 

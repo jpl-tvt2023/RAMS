@@ -68,6 +68,22 @@ describe('Debtors', () => {
     });
   });
 
+  test('each invoice shows its Tally narration; a missing one is highlighted', async () => {
+    reports.getDebtors.mockResolvedValue({
+      rows: [
+        { ...DEBTOR, narration: 'PO 4500123456' },
+        {
+          ...DEBTOR, guid: 'g6', number: '6/RM/26-27', narration: null, narration_missing: true, credit_notes: [], credit_notes_paise: 0,
+        },
+      ],
+      total: 2, page: 1, page_size: 50, companies: COMPANIES, company_id: 2, tabs: [], all: 2, unknown: 0,
+      totals: { invoices: 2, total_paise: 0, credit_notes_paise: 0, outstanding_paise: 0, overdue_paise: 0 },
+    });
+    renderWithProviders(<Debtors />, { user: VIEWER });
+    expect(await screen.findByText('PO 4500123456')).toBeInTheDocument();
+    expect(within(screen.getByText('6/RM/26-27').closest('tr')).getByText('No narration')).toBeInTheDocument();
+  });
+
   test('opens on the default company; each invoice with its internal and vendor PO numbers, amount, CN and outstanding', async () => {
     renderWithProviders(<Debtors />, { user: VIEWER });
     expect(await screen.findAllByText('607/RM/26-27')).not.toHaveLength(0);
@@ -126,18 +142,21 @@ describe('Receivables', () => {
     renderWithProviders(<Receivables />, { user: VIEWER });
     expect(await screen.findByText('Not known')).toBeInTheDocument();
     expect(screen.getAllByText('₹1,70,77,716').length).toBeGreaterThan(0);
-    expect(await screen.findByLabelText('Scootsy credit days')).toBeDisabled();
+    expect(await screen.findByLabelText('Exception days')).toBeDisabled();
+    expect(screen.queryByLabelText('Scootsy credit days')).not.toBeInTheDocument(); // on Admin → Credit terms now
   });
 
-  test('an Accountant sets a marketplace\'s credit days; empty means the default', async () => {
-    reports.updateTerms.mockResolvedValue({ settings: { default_credit_days: 30, exception_days: 15 }, terms: [{ vendor: 'Blinkit', credit_days: 20 }, { vendor: 'Scootsy', credit_days: 5 }] });
+  test('an Accountant sets the exception days here; the credit days are on Admin → Credit terms', async () => {
+    reports.updateReportSettings.mockResolvedValue({ settings: { default_credit_days: 30, exception_days: 20 }, terms: [] });
     renderWithProviders(<Receivables />, { user: ACCOUNTANT });
     const user = userEvent.setup();
-    const blinkit = await screen.findByLabelText('Blinkit credit days');
-    await user.type(blinkit, '20');
+    const days = await screen.findByLabelText('Exception days');
+    await user.clear(days);
+    await user.type(days, '20');
     await user.tab();
-    expect(reports.updateTerms).toHaveBeenCalledWith('Blinkit', 20);
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Blinkit: 20 days'));
+    expect(reports.updateReportSettings).toHaveBeenCalledWith({ exception_days: 20 });
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Saved'));
+    expect(screen.getByRole('link', { name: 'Admin → Credit terms' })).toHaveAttribute('href', '/admin/credit-terms');
   });
 });
 

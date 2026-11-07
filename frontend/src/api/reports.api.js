@@ -21,7 +21,7 @@ export const getTransfers = getter('transfers');
 export const getReceivables = getter('receivables');
 // { categories: [{ code, count, rows }], exception_days, as_of, companies }
 export const getExceptions = getter('exceptions');
-// { settings, terms: [{ vendor, credit_days }] }
+// { settings, terms: [{ vendor, credit_days, transfer, updated_at, updated_by_name }] }
 export const getReportSettings = getter('settings');
 
 export async function updateReportSettings(body) {
@@ -32,5 +32,16 @@ export async function updateReportSettings(body) {
 // credit_days null = the default
 export async function updateTerms(vendor, creditDays) {
   const { data } = await api.put(`/reports/terms/${encodeURIComponent(vendor)}`, { credit_days: creditDays });
+  return data;
+}
+
+// What a change to credit days would do, before it is saved. vendor null is
+// the default; creditDays null (with a vendor) is "use the default".
+// { vendor, credit_days, effective_days, open_invoices, overdue_now, overdue_after,
+//   become_overdue, become_overdue_paise, stop_overdue, stop_overdue_paise }
+export async function previewTerms(vendor, creditDays) {
+  const { data } = await api.get('/reports/terms/preview', {
+    params: { ...(vendor ? { vendor } : {}), credit_days: creditDays == null ? '' : creditDays },
+  });
   return data;
 }

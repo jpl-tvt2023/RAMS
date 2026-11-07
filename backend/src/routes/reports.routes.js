@@ -16,6 +16,7 @@ router.get('/receivables', auth, view, c.receivables);
 router.get('/exceptions', auth, view, c.exceptions);
 router.get('/settings', auth, view, c.getSettings);
 router.put('/settings', auth, settings, c.updateSettings);
+router.get('/terms/preview', auth, settings, c.previewTerms);
 router.put('/terms/:vendor', auth, settings, c.updateTerms);
 
 module.exports = router;

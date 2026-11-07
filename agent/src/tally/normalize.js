@@ -10,6 +10,9 @@ const { toArray, txt, field, yes, findAll, leafPaths, tallyDate, num } = require
 // GSTIN: 2-digit state, 10-char PAN, entity, 'Z', check digit.
 const GSTIN_RE = /^\d{2}[A-Z]{5}\d{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/;
 const panOf = (gstin) => (GSTIN_RE.test(gstin || '') ? gstin.slice(2, 12) : '');
+// A voucher's narration is shown in RAMS, so it is kept whole: a receipt's can
+// list dozens of invoice numbers. RAMS keeps the same.
+const NARRATION_MAX = 2000;
 
 // Tally's reserved voucher types. A custom type ("Sales-Zepto") is one of
 // these underneath; its base type decides what it means for RAMS.
@@ -72,12 +75,47 @@ function voucherTypesFrom(tree) {
   })).filter((t) => t.name);
 }
 
-function ledgersFrom(tree) {
+// How ledgersFrom reads a ledger's state and GSTIN, sent with the masters. 2:
+// the latest dated address and GST registration (Tally keeps their history,
+// oldest first). RAMS takes state and GSTIN only from a Connector that reads
+// them at least this well.
+const LEDGER_READING = 2;
+const usable = (s) => present(s) && !/^any$/i.test(s);
+
+// The latest value of one of `keys` in a ledger's dated list (an address or
+// GST registration), applicable on `asOf`. Entries dated later are left out.
+function latestOf(l, list, keys, asOf) {
+  const entries = toArray(l[list])
+    .filter((e) => e && typeof e === 'object')
+    .map((e) => ({ from: tallyDate(e.APPLICABLEFROM), e }))
+    .filter((x) => !asOf || !x.from || x.from <= asOf)
+    .sort((a, b) => a.from.localeCompare(b.from));
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    for (const k of keys) {
+      const v = txt(entries[i].e[k]);
+      if (usable(v)) return v;
+    }
+  }
+  return '';
+}
+
+function ledgersFrom(tree, { asOf = new Date().toISOString().slice(0, 10) } = {}) {
   return findAll(tree, 'LEDGER').map((l) => {
-    // GSTIN moved from PARTYGSTIN to LEDGSTREGDETAILS.LIST in TallyPrime 3;
-    // take any value anywhere in the ledger that is shaped like one.
-    const gstins = [...new Set(Object.values(leafPaths(l, () => true)).flat().filter((v) => GSTIN_RE.test(v)))];
-    const statePaths = leafPaths(l, (p) => /(^|\/)(LEDSTATENAME|STATENAME|STATE)$/.test(p));
+    // GSTIN moved from PARTYGSTIN to LEDGSTREGDETAILS.LIST in TallyPrime 3.
+    // The latest registration's comes first; every GSTIN-shaped value
+    // anywhere in the ledger is kept after it.
+    const latestGstin = latestOf(l, 'LEDGSTREGDETAILS.LIST', ['GSTIN'], asOf);
+    const anywhere = Object.values(leafPaths(l, () => true)).flat().filter((v) => GSTIN_RE.test(v));
+    const gstins = [...new Set([...(GSTIN_RE.test(latestGstin) ? [latestGstin] : []), ...anywhere])];
+    // The address's state, then the older top-level fields, then the GST
+    // registration's -- never a GST rate block's (STATEWISEDETAILS "Any").
+    const state = [
+      latestOf(l, 'LEDMAILINGDETAILS.LIST', ['STATE'], asOf),
+      txt(l.LEDSTATENAME),
+      txt(l.STATENAME),
+      latestOf(l, 'LEDGSTREGDETAILS.LIST', ['STATE', 'PLACEOFSUPPLY'], asOf),
+      txt(l.PRIORSTATENAME),
+    ].find(usable) || '';
     const name = field(l, 'NAME') || names(l)[0] || '';
     return {
       name,
@@ -87,7 +125,7 @@ function ledgersFrom(tree) {
       masterId: num(l.MASTERID),
       alterId: num(l.ALTERID),
       gstins,
-      state: (Object.values(statePaths).flat().find(present)) || '',
+      state,
       billWise: yes(l.ISBILLWISEON),
     };
   }).filter((l) => l.name);
@@ -246,7 +284,7 @@ function voucherFrom(v, { baseTypeOf = () => 'Unknown', docFields = true } = {})
     party,
     partyGstin: txt(v.PARTYGSTIN),
     cmpGstin: txt(v.CMPGSTIN) || field(v.GSTREGISTRATION, 'TAXREGISTRATION'),
-    narration: txt(v.NARRATION).slice(0, 300),
+    narration: txt(v.NARRATION).slice(0, NARRATION_MAX),
     cancelled: yes(v.ISCANCELLED),
     optional: yes(v.ISOPTIONAL),
     invoice: yes(v.ISINVOICE),
@@ -295,7 +333,7 @@ function sysInfoFrom(tree, { probeDay = 15 } = {}) {
 }
 
 module.exports = {
-  GSTIN_RE, panOf, BASE_TYPES, BLANKISH, present,
+  GSTIN_RE, panOf, BASE_TYPES, BLANKISH, present, LEDGER_READING, NARRATION_MAX,
   companiesFrom, groupsFrom, voucherTypesFrom, ledgersFrom, stockItemsFrom,
   baseTypeResolver, groupResolver, voucherFrom, vouchersFrom, docFieldsOf, voucherListFrom, balancesFrom, sysInfoFrom,
 };

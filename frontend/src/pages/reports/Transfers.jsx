@@ -8,6 +8,8 @@ import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
 import { formatDay, formatRupees } from '../../utils/formatters';
 import { downloadCsv, rupeesForCsv } from '../../utils/csv';
+import Narration from '../../components/shared/Narration';
+import { narrationForCsv } from '../../utils/highlights';
 
 // Reports -> Stock transfers: sales from one Roymax registration to another
 // (a party ledger that is "Our own registration" on Party ledgers). They are
@@ -26,7 +28,7 @@ export default function Transfers() {
     try {
       const all = await getTransfers({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page_size: 10000 });
       downloadCsv('rams-stock-transfers.csv', [
-        ['From', (r) => r.company], ['Voucher', (r) => r.number], ['Date', (r) => r.date], ['To', (r) => r.party], ['Quantity', (r) => r.qty],
+        ['From', (r) => r.company], ['Voucher', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForCsv], ['To', (r) => r.party], ['Quantity', (r) => r.qty],
         ['Value', (r) => rupeesForCsv(r.total_paise)],
       ], all.rows);
     } catch { toast.error('The download failed'); }
@@ -57,7 +59,7 @@ export default function Transfers() {
       >
         {view.rows.map((r) => (
           <tr key={r.guid} className="border-b border-gray-100">
-            <td className={`${td} whitespace-nowrap`}><span className="font-medium">{r.number}</span><p className="text-xs text-gray-400">{formatDay(r.date)}</p></td>
+            <td className={`${td} whitespace-nowrap`}><span className="font-medium">{r.number}</span><p className="text-xs text-gray-400">{formatDay(r.date)}</p><Narration text={r.narration} missing={r.narration_missing} className="mt-0.5 whitespace-normal" /></td>
             <td className={td}>{r.company}</td>
             <td className={td}>{r.party}</td>
             <td className={num}>{Number(r.qty).toLocaleString('en-IN')}</td>

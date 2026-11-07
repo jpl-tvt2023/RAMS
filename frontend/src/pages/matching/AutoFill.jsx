@@ -11,6 +11,8 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Pagination, { loadPersistedPageSize, persistPageSize } from '../../components/ui/Pagination';
 import { HistoryButton } from '../../components/shared/HistoryDrawer';
 import HelpLink from '../../components/shared/HelpLink';
+import Narration from '../../components/shared/Narration';
+import Legend from '../../components/shared/Legend';
 import {
   getAutofillSummary, listAutofillItems, listAutofillEvents, updateAutofillSettings,
   approveAutofill, runAutofill, retryAutofill, overwriteAutofill,
@@ -19,7 +21,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSessionState } from '../../hooks/useSessionState';
 import { PERM } from '../../utils/roles';
 import {
-  FIELDS, MODES, itemStatus, changeText,
+  FIELDS, MODES, itemStatus, changeText, AUTOFILL_LEGEND,
 } from '../../utils/autofillText';
 import { formatDateTime } from '../../utils/formatters';
 
@@ -338,7 +340,11 @@ export default function AutoFill() {
                 <tr key={`${r.kind}:${r.id}`} className="border-b border-gray-100 align-top">
                   <td className="px-4 py-3 font-medium whitespace-nowrap">{rowLabel(r)}{r.kind === 'rtv' && <p className="text-xs text-gray-400">PO {r.po_id}</p>}</td>
                   <td className="px-4 py-3">{r.vendor || '—'}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{r.voucher_number || r.value}<p className="text-xs text-gray-400">{r.company || ''}</p></td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {r.voucher_number || r.value}
+                    <p className="text-xs text-gray-400">{r.company || ''}</p>
+                    <Narration text={r.narration} missing={r.narration_missing} className="mt-0.5 whitespace-normal" />
+                  </td>
                   <td className="px-4 py-3">{changeText(r)}</td>
                   <td className="px-4 py-3 min-w-[12rem]">
                     {tab === 'refused'
@@ -371,6 +377,7 @@ export default function AutoFill() {
           </table>
           {!loading && data.rows.length === 0 && <EmptyState summary={summary} view={view} />}
         </div>
+        {tab !== 'written' && <Legend items={AUTOFILL_LEGEND} withNarration className="px-4 py-2 border-t border-gray-100" />}
         <Pagination page={page} pageSize={pageSize} total={data.total} onPageChange={setPage}
           onPageSizeChange={(s) => { setPageSize(s); persistPageSize('autofill', s); setPage(1); }} />
       </div>

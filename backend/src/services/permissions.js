@@ -57,15 +57,15 @@ const CATALOG = [
   },
   {
     key: 'ledgers.view', area: 'Ledgers', label: 'See Ledgers',
-    description: 'Each party\'s day: the opening, the entries typed in RAMS, Tally\'s entries and the check between them',
+    description: 'The bill-to-bill statement per party: Tally\'s opening, invoices, notes, TDS, journals, receipts and closing, and the check on the notes typed in RAMS',
   },
   {
     key: 'ledgers.entry', area: 'Ledgers', label: 'Record ledger entries',
-    description: 'Add, change and remove a party\'s invoices, debit notes, credit notes and receipts on Ledgers',
+    description: 'Add, change and remove a party\'s marketplace debit notes and our credit notes on Ledgers',
   },
   {
     key: 'ledgers.settings', area: 'Ledgers', label: 'Change ledger settings',
-    description: 'How many days either side may wait for the other, the amount tolerance, and the placeholder opening',
+    description: 'Which marketplaces Ledgers covers, how long Tally may take to book a note, the amount tolerance and the placeholder opening',
   },
   {
     key: 'sync.companies', area: 'Tally sync', label: 'Turn company sync on or off',
@@ -74,6 +74,10 @@ const CATALOG = [
   {
     key: 'sync.schedule', area: 'Tally sync', label: 'Change the sync schedule',
     description: 'Office days and hours, the light sync interval and the end-of-day check',
+  },
+  {
+    key: 'narration.settings', area: 'Tally sync', label: 'Change the narration check',
+    description: 'Which Tally voucher types need a narration, and from which date. Records without one are highlighted',
   },
   {
     key: 'sync.run', area: 'Tally sync', label: 'Sync now',

@@ -11,6 +11,8 @@ import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
 import { formatDay, formatRupees } from '../../utils/formatters';
 import { downloadCsv, rupeesForCsv } from '../../utils/csv';
+import Narration from '../../components/shared/Narration';
+import { narrationForCsv } from '../../utils/highlights';
 
 // Reports -> Debtors: each Tally sales invoice with its internal (ROMS) and
 // vendor PO numbers, total, credit notes and what is still owed, a tab per
@@ -46,7 +48,7 @@ function CreditNotes({ invoice, onClose }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              {['CN No', 'Date', 'Type', 'Amount', 'RTV No'].map((h) => (
+              {['CN No', 'Date', 'Type', 'Narration', 'Amount', 'RTV No'].map((h) => (
                 <th key={h} className={`px-3 py-2 font-semibold text-gray-600 whitespace-nowrap ${h === 'Amount' ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr>
@@ -57,6 +59,7 @@ function CreditNotes({ invoice, onClose }) {
                 <td className={`${td} font-medium`}>{c.number}</td>
                 <td className={`${td} whitespace-nowrap`}>{formatDay(c.date)}</td>
                 <td className={td}>{c.voucher_type}</td>
+                <td className={td}><Narration text={c.narration} missing={c.narration_missing} /></td>
                 <td className={num}>{formatRupees(c.amount_paise)}</td>
                 <td className={td}>{c.rtv_no || <span className="text-gray-400">—</span>}</td>
               </tr>
@@ -65,7 +68,7 @@ function CreditNotes({ invoice, onClose }) {
           {cns.length > 1 && (
             <tfoot>
               <tr className="bg-gray-50 font-semibold">
-                <td className={td} colSpan={3}>Total</td>
+                <td className={td} colSpan={4}>Total</td>
                 <td className={num}>{formatRupees(invoice.credit_notes_paise)}</td>
                 <td />
               </tr>
@@ -102,7 +105,7 @@ export default function Debtors() {
     try {
       const all = await getDebtors({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page_size: 10000 });
       downloadCsv('rams-debtors.csv', [
-        ['Company', (r) => r.company], ['Invoice', (r) => r.number], ['Date', (r) => r.date], ['Party', (r) => r.party],
+        ['Company', (r) => r.company], ['Invoice', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForCsv], ['Party', (r) => r.party],
         ['Marketplace', (r) => r.vendor || ''], ['Internal PO no', (r) => r.pos.join(' ')], ['Vendor PO no', (r) => r.vendor_pos.join(' ')],
         ['Amount', (r) => rupeesForCsv(r.total_paise)], ['CN', (r) => rupeesForCsv(r.credit_notes_paise)], ['CN numbers', (r) => r.credit_notes.map((c) => c.number).join(' ')],
         ['Outstanding', (r) => rupeesForCsv(r.outstanding_paise)], ['Status', (r) => STATUS_LABEL[r.status] || r.status],
@@ -150,7 +153,11 @@ export default function Debtors() {
       >
         {view.rows.map((r) => (
           <tr key={r.guid} className="border-b border-gray-100 align-top">
-            <td className={`${td} whitespace-nowrap`}><span className="font-medium">{r.number}</span><p className="text-xs text-gray-400">{r.company} · {formatDay(r.date)}</p></td>
+            <td className={`${td} whitespace-nowrap`}>
+              <span className="font-medium">{r.number}</span>
+              <p className="text-xs text-gray-400">{r.company} · {formatDay(r.date)}</p>
+              <Narration text={r.narration} missing={r.narration_missing} className="mt-0.5 whitespace-normal" />
+            </td>
             <td className={`${td} max-w-[16rem]`}>{r.party}</td>
             <td className={`${td} whitespace-nowrap`}>
               {r.pos.length > 0

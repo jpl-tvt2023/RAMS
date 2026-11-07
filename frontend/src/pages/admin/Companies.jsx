@@ -10,6 +10,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Badge from '../../components/ui/Badge';
 import { HistoryButton } from '../../components/shared/HistoryDrawer';
 import SyncSchedulePanel from '../../components/settings/SyncSchedulePanel';
+import NarrationRulePanel from '../../components/settings/NarrationRulePanel';
 import HelpLink from '../../components/shared/HelpLink';
 import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
@@ -71,6 +72,7 @@ export default function Companies() {
       </div>
 
       <SyncSchedulePanel />
+      <NarrationRulePanel />
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">

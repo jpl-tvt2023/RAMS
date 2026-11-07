@@ -18,7 +18,7 @@
 // RAMS moves the watermarks only when the run finishes ok, to the counters
 // Tally had when it started (backend controllers/agent.controller.js).
 const { periods, parseIso } = require('../util');
-const { baseTypeResolver } = require('../tally/normalize');
+const { baseTypeResolver, LEDGER_READING } = require('../tally/normalize');
 const {
   pullMasters, pullPeriod, pullVoucherList, pullBalances,
 } = require('../tally/pull');
@@ -83,7 +83,8 @@ async function syncCompany({
   const masters = async () => {
     const got = await pullMasters(tally, live);
     errors.push(...got.errors);
-    const res = await api.masters(runId, got.masters);
+    // ledgerReading: how well this Connector reads a ledger's state and GSTIN.
+    const res = await api.masters(runId, { ...got.masters, ledgerReading: LEDGER_READING });
     counts.masters += res.upserted || 0;
     if (got.masters.voucherTypes) {
       typesCache.set(live.guid, got.masters.voucherTypes);

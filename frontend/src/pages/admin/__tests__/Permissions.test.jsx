@@ -15,6 +15,7 @@ const CATALOG = [
   { key: 'sync.schedule', area: 'Tally sync', label: 'Change the sync schedule', description: 'Office hours' },
   { key: 'reports.view', area: 'Reports', label: 'See the reports', description: 'The report screens' },
   { key: 'reports.settings', area: 'Reports', label: 'Change credit terms', description: 'Credit days' },
+  { key: 'sync.run', area: 'Tally sync', label: 'Sync now', description: 'A light sync now' },
 ];
 const VIEW = {
   catalog: CATALOG, roles: ['Accountant', 'Viewer'],
@@ -47,6 +48,7 @@ describe('Roles & permissions', () => {
   test('a permission whose screens are all held is not shown', async () => {
     renderWithProviders(<Permissions />, { user: ADMIN });
     expect(await screen.findByText('See the reports')).toBeInTheDocument(); // Debtors is released
-    expect(screen.queryByText('Change credit terms')).not.toBeInTheDocument(); // Receivables is still held
+    expect(screen.getByText('Change credit terms')).toBeInTheDocument(); // Admin → Credit terms is released
+    expect(screen.queryByText('Sync now')).not.toBeInTheDocument(); // Sync health is still held
   });
 });

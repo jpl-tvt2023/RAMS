@@ -43,6 +43,8 @@ export const debtorsHelp = {
     },
   ],
   faq: [
+    { q: 'Why is a narration highlighted in yellow?', a: 'Tally has no narration on that record, and the narration check (Admin → Tally companies) says it needs one. Ask the accountant to add it in Tally; it shows after the next sync.' },
+    { q: 'Where are the credit days set?', a: 'On Admin → Credit terms, for anyone with “Change credit terms” (Accountants by default). A change shows what it would do before it is saved.' },
     { q: 'What is the difference between Internal PO no and Vendor PO no?', a: 'Internal PO no is ROMS’s own PO id (for example B002). Vendor PO no is the marketplace’s purchase order number, as typed in ROMS.' },
     { q: 'What is the difference between Amount and Outstanding?', a: 'Amount is the invoice’s total. Outstanding is what is still owed after receipts, credit notes, TDS and other adjustments set against it in Tally.' },
     { q: 'Which credit notes count in CN?', a: 'Every credit note entered "Agst Ref" against the invoice’s bill in Tally. A credit note entered On Account isn’t set against any invoice, so it doesn’t show here.' },
@@ -153,10 +155,10 @@ export const receivablesHelp = {
       ],
     },
     {
-      title: 'Set credit terms',
+      title: 'Set credit terms and exception days',
       steps: [
-        'Under Credit terms, type a marketplace’s credit days and click away to save. Leave it empty to use the default.',
-        'Change the default, and how many days before an invoice with no PO or an RTV row with no credit note becomes an exception.',
+        'Each marketplace’s credit days, and the default, are set on Admin → Credit terms.',
+        'Here, under Exception days, set how many days before an invoice with no PO or an RTV row with no credit note becomes an exception.',
         'Every change is recorded; the History button shows them.',
       ],
     },

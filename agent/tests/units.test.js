@@ -7,7 +7,7 @@ const {
   VOUCHER_COLLECTION, BALANCES_COLLECTION,
 } = require('../src/tally/requests');
 const {
-  baseTypeResolver, groupResolver, ledgersFrom, voucherFrom, balancesFrom, GSTIN_RE, panOf,
+  baseTypeResolver, groupResolver, ledgersFrom, voucherFrom, balancesFrom, GSTIN_RE, panOf, LEDGER_READING, NARRATION_MAX,
 } = require('../src/tally/normalize');
 const { pullBalances } = require('../src/tally/pull');
 const { periods, fyOf, previousFyStart, readEnvFile } = require('../src/util');
@@ -182,6 +182,25 @@ describe('normalize', () => {
     expect(legacy).toMatchObject({ gstins: ['27ABGFR0562B1ZI'], state: 'Maharashtra' });
     expect(GSTIN_RE.test('27ABGFR0562B1ZI')).toBe(true);
     expect(panOf('27ABGFR0562B1ZI')).toBe('ABGFR0562B');
+  });
+
+  test('a ledger’s state is its latest dated address, never a GST rate block’s "Any"', () => {
+    const mh = buildDataset().companies.find((c) => c.code === 'MH');
+    const tree = parseXml(xml.mastersXml(mh, 'Ledgers'));
+    const scootsy = ledgersFrom(tree).find((l) => l.name === 'Scootsy Logistics Pvt Ltd');
+    expect(scootsy).toMatchObject({ state: 'Maharashtra', gstins: ['27AAICS4785M1ZW'] }); // not West Bengal (2022), not Any
+    // Read as of a day before the correction, the older entry applies.
+    const before = ledgersFrom(tree, { asOf: '2024-01-01' }).find((l) => l.name === 'Scootsy Logistics Pvt Ltd');
+    expect(before.state).toBe('West Bengal');
+    expect(LEDGER_READING).toBe(2);
+  });
+
+  test('a long narration is kept whole, up to 2,000 characters', () => {
+    const long = 'Being payment received against :- '.concat(Array.from({ length: 120 }, (_, i) => `${500 + i}/RM/26-27`).join(','));
+    const v = voucherFrom({ VOUCHERTYPENAME: 'Receipt', GUID: 'g1', DATE: '20260701', NARRATION: long });
+    expect(long.length).toBeGreaterThan(300);
+    expect(v.narration).toBe(long.slice(0, NARRATION_MAX));
+    expect(NARRATION_MAX).toBe(2000);
   });
 
   test('vouchers in invoice view and accounting view', () => {

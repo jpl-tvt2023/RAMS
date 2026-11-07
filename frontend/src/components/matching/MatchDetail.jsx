@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
+import Narration from '../shared/Narration';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { HistoryButton } from '../shared/HistoryDrawer';
 import { getResult, decide, searchVouchers } from '../../api/matching.api';
@@ -120,6 +121,7 @@ export default function MatchDetail({
             <div>
               <h3 className="font-semibold text-gray-900">Tally {noun}</h3>
               <p className="text-gray-700 mt-1">{detail.company} · <span className="font-medium">{detail.voucher_number}</span> · {formatDay(detail.voucher_date)}</p>
+              <div className="mt-1"><Narration text={detail.narration} missing={detail.narration_missing} /></div>
               {detail.fill && (
                 <p className="text-gray-500 mt-1">
                   Auto-fill: <span className="font-medium text-gray-800">{fillText(detail.fill)}</span>
@@ -178,7 +180,7 @@ export default function MatchDetail({
                 <div className="overflow-x-auto mt-1 border border-gray-200 rounded-lg">
                   <table className="w-full text-sm">
                     <thead><tr className="bg-gray-50 text-left text-gray-600">
-                      {['Company', 'Number', 'Date', 'Party', 'Amount', 'Found by', ''].map((h) => <th key={h} className="px-3 py-2 font-semibold whitespace-nowrap">{h}</th>)}
+                      {['Company', 'Number', 'Date', 'Party', 'Narration', 'Amount', 'Found by', ''].map((h) => <th key={h} className="px-3 py-2 font-semibold whitespace-nowrap">{h}</th>)}
                     </tr></thead>
                     <tbody>
                       {detail.candidates.map((c) => {
@@ -189,6 +191,7 @@ export default function MatchDetail({
                             <td className="px-3 py-2 font-medium whitespace-nowrap">{c.number}</td>
                             <td className="px-3 py-2 whitespace-nowrap">{formatDay(c.date)}</td>
                             <td className="px-3 py-2">{c.party}</td>
+                            <td className="px-3 py-2"><Narration text={c.narration} missing={c.narration_missing} /></td>
                             <td className="px-3 py-2 tabular-nums whitespace-nowrap">{rupees(c.total_paise)}</td>
                             <td className="px-3 py-2 text-gray-500">{(c.via || []).map((m) => METHOD_TEXT[m] || m).join(', ')}</td>
                             <td className="px-3 py-2 text-right whitespace-nowrap">
@@ -219,7 +222,10 @@ export default function MatchDetail({
                   {found.length === 0 && <li className="px-3 py-2 text-gray-400">Nothing found.</li>}
                   {found.map((v) => (
                     <li key={`${v.company_id}:${v.guid}`} className="px-3 py-2 flex items-center justify-between gap-2">
-                      <span>{v.company} · <span className="font-medium">{v.number}</span> · {formatDay(v.date)} · {v.party} · {rupees(v.total_paise)}</span>
+                      <span>
+                        {v.company} · <span className="font-medium">{v.number}</span> · {formatDay(v.date)} · {v.party} · {rupees(v.total_paise)}
+                        <Narration text={v.narration} missing={v.narration_missing} className="mt-0.5" />
+                      </span>
                       <Button size="sm" variant="outline" onClick={() => setConfirm(pickDialog(v))}>Use this {noun}</Button>
                     </li>
                   ))}

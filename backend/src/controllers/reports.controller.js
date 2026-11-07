@@ -1,8 +1,9 @@
 const db = require('../config/db');
 const { logAction, diffFields } = require('../services/auditLog.service');
 const {
-  loadBook, loadSettings, receivables: receivablesOf, daysBetween,
+  loadBook, loadSettings, receivables: receivablesOf, daysBetween, addDays,
 } = require('../books/book');
+const { narrationLookup } = require('../services/narration');
 
 // Reports: Debtors, Invoices, Credit & debit notes, Stock transfers,
 // Receivables and Exceptions, worked out at read time from the Tally copy
@@ -80,8 +81,10 @@ async function debtors(req, res, next) {
       totals, tabs, unknown, all: base.length, companies: book.companies, company_id: companyId, as_of: book.today,
     });
 
-    // The RTV row each credit note on this page was linked to, if any.
+    // The RTV row each credit note on this page was linked to, if any, and
+    // every narration on the page.
     const cnsOf = (i) => i.settled_by.filter((s) => s.as === 'credit_notes');
+    const narrationOf = await narrationLookup(db, page.rows.flatMap((i) => [[i.company_id, i.guid], ...cnsOf(i).map((c) => [i.company_id, c.guid])]));
     const guids = [...new Set(page.rows.flatMap((i) => cnsOf(i).map((s) => s.guid)))];
     const rtvOf = new Map();
     if (guids.length) {
@@ -97,6 +100,7 @@ async function debtors(req, res, next) {
       guid: i.guid,
       number: i.number,
       date: i.date,
+      ...narrationOf(i.company_id, i.guid),
       party: i.party,
       vendor: i.vendor,
       pos: i.pos,
@@ -104,7 +108,7 @@ async function debtors(req, res, next) {
       total_paise: i.total_paise,
       credit_notes_paise: i.credit_notes_paise,
       credit_notes: cnsOf(i).map((s) => ({
-        guid: s.guid, number: s.number, date: s.date, voucher_type: s.voucher_type, amount_paise: s.amount_paise, rtv_no: rtvOf.get(`${i.company_id}|${s.guid}`) || null,
+        guid: s.guid, number: s.number, date: s.date, voucher_type: s.voucher_type, amount_paise: s.amount_paise, rtv_no: rtvOf.get(`${i.company_id}|${s.guid}`) || null, ...narrationOf(i.company_id, s.guid),
       })),
       outstanding_paise: i.outstanding_paise,
       status: i.status,
@@ -144,7 +148,14 @@ async function invoices(req, res, next) {
       overdue_paise: list.filter((i) => i.status === 'overdue').reduce((a, i) => a + i.outstanding_paise, 0),
     };
     const vendors = [...new Set(book.invoices.map((i) => i.vendor).filter(Boolean))].sort();
-    res.json(paged(list, q, { totals, vendors, companies: book.companies, as_of: book.today }));
+    const page = paged(list, q, {
+      totals, vendors, companies: book.companies, as_of: book.today,
+    });
+    const narrationOf = await narrationLookup(db, page.rows.flatMap((i) => [[i.company_id, i.guid], ...i.settled_by.map((x) => [i.company_id, x.guid])]));
+    page.rows = page.rows.map((i) => ({
+      ...i, ...narrationOf(i.company_id, i.guid), settled_by: i.settled_by.map((x) => ({ ...x, ...narrationOf(i.company_id, x.guid) })),
+    }));
+    res.json(page);
   } catch (err) { sendError(res, next, err); }
 }
 
@@ -208,7 +219,10 @@ async function notes(req, res, next) {
       })
       .filter((n) => matches(q.q, n.number, n.party, ...n.against, ...n.pos, n.rtv?.rtv_no));
     list = list.sort((a, b) => b.date.localeCompare(a.date) || String(b.number).localeCompare(String(a.number)));
-    res.json(paged(list, q, { totals: { notes: list.length, amount_paise: sum(list, 'amount_paise') }, companies: book.companies }));
+    const page = paged(list, q, { totals: { notes: list.length, amount_paise: sum(list, 'amount_paise') }, companies: book.companies });
+    const narrationOf = await narrationLookup(db, page.rows.map((r) => [r.company_id, r.guid]));
+    page.rows = page.rows.map((r) => ({ ...r, ...narrationOf(r.company_id, r.guid) }));
+    res.json(page);
   } catch (err) { sendError(res, next, err); }
 }
 
@@ -236,7 +250,10 @@ async function transfers(req, res, next) {
       company_id: i.company_id, company: i.company, guid: i.guid, number: i.number, date: i.date, party: i.party,
       total_paise: i.total_paise, ...(qty.get(i.key) || { qty: 0, lines: 0 }),
     }));
-    res.json(paged(out, q, { totals: { transfers: out.length, total_paise: sum(out, 'total_paise') }, companies: book.companies }));
+    const page = paged(out, q, { totals: { transfers: out.length, total_paise: sum(out, 'total_paise') }, companies: book.companies });
+    const narrationOf = await narrationLookup(db, page.rows.map((r) => [r.company_id, r.guid]));
+    page.rows = page.rows.map((r) => ({ ...r, ...narrationOf(r.company_id, r.guid) }));
+    res.json(page);
   } catch (err) { sendError(res, next, err); }
 }
 
@@ -294,7 +311,7 @@ async function exceptions(req, res, next) {
           .filter((i) => !i.internal && !i.pos.length && !unmatched.has(i.vendor) && i.age_days > days && (!companyId || i.company_id === companyId))
           .sort((a, b) => a.date.localeCompare(b.date))
           .map((i) => ({
-            company: i.company, number: i.number, date: i.date, party: i.party, vendor: i.vendor, total_paise: i.total_paise, age_days: i.age_days,
+            company_id: i.company_id, company: i.company, guid: i.guid, number: i.number, date: i.date, party: i.party, vendor: i.vendor, total_paise: i.total_paise, age_days: i.age_days,
           })),
       },
       {
@@ -325,6 +342,9 @@ async function exceptions(req, res, next) {
         })),
       },
     ].map((c) => ({ code: c.code, count: c.rows.length, rows: c.rows.slice(0, EXCEPTION_LIMIT) }));
+    const noPo = categories.find((c) => c.code === 'invoice_no_po');
+    const narrationOf = await narrationLookup(db, noPo.rows.map((r) => [r.company_id, r.guid]));
+    noPo.rows = noPo.rows.map((r) => ({ ...r, ...narrationOf(r.company_id, r.guid) }));
     res.json({
       categories, exception_days: days, as_of: book.today, companies: book.companies,
     });
@@ -336,16 +356,22 @@ async function exceptions(req, res, next) {
 async function settingsData() {
   const [settings, vendors] = await Promise.all([
     loadSettings(db),
-    rowsOf(`SELECT v.vendor, t.credit_days, t.updated_at, u.name AS updated_by_name FROM
+    rowsOf(`SELECT v.vendor, t.credit_days, t.updated_at, u.name AS updated_by_name, m.mode FROM
               (SELECT name AS vendor FROM roms_vendors UNION SELECT vendor FROM vendor_terms) v
               LEFT JOIN vendor_terms t ON t.vendor = v.vendor LEFT JOIN users u ON u.id = t.updated_by
+              LEFT JOIN match_vendors m ON m.vendor = v.vendor
              ORDER BY v.vendor`),
   ]);
   const { terms, ...rest } = settings;
   return {
     settings: rest,
+    // transfer: a vendor set to stock transfer, whose sales are never owed.
     terms: vendors.map((v) => ({
-      vendor: v.vendor, credit_days: v.credit_days == null ? null : Number(v.credit_days), updated_at: v.updated_at || null, updated_by_name: v.updated_by_name || null,
+      vendor: v.vendor,
+      credit_days: v.credit_days == null ? null : Number(v.credit_days),
+      transfer: v.mode === 'transfer',
+      updated_at: v.updated_at || null,
+      updated_by_name: v.updated_by_name || null,
     })),
   };
 }
@@ -413,6 +439,46 @@ async function updateTerms(req, res, next) {
   } catch (err) { sendError(res, next, err); }
 }
 
+// GET /api/reports/terms/preview?vendor&credit_days -- what a change would do
+// to the invoices still owed, before it is saved. Without a vendor it is the
+// default, for every marketplace without its own days. credit_days empty
+// (with a vendor) is "use the default". Nothing is written.
+async function previewTerms(req, res, next) {
+  try {
+    const q = req.query;
+    const vendor = q.vendor ? String(q.vendor) : null;
+    const days = q.credit_days == null || q.credit_days === '' ? null : Number(q.credit_days);
+    if (days === null && !vendor) throw fail(400, 'Type the default credit days');
+    if (days !== null && !intIn(days, 0, 365)) throw fail(400, 'Credit days must be 0-365');
+    const book = await loadBook(db);
+    const { terms, default_credit_days: fallback } = book.settings;
+    const effective = days ?? fallback;
+    const applies = (i) => (vendor ? i.vendor === vendor : !(i.vendor && terms[i.vendor] != null));
+    const owed = book.invoices.filter((i) => !i.internal && i.outstanding_paise > 0 && applies(i));
+    const out = {
+      vendor,
+      credit_days: days,
+      effective_days: effective,
+      open_invoices: owed.length,
+      overdue_now: 0,
+      overdue_after: 0,
+      become_overdue: 0,
+      become_overdue_paise: 0,
+      stop_overdue: 0,
+      stop_overdue_paise: 0,
+    };
+    for (const i of owed) {
+      const was = i.status === 'overdue';
+      const will = book.today > addDays(i.date, effective);
+      if (was) out.overdue_now += 1;
+      if (will) out.overdue_after += 1;
+      if (will && !was) { out.become_overdue += 1; out.become_overdue_paise += i.outstanding_paise; }
+      if (was && !will) { out.stop_overdue += 1; out.stop_overdue_paise += i.outstanding_paise; }
+    }
+    res.json(out);
+  } catch (err) { sendError(res, next, err); }
+}
+
 module.exports = {
-  debtors, invoices, notes, transfers, receivables, exceptions, getSettings, updateSettings, updateTerms,
+  debtors, invoices, notes, transfers, receivables, exceptions, getSettings, updateSettings, updateTerms, previewTerms,
 };

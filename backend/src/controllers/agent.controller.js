@@ -28,6 +28,14 @@ const { sendAutofill, autofillDue, lastAutofill } = require('../matching/autofil
 const KINDS = ['light', 'heavy', 'backfill', 'resync'];
 const MAX_VOUCHERS = 250;
 const MAX_LIST = 20000;
+// A voucher's narration is shown on every screen that lists it, so it is kept
+// whole (a receipt's can list dozens of invoice numbers).
+const NARRATION_MAX = 2000;
+// How a ledger's state and GSTIN are read from Tally. Connector 0.7.0 reads
+// the latest dated address and GST registration (2) where older ones took the
+// first value they met (1). State and GSTIN are taken only from a payload that
+// reads them at least this well, so an older Connector can't undo a fix.
+const LEDGER_READING = 2;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const ABANDONED = JSON.stringify(['Abandoned: a newer run started before this one finished']);
 
@@ -276,6 +284,8 @@ const MASTERS = {
   ledgers: {
     table: 'tally_ledgers', renames: true,
     cols: ['name', 'parent', 'aliases', 'gstin', 'gstins', 'state', 'is_bill_wise', 'master_id', 'alter_id'],
+    // Kept as stored unless the payload reads them at LEDGER_READING.
+    readings: ['gstin', 'gstins', 'state'],
     values: (m) => {
       const gstins = Array.isArray(m.gstins) ? m.gstins.map((g) => text(g, 20)).filter(Boolean) : [];
       return [
@@ -302,13 +312,19 @@ const MASTERS = {
   },
 };
 
-// POST /api/agent/runs/:id/masters { groups?, ledgers?, stockItems?, voucherTypes? }
+const sameValue = (a, b) => String(a ?? '') === String(b ?? '');
+
+// POST /api/agent/runs/:id/masters { groups?, ledgers?, stockItems?, voucherTypes?, ledgerReading? }
 // Each list sent is COMPLETE, so what it lacks was deleted in Tally. A kind the
 // Connector could not read is simply left out, and nothing of it is touched.
+// A master is left alone only when everything about it is unchanged -- a
+// Connector that reads a field better corrects the stored row even though
+// Tally's AlterID hasn't moved.
 async function masters(req, res, next) {
   try {
     const run = await openRun(req);
     const body = req.body || {};
+    const readsWell = Number(body.ledgerReading) >= LEDGER_READING;
     const stmts = [];
     const result = { upserted: 0, unchanged: 0, deleted: 0, renamed: 0 };
 
@@ -321,7 +337,7 @@ async function masters(req, res, next) {
       if (missingGuid) throw bad(`${key}: ${missingGuid} record(s) without a GUID or name`);
 
       const { rows: stored } = await db.execute({
-        sql: `SELECT guid, name, alter_id, deleted_at FROM ${spec.table} WHERE company_id = ?`,
+        sql: `SELECT guid, deleted_at, ${spec.cols.join(', ')} FROM ${spec.table} WHERE company_id = ?`,
         args: [run.company_id],
       });
       const byGuid = new Map(stored.map((r) => [r.guid, r]));
@@ -337,9 +353,12 @@ async function masters(req, res, next) {
         incoming.add(guid);
         const values = spec.values(m);
         const before = byGuid.get(guid);
+        if (before && spec.readings && !readsWell) {
+          for (const col of spec.readings) values[spec.cols.indexOf(col)] = before[col] ?? null;
+        }
         if (before && !before.deleted_at) {
           if (spec.renames && before.name !== values[0]) result.renamed++;
-          if (int(m.alterId) != null && Number(before.alter_id) === int(m.alterId) && before.name === values[0]) {
+          if (spec.cols.every((col, i) => sameValue(before[col], values[i]))) {
             result.unchanged++;
             continue;
           }
@@ -421,7 +440,7 @@ function voucherStatements(v, companyId, runId, replaceLines) {
       companyId, guid,
       int(v.masterId), int(v.alterId), v.date, text(v.type, 200), text(v.baseType, 60) || 'Unknown',
       text(v.number, 200), text(v.reference, 200), ISO.test(v.referenceDate || '') ? v.referenceDate : null,
-      text(v.party, 300), text(v.partyGstin, 20), text(v.cmpGstin, 20), text(v.narration, 300),
+      text(v.party, 300), text(v.partyGstin, 20), text(v.cmpGstin, 20), text(v.narration, NARRATION_MAX),
       flag(v.invoice), flag(v.cancelled), flag(v.optional), paise(v.total),
       runId,
     ],

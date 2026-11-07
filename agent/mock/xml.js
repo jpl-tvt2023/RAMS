@@ -42,8 +42,14 @@ function groupXml(g, i) {
 function ledgerXml(l, style, i) {
   let gst = '';
   if (l.gstin && style === 'tp3') {
-    gst = `<LEDGSTREGDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM><GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE>${tag('STATE', l.state)}${tag('PLACEOFSUPPLY', l.state)}${tag('GSTIN', l.gstin)}</LEDGSTREGDETAILS.LIST>`
-      + `<LEDMAILINGDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM>${tag('MAILINGNAME', l.name)}${tag('STATE', l.state)}<COUNTRY>India</COUNTRY></LEDMAILINGDETAILS.LIST>`;
+    // As real TallyPrime 3 ledgers: a GST rate block whose state is "Any",
+    // then the GST registration and the address, each a dated list oldest
+    // first (priorState: an older entry, corrected since).
+    const dated = (from, state) => `<LEDGSTREGDETAILS.LIST><APPLICABLEFROM>${from}</APPLICABLEFROM><GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE>${tag('STATE', '')}${tag('PLACEOFSUPPLY', state)}${tag('GSTIN', l.gstin)}</LEDGSTREGDETAILS.LIST>`;
+    const mailing = (from, state) => `<LEDMAILINGDETAILS.LIST><APPLICABLEFROM>${from}</APPLICABLEFROM>${tag('MAILINGNAME', l.name)}${tag('STATE', state)}<COUNTRY>India</COUNTRY></LEDMAILINGDETAILS.LIST>`;
+    gst = '<STATEWISEDETAILS.LIST><STATENAME>&#4; Any</STATENAME></STATEWISEDETAILS.LIST>'
+      + (l.priorState ? dated('20220401', l.priorState) : '') + dated('20250401', l.state)
+      + (l.priorState ? mailing('20220401', l.priorState) : '') + mailing('20250401', l.state);
   } else if (l.gstin) {
     gst = `<GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE>${tag('PARTYGSTIN', l.gstin)}${tag('LEDSTATENAME', l.state)}`;
   }
