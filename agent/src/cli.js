@@ -2,6 +2,7 @@
 // RAMS Connector — command line. Reads Tally, never writes to it.
 //   Phase 0: probe, record, profile, roms-refs, analyze
 //   M3:      run (the service), sync (one sync now), status
+//   M8:      check (for setup.ps1, the setup window)
 const fs = require('fs');
 const path = require('path');
 const { createTallyClient } = require('./tally/client');
@@ -32,7 +33,10 @@ const HELP = `RAMS Connector ${version} — reads TallyPrime, never writes to it
       --dry-run [--out DIR]  backfill into files instead of RAMS (nothing is sent)
       --from YYYY-MM-DD      with --dry-run: first voucher date (default ${ROMS_GO_LIVE})
   status                     What RAMS knows next to what Tally says now.
-      --config FILE          for run / sync / status (default: %ProgramData%\\RAMS\\connector.json,
+  check                      One line of JSON for the setup window: does Tally
+                             answer, which companies are open, does RAMS accept
+                             the token, and which companies RAMS syncs.
+      --config FILE          for run / sync / status / check (default: %ProgramData%\\RAMS\\connector.json,
                              else agent/connector.json; see connector.example.json)
 
   ping                       Is Tally reachable? Which companies are open?
@@ -243,6 +247,46 @@ const commands = {
         ? ` — last round ${f.last.startedAt} UTC (${f.last.status}): ${c.written || 0} written, ${c.refused || 0} refused, ${c.checked || 0} checked${f.last.error ? ` — ${f.last.error}` : ''}`
         : ' — nothing sent yet'}`);
     }
+  },
+
+  // The setup window's checks. Always one JSON line and exit 0, so the window
+  // can say in plain words what to fix. The heartbeat also tells RAMS which
+  // companies are open, so an Admin can turn them on.
+  async check(args) {
+    const { config, tally } = connector(args);
+    const out = {
+      version,
+      tally: { ok: false, where: tally.where, message: '', educational: null, companies: [] },
+      rams: { ok: false, where: config.apiUrl, message: '', code: null, syncOn: [], syncFrom: null },
+    };
+    let api = null;
+    let refused = null;
+    try {
+      const client = createApiClient({ apiUrl: config.apiUrl, token: config.token, retries: 0 });
+      // The service keeps only the message; the window needs the reason too.
+      api = { ...client, heartbeat: (body) => client.heartbeat(body).catch((e) => { refused = e; throw e; }) };
+    } catch (e) {
+      out.rams.message = e.message;
+    }
+    // Tally is checked even without a token, so its fix can be shown first.
+    const service = createService({ cfg: config, tally, api, log: () => {} });
+    const t = await service.checkTally({ force: true });
+    out.tally = {
+      ...out.tally, ok: Boolean(t.reachable), message: t.message, educational: t.educational, companies: service.state.live.map((c) => c.name),
+    };
+    if (api) {
+      const server = await service.heartbeat();
+      if (server) {
+        out.rams = {
+          ...out.rams, ok: true, where: api.where, syncOn: server.companies.map((c) => c.code || c.name), syncFrom: server.settings.syncFrom,
+        };
+      } else {
+        out.rams = {
+          ...out.rams, where: api.where, message: refused ? refused.message : String(service.state.lastError || '').replace(/^RAMS: /, ''), code: (refused && refused.code) || null,
+        };
+      }
+    }
+    log(JSON.stringify(out));
   },
 
   async ping(args) {

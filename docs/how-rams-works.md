@@ -49,6 +49,7 @@ Royal Mart keeps its **accounts in Tally** and its **marketplace orders in ROMS*
 **The Connector** is a small program on the office PC where Tally runs.
 - It reads Tally over Tally's own connection, the same one Tally uses for its reports.
 - It sends the books to RAMS over a secure (HTTPS) connection, using a private key that only RAMS accepts.
+- **Setting it up** is one double-click on *Setup RAMS Connector*. You paste the Connector code an Admin gives you and click Connect. It checks that Tally answers and that RAMS accepts the code, and says what to change if not. It then loads Tally into RAMS the first time and starts by itself each time you sign in to Windows.
 
 **When it reads Tally:**
 - **Every minute:** it tells RAMS it's alive, and whether Tally is open.
