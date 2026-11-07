@@ -103,9 +103,15 @@ const DAY = {
   ],
 };
 
+// The companies arrive with the parties, after the Company box is drawn.
+async function chooseCompany(user, code) {
+  await screen.findByRole('option', { name: code });
+  await user.selectOptions(screen.getByLabelText('Company'), code);
+}
+
 // Company → marketplace → all states → one party.
 async function chooseZeptoPune(user) {
-  await user.selectOptions(await screen.findByLabelText('Company'), 'MH');
+  await chooseCompany(user, 'MH');
   await user.selectOptions(screen.getByLabelText('Marketplace'), 'Zepto');
   await user.click(screen.getByRole('button', { name: 'State' }));
   await user.click(screen.getByRole('checkbox', { name: 'All states' }));
@@ -139,7 +145,7 @@ describe('Ledgers', () => {
   test('a marketplace that doesn’t pay bill to bill is coming soon', async () => {
     renderWithProviders(<Ledgers />, { user: VIEWER });
     const user = userEvent.setup();
-    await user.selectOptions(await screen.findByLabelText('Company'), 'MH');
+    await chooseCompany(user, 'MH');
     const vendor = screen.getByLabelText('Marketplace');
     expect(within(vendor).getByRole('option', { name: 'All (Minutes, Zepto)' })).toBeInTheDocument();
     await user.selectOptions(vendor, 'Blinkit');
@@ -150,7 +156,7 @@ describe('Ledgers', () => {
   test('states list both readings; the statement row is Tally’s, with the check in its cells', async () => {
     renderWithProviders(<Ledgers />, { user: VIEWER });
     const user = userEvent.setup();
-    await user.selectOptions(await screen.findByLabelText('Company'), 'MH');
+    await chooseCompany(user, 'MH');
     await user.selectOptions(screen.getByLabelText('Marketplace'), 'Zepto');
     await user.click(screen.getByRole('button', { name: 'State' }));
     const states = screen.getByRole('group', { name: 'State' });
@@ -229,7 +235,7 @@ describe('Ledgers', () => {
   test('a company with no bill-to-bill party says where to map them', async () => {
     renderWithProviders(<Ledgers />, { user: ADMIN });
     const user = userEvent.setup();
-    await user.selectOptions(await screen.findByLabelText('Company'), 'HR');
+    await chooseCompany(user, 'HR');
     expect(screen.getByText(/No party ledger here is mapped/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Matching → Party ledgers' })).toHaveAttribute('href', '/matching/parties');
   });
