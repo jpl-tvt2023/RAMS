@@ -12,6 +12,7 @@ import AuditLog from './pages/admin/AuditLog';
 import Companies from './pages/admin/Companies';
 import CreditTerms from './pages/admin/CreditTerms';
 import Permissions from './pages/admin/Permissions';
+import FileStorage from './pages/admin/FileStorage';
 import MatchReview from './pages/matching/MatchReview';
 import MatchingRules from './pages/matching/MatchingRules';
 import PartyLedgers from './pages/matching/PartyLedgers';
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/admin/companies" element={<ProtectedRoute permission={[PERM.SYNC_COMPANIES, PERM.SYNC_SCHEDULE, PERM.NARRATION_SETTINGS]}><Companies /></ProtectedRoute>} />
           <Route path="/admin/credit-terms" element={<ProtectedRoute permission={PERM.REPORTS_SETTINGS}><CreditTerms /></ProtectedRoute>} />
           <Route path="/admin/permissions" element={<ProtectedRoute roles={ADMIN_ONLY}><Permissions /></ProtectedRoute>} />
+          <Route path="/admin/files" element={<ProtectedRoute roles={ADMIN_ONLY}><FileStorage /></ProtectedRoute>} />
           <Route path="/matching" element={<ProtectedRoute permission={PERM.MATCHING_VIEW}><MatchReview /></ProtectedRoute>} />
           <Route path="/matching/rules" element={<ProtectedRoute permission={PERM.MATCHING_VIEW}><MatchingRules /></ProtectedRoute>} />
           <Route path="/matching/parties" element={<ProtectedRoute permission={PERM.MATCHING_VIEW}><PartyLedgers /></ProtectedRoute>} />

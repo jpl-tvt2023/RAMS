@@ -23,6 +23,7 @@ export const PERM_SCREENS = {
   'sync.run': ['/sync'],
   'ledgers.view': ['/ledgers'],
   'ledgers.entry': ['/ledgers'],
+  'ledgers.files': ['/ledgers'],
   'ledgers.settings': ['/ledgers'],
 };
 

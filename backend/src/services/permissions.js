@@ -64,6 +64,10 @@ const CATALOG = [
     description: 'Add, change and remove a party\'s marketplace debit notes and our credit notes on Ledgers',
   },
   {
+    key: 'ledgers.files', area: 'Ledgers', label: 'Attach files',
+    description: 'Add and remove PDFs, photos and emails on a party\'s rows. Anyone who sees Ledgers or Debtors can view and download them',
+  },
+  {
     key: 'ledgers.settings', area: 'Ledgers', label: 'Change ledger settings',
     description: 'Which marketplaces Ledgers covers, how long Tally may take to book a note, the amount tolerance and the placeholder opening',
   },

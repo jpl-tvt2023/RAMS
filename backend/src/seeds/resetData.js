@@ -10,7 +10,7 @@
 // Deleted:
 //   - Tally's books: vouchers and their lines, ledger balances, sync state and runs
 //   - the copy of ROMS, every match and auto-fill result
-//   - Ledgers' typed DN/CN and loaded openings
+//   - Ledgers' typed DN/CN and loaded openings, and every file on Ledgers rows
 //   - every Connector token, the companies switched off, and the audit log
 // Kept:
 //   - users, roles and permissions
@@ -26,7 +26,7 @@ const db = require('../config/db');
 // Children before parents, so foreign keys never block a delete.
 const CLEARED = [
   'tally_vch_ledger_lines', 'tally_vch_bill_allocations', 'tally_vch_inventory_lines', 'tally_vch_orders', 'tally_vouchers',
-  'tally_ledger_balances', 'sync_requests', 'ledger_entries', 'ledger_openings',
+  'tally_ledger_balances', 'sync_requests', 'ledger_files', 'file_chunks', 'file_blobs', 'ledger_entries', 'ledger_openings',
   'match_results', 'doc_links', 'match_runs', 'autofill_events', 'autofill_items', 'autofill_runs',
   'roms_po_lines', 'roms_pos', 'roms_vendor_codes', 'roms_products', 'roms_vendors', 'roms_rtv', 'roms_refresh',
   'tally_sync_runs', 'tally_sync_state', 'agents', 'audit_logs',

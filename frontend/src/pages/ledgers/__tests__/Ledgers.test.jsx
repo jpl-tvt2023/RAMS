@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import Ledgers from '../Ledgers';
 import { renderWithProviders, ADMIN, ACCOUNTANT, VIEWER } from '../../../test/renderWithProviders';
 import * as ledgers from '../../../api/ledgers.api';
+import { NO_FILE } from '../../../utils/highlights';
 import toast from 'react-hot-toast';
 
 vi.mock('../../../api/ledgers.api', () => ({
@@ -17,6 +18,7 @@ vi.mock('../../../api/ledgers.api', () => ({
   updateLedgerSettings: vi.fn(),
 }));
 vi.mock('../../../api/audit.api', () => ({ getEntityHistory: vi.fn().mockResolvedValue([]) }));
+vi.mock('../../../api/files.api', () => ({ uploadFile: vi.fn(), fetchFile: vi.fn(), deleteFile: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 const Z1 = {
@@ -262,5 +264,95 @@ describe('Ledgers', () => {
     renderWithProviders(<Ledgers />, { user: VIEWER });
     await screen.findByText(Z2.name);
     expect(screen.queryByRole('button', { name: /Ledger settings/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('Ledgers files', () => {
+  const PDF = {
+    id: 31, name: 'FKIDN51803946.pdf', kind: 'pdf', size: 120000, uploaded_by_name: 'Asha', uploaded_at: '2026-11-02 09:00:00',
+  };
+  const INVOICE_SCAN = { ...PDF, id: 32, name: 'invoice 201.jpg', kind: 'image' };
+  // The first DN has its file, the second has none; the invoice has a scan.
+  const withFiles = {
+    ...DAY,
+    entries_without_file: 1,
+    entries: [{ ...DAY.entries[0], files: [PDF] }, { ...DAY.entries[1], files: [] }],
+    vouchers: [{ ...DAY.vouchers[0], files: [INVOICE_SCAN] }, { ...DAY.vouchers[1], files: [] }],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    ledgers.getLedgerParties.mockResolvedValue({
+      ...PARTIES,
+      attention: [...PARTIES.attention, {
+        party: Z1, counts: { missing: 0, not_entered: 0, amount_differs: 0, booked_twice: 0, no_file: 2 }, since: '2026-10-02', state_differs: false,
+      }],
+      attention_total: 2,
+    });
+    ledgers.getLedgerStatement.mockResolvedValue({ ...STATEMENT, rows: [{ ...STATEMENT.rows[0], entries_without_file: 1 }] });
+    ledgers.getLedgerParty.mockResolvedValue(withFiles);
+  });
+
+  test('a DN or CN typed here with no file is orange and says so; Tally rows and filed notes are not', async () => {
+    renderWithProviders(<Ledgers />, { user: VIEWER });
+    await chooseZeptoPune(userEvent.setup());
+    const statementRow = (await screen.findByRole('button', { name: Z1.name })).closest('tr');
+    expect(within(statementRow).getByText('1 DN/CN without a file')).toBeInTheDocument();
+
+    const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
+    const bare = within(detail).getByText('RTDN00019933').closest('tr');
+    expect(bare).toHaveClass(NO_FILE.row);
+    expect(within(bare).getByText('No file')).toBeInTheDocument();
+    const filed = within(detail).getByText('FKIDN51803946', { selector: 'span' }).closest('tr');
+    expect(filed).not.toHaveClass(NO_FILE.row);
+    expect(within(filed).getByRole('button', { name: 'Files on Marketplace DN FKIDN51803946' })).toHaveTextContent('1 file');
+    const invoice = within(detail).getByText('201/RM/26-27').closest('tr');
+    expect(invoice).not.toHaveClass(NO_FILE.row);
+    expect(within(invoice).getByRole('button', { name: 'Files on Sales 201/RM/26-27' })).toBeInTheDocument();
+    // A Viewer can open files but not add them.
+    expect(within(detail).queryByRole('button', { name: /^Add a file/ })).not.toBeInTheDocument();
+    expect(within(detail).getByRole('note', { name: 'What the colours mean' })).toHaveTextContent('No file');
+  });
+
+  test('“Without a file” shows just those notes', async () => {
+    renderWithProviders(<Ledgers />, { user: VIEWER });
+    await chooseZeptoPune(userEvent.setup());
+    const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
+    const toggle = within(detail).getByRole('button', { name: 'Without a file (1)' });
+    await userEvent.setup().click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(within(detail).queryByText('FKIDN51803946', { selector: 'span' })).not.toBeInTheDocument();
+    expect(within(detail).getByText('RTDN00019933')).toBeInTheDocument();
+  });
+
+  test('Needs attention counts the notes without a file, and opens just those', async () => {
+    renderWithProviders(<Ledgers />, { user: VIEWER });
+    const user = userEvent.setup();
+    const row = (await screen.findByRole('button', { name: Z1.name })).closest('tr');
+    expect(within(row).getByText('2 DN/CN without a file')).toBeInTheDocument();
+    await user.click(within(row).getByRole('button', { name: Z1.name }));
+    const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
+    expect(within(detail).getByRole('button', { name: 'Without a file (1)' })).toHaveAttribute('aria-pressed', 'true');
+    expect(ledgers.getLedgerStatement).toHaveBeenCalledWith(expect.objectContaining({ parties: ['2:Z1'], from: '2026-10-02' }));
+  });
+
+  test('an Accountant adds a file from the Files column', async () => {
+    renderWithProviders(<Ledgers />, { user: ACCOUNTANT });
+    const user = userEvent.setup();
+    await chooseZeptoPune(user);
+    const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
+    await user.click(within(detail).getByRole('button', { name: 'Add a file to Marketplace DN RTDN00019933' }));
+    const dialog = screen.getByRole('dialog', { name: 'Files — Marketplace DN RTDN00019933' });
+    expect(within(dialog).getByText('No file yet.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: /Choose files/ })).toBeInTheDocument();
+  });
+
+  test('removing a note warns that its files go with it', async () => {
+    renderWithProviders(<Ledgers />, { user: ACCOUNTANT });
+    const user = userEvent.setup();
+    await chooseZeptoPune(user);
+    await user.click(await screen.findByRole('button', { name: 'Remove FKIDN51803946' }));
+    expect(screen.getByRole('dialog', { name: 'Remove this note?' })).toHaveTextContent('Its file is removed with it.');
   });
 });

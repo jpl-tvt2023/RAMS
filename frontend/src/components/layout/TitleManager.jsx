@@ -14,6 +14,7 @@ const TITLES = [
   ['/admin/companies', 'Tally companies'],
   ['/admin/permissions', 'Roles & permissions'],
   ['/admin/credit-terms', 'Credit terms'],
+  ['/admin/files', 'File storage'],
   ['/matching', 'Match review'],
   ['/matching/rules', 'Matching rules'],
   ['/matching/parties', 'Party ledgers'],

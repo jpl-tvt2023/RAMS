@@ -5,7 +5,8 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // public/pdfjs-wasm holds pdf.js's own decoders, copied in by vite.config.js.
+  globalIgnores(['dist', 'public/pdfjs-wasm']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [

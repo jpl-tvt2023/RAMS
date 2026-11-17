@@ -5,6 +5,7 @@ const { isValidDateString } = require('../utils/dateValidation');
 const { todayIst } = require('../matching/load');
 const { normKey, compactKey } = require('../matching/docno');
 const { keyOf } = require('../utils/gstStates');
+const { filesFor, unlinkEntry } = require('../services/files');
 const {
   KINDS, MIN_DN, loadSettings, loadParties, findsNumber, statementOf, partyDetailOf, attentionOf, monthStart, addDays,
 } = require('../ledgers/ledger');
@@ -143,7 +144,8 @@ async function statement(req, res, next) {
   } catch (err) { sendError(res, next, err); }
 }
 
-// GET /api/ledgers/party?company_id&ledger_guid&from&to -- one party's range.
+// GET /api/ledgers/party?company_id&ledger_guid&from&to -- one party's range,
+// with the files on each typed note and each Tally voucher.
 async function party(req, res, next) {
   try {
     const q = req.query;
@@ -151,9 +153,16 @@ async function party(req, res, next) {
     if (!q.company_id || !q.ledger_guid) throw fail(400, 'Choose a party');
     const p = await billToBillParty(q.company_id, q.ledger_guid);
     const { from, to } = rangeIn(q, today);
-    res.json(await partyDetailOf(db, {
+    const detail = await partyDetailOf(db, {
       party: p, from, to, today,
-    }));
+    });
+    const found = await filesFor(db, {
+      entryIds: detail.entries.map((e) => e.id),
+      vouchers: detail.vouchers.map((v) => [p.company_id, v.guid]),
+    });
+    detail.entries = detail.entries.map((e) => ({ ...e, files: found.entry(e.id) }));
+    detail.vouchers = detail.vouchers.map((v) => ({ ...v, files: found.voucher(p.company_id, v.guid) }));
+    res.json(detail);
   } catch (err) { sendError(res, next, err); }
 }
 
@@ -276,28 +285,32 @@ async function updateEntry(req, res, next) {
   } catch (err) { sendError(res, next, err); }
 }
 
-// DELETE /api/ledgers/entries/:id -- the row stays, marked removed.
+// DELETE /api/ledgers/entries/:id -- the row stays, marked removed. Its files
+// go with it (a file no other row uses is deleted, to free the space).
 async function deleteEntry(req, res, next) {
   try {
     const e = await liveEntry(req.params.id);
     const [l] = await rowsOf('SELECT name FROM tally_ledgers WHERE company_id = ? AND guid = ?', [e.company_id, e.ledger_guid]);
     const name = l?.name || e.ledger_guid;
-    await inTx(async (tx) => {
+    const removed = await inTx(async (tx) => {
       await tx.execute({
         sql: "UPDATE ledger_entries SET deleted_at = datetime('now'), deleted_by = ? WHERE id = ?",
         args: [req.user.id, e.id],
       });
+      const gone = await unlinkEntry(tx, e.id);
+      const withFiles = gone.length ? ` and its ${gone.length === 1 ? 'file' : `${gone.length} files`} (${gone.map((f) => f.file_name).join(', ')})` : '';
       await logAction({
         client: tx,
         userId: req.user.id,
         actionType: 'LEDGER_ENTRY_DELETE',
-        description: `Entry removed — ${describe({ name }, { ...e, amount_paise: Number(e.amount_paise) })}`,
+        description: `Entry removed — ${describe({ name }, { ...e, amount_paise: Number(e.amount_paise) })}${withFiles}`,
         entityType: 'ledger_entries',
         entityId: Number(e.id),
         entityRef: name,
       });
+      return gone.length;
     });
-    res.json({ id: Number(e.id), deleted: true });
+    res.json({ id: Number(e.id), deleted: true, files_removed: removed });
   } catch (err) { sendError(res, next, err); }
 }
 

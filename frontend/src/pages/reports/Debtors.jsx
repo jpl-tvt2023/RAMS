@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { Paperclip } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
+import FilesDialog from '../../components/files/FilesDialog';
 import Pagination, { loadPersistedPageSize, persistPageSize } from '../../components/ui/Pagination';
 import ReportFrame, {
   ReportTable, selectCls, td, num,
@@ -18,7 +20,7 @@ import { narrationForCsv } from '../../utils/highlights';
 // vendor PO numbers, total, credit notes and what is still owed, a tab per
 // marketplace. It opens on the company set as the default on Admin -> Tally
 // companies ('default' until the person picks one). Stock transfers are left
-// out.
+// out. An invoice's files (added on Ledgers) can be viewed and downloaded.
 const STATUSES = [['', 'All'], ['open', 'Open'], ['overdue', 'Overdue'], ['settled', 'Settled'], ['no_po', 'No PO']];
 const STATUS_LABEL = {
   open: 'Open', overdue: 'Overdue', settled: 'Settled', not_billwise: 'Not bill-wise',
@@ -89,6 +91,7 @@ export default function Debtors() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(() => loadPersistedPageSize('debtors', 50));
   const [cnsOf, setCnsOf] = useState(null);
+  const [filesOf, setFilesOf] = useState(null);
   const { data, last, loading } = useKeyedLoad(getDebtors, { ...filters, page, page_size: pageSize });
   const set = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
   const view = data || { rows: [], total: last?.total || 0 };
@@ -148,7 +151,7 @@ export default function Debtors() {
       )}
       <ReportTable
         loading={loading}
-        head={['Invoice', 'Party', 'Internal PO no', 'Vendor PO no', { label: 'Amount', right: true }, { label: 'CN', right: true }, { label: 'Outstanding', right: true }]}
+        head={['Invoice', 'Party', 'Internal PO no', 'Vendor PO no', { label: 'Amount', right: true }, { label: 'CN', right: true }, { label: 'Outstanding', right: true }, 'Files']}
         empty={!loading && view.rows.length === 0 && <p className="text-center text-gray-400 py-8">No invoice matches these filters.</p>}
       >
         {view.rows.map((r) => (
@@ -175,12 +178,28 @@ export default function Debtors() {
               ) : <span className="text-gray-400">—</span>}
             </td>
             <td className={`${num} font-medium`}><Outstanding r={r} /></td>
+            <td className={td}>
+              {r.files?.length > 0 ? (
+                <button type="button" onClick={() => setFilesOf(r)} aria-label={`Files on ${r.number}`} className="inline-flex items-center gap-1 text-brand hover:underline whitespace-nowrap">
+                  <Paperclip size={14} aria-hidden="true" />
+                  {r.files.length} {r.files.length === 1 ? 'file' : 'files'}
+                </button>
+              ) : <span className="text-gray-400">—</span>}
+            </td>
           </tr>
         ))}
       </ReportTable>
       <Pagination page={page} pageSize={pageSize} total={view.total} onPageChange={setPage}
         onPageSizeChange={(s) => { setPageSize(s); persistPageSize('debtors', s); setPage(1); }} />
       <CreditNotes invoice={cnsOf} onClose={() => setCnsOf(null)} />
+      {filesOf && (
+        <FilesDialog
+          title={`Invoice ${filesOf.number}`}
+          subtitle={`${filesOf.party} · ${filesOf.company} · ${formatDay(filesOf.date)}. Files are added on Ledgers.`}
+          files={filesOf.files}
+          onClose={() => setFilesOf(null)}
+        />
+      )}
     </ReportFrame>
   );
 }

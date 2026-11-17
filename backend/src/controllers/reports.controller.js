@@ -4,6 +4,7 @@ const {
   loadBook, loadSettings, receivables: receivablesOf, daysBetween, addDays,
 } = require('../books/book');
 const { narrationLookup } = require('../services/narration');
+const { filesFor } = require('../services/files');
 
 // Reports: Debtors, Invoices, Credit & debit notes, Stock transfers,
 // Receivables and Exceptions, worked out at read time from the Tally copy
@@ -94,6 +95,8 @@ async function debtors(req, res, next) {
                                      AND d.voucher_guid IN (${guids.map(() => '?').join(',')})`, guids);
       for (const l of links) rtvOf.set(`${Number(l.company_id)}|${l.voucher_guid}`, l.rtv_no);
     }
+    // The files attached to each invoice on Ledgers.
+    const found = await filesFor(db, { vouchers: page.rows.map((i) => [i.company_id, i.guid]) });
     page.rows = page.rows.map((i) => ({
       company_id: i.company_id,
       company: i.company,
@@ -114,6 +117,7 @@ async function debtors(req, res, next) {
       status: i.status,
       due_date: i.due_date,
       overdue_days: i.overdue_days,
+      files: found.voucher(i.company_id, i.guid),
     }));
     res.json(page);
   } catch (err) { sendError(res, next, err); }

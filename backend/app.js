@@ -50,6 +50,7 @@ app.use(cors((req, cb) => {
 }));
 // The Connector sends voucher batches of up to 250 (about 300 KB); everything
 // else stays on the small limit. The global parser skips a body already read.
+// A file upload (/api/files) is not JSON: its route reads it raw, up to 4 MB.
 app.use('/api/agent', express.json({ limit: '4mb' }));
 app.use(express.json({ limit: '256kb' }));
 app.use(cookieParser());
@@ -65,6 +66,7 @@ app.use('/api/matching',   require('./src/routes/matching.routes'));
 app.use('/api/autofill',   require('./src/routes/autofill.routes'));
 app.use('/api/reports',    require('./src/routes/reports.routes'));
 app.use('/api/ledgers',    require('./src/routes/ledgers.routes'));
+app.use('/api/files',      require('./src/routes/files.routes'));
 app.use('/api/agent',      require('./src/routes/agent.routes'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));

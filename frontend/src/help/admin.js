@@ -1,4 +1,5 @@
-// Help: Users, the Audit Log and history, Tally companies, Roles & permissions.
+// Help: Users, the Audit Log and history, Tally companies, Roles & permissions,
+// File storage.
 export const users = {
   id: 'users',
   path: '/admin/users',
@@ -163,6 +164,44 @@ export const creditTerms = {
     { q: 'What does “Default (30)” mean?', a: 'The marketplace has no days of its own, so it uses the default, 30 days to begin with.' },
     { q: 'Why aren’t Flipkart and Amazon listed?', a: 'They are set to stock transfer on Matching rules: sales between our own registrations, so nothing is owed and nothing is overdue.' },
     { q: 'Does the preview change anything?', a: 'No. Nothing is saved until you click Save.' },
+  ],
+};
+
+export const fileStorage = {
+  id: 'file-storage',
+  path: '/admin/files',
+  area: 'Admin',
+  title: 'File storage',
+  who: 'Admin and Owner only.',
+  summary: 'How much space the files attached on Ledgers take in RAMS’s database, how much RAMS saved, and the biggest files. Photos are made smaller before they are sent, PDFs and emails are compressed without losing anything, and a file attached to several rows is kept once.',
+  flows: [
+    {
+      title: 'See how much space files take',
+      steps: [
+        'Admin → File storage.',
+        'Files: how many are attached, and how many RAMS keeps (fewer when one file is on several rows).',
+        'Space used: what they take in the database. Space saved: how much smaller that is than the files as they were picked.',
+        '“By kind” splits it into PDFs, photos and emails.',
+      ],
+    },
+    {
+      title: 'Find and look at the biggest files',
+      steps: [
+        'The list at the bottom shows the 20 biggest files, where each is attached, and who added it when.',
+        'Click View to see one inside RAMS (an email downloads instead), or Open on Ledgers to go to its party.',
+      ],
+    },
+    {
+      title: 'Free space',
+      steps: [
+        'Open the file’s party on Ledgers and remove the files nobody needs (the bin in the row’s files).',
+        'A file is deleted once no row uses it; the removal stays in the audit log.',
+      ],
+    },
+  ],
+  faq: [
+    { q: 'How much space is there?', a: 'It depends on the database plan, which is on the Turso dashboard. RAMS can’t read it from inside. As a guide, one file for every DN, CN and invoice comes to about 1 GB a year.' },
+    { q: 'Why is “Space saved” more than the photos shrank?', a: 'It also counts PDFs and emails kept compressed, and every file attached to more than one row but kept once.' },
   ],
 };
 

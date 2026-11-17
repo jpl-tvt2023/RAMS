@@ -12,6 +12,8 @@ backend/tests/.tmp/
 
 # Frontend build output
 frontend/dist/
+# pdf.js's decoders, copied out of node_modules before each dev run and build
+frontend/public/pdfjs-wasm/
 
 # Probe output and ROMS references hold real books and real PO numbers —
 # never commit them. Synthetic fixtures live in agent/mock/ instead.

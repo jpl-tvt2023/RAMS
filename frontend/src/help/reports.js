@@ -41,8 +41,17 @@ export const debtorsHelp = {
       title: 'Download it',
       steps: ['Click Download CSV. It downloads every invoice the filters show, not just this page, for Excel.'],
     },
+    {
+      title: 'See an invoice’s files',
+      steps: [
+        'In the Files column, click the count (for example “1 file”). A dash means the invoice has no file.',
+        'Click View to see a PDF or a photo inside RAMS, or Download to save it.',
+        'Files are added on Ledgers, in the party’s “In Tally” list. Debtors only shows them.',
+      ],
+    },
   ],
   faq: [
+    { q: 'Where do the files come from?', a: 'They are attached on Ledgers, to the invoice’s row in the party’s “In Tally” list, by anyone with “Attach files”. Debtors shows the same files.' },
     { q: 'Why is a narration highlighted in yellow?', a: 'Tally has no narration on that record, and the narration check (Admin → Tally companies) says it needs one. Ask the accountant to add it in Tally; it shows after the next sync.' },
     { q: 'Where are the credit days set?', a: 'On Admin → Credit terms, for anyone with “Change credit terms” (Accountants by default). A change shows what it would do before it is saved.' },
     { q: 'What is the difference between Internal PO no and Vendor PO no?', a: 'Internal PO no is ROMS’s own PO id (for example B002). Vendor PO no is the marketplace’s purchase order number, as typed in ROMS.' },

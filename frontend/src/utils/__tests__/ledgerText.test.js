@@ -4,7 +4,7 @@ import {
 } from '../ledgerText';
 import { AUTOFILL_LEGEND } from '../autofillText';
 import { OUTCOMES } from '../matchReasons';
-import { NO_NARRATION } from '../highlights';
+import { NO_NARRATION, NO_FILE } from '../highlights';
 
 describe('ledger text', () => {
   test('one colour, one meaning: no colour stands for two things on Ledgers', () => {
@@ -19,6 +19,13 @@ describe('ledger text', () => {
     // The yellow highlight is nobody's badge colour.
     expect(NO_NARRATION.className).toMatch(/yellow/);
     expect(colors.join(' ')).not.toMatch(/yellow/);
+    // Orange means only "a note typed here with no file": not a badge, not
+    // the narration highlight, and not red (which is "missing").
+    expect(NO_FILE.className).toMatch(/orange/);
+    expect(NO_FILE.row).toMatch(/orange/);
+    expect(colors.join(' ')).not.toMatch(/orange/);
+    expect(NO_NARRATION.className).not.toMatch(/orange/);
+    expect(`${NO_FILE.className} ${NO_FILE.row}`).not.toMatch(/red|yellow/);
   });
 
   test('the other legends use each colour for one meaning too', () => {

@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Settings, Users, ScrollText, Building2, Link2, ListChecks, SlidersHorizontal, BookUser, ShieldCheck, LifeBuoy, PenLine,
-  FileText, Receipt, ArrowLeftRight, Wallet, AlertTriangle, Activity, BarChart3, IndianRupee, BookOpen, CalendarClock,
+  FileText, Receipt, ArrowLeftRight, Wallet, AlertTriangle, Activity, BarChart3, IndianRupee, BookOpen, CalendarClock, HardDrive,
 } from 'lucide-react';
 import { isReleased } from './releases';
 
@@ -41,6 +41,7 @@ export const PERM = {
   REPORTS_SETTINGS: 'reports.settings',
   LEDGERS_VIEW: 'ledgers.view',
   LEDGERS_ENTRY: 'ledgers.entry',
+  LEDGERS_FILES: 'ledgers.files',
   LEDGERS_SETTINGS: 'ledgers.settings',
   SYNC_COMPANIES: 'sync.companies',
   SYNC_SCHEDULE: 'sync.schedule',
@@ -172,6 +173,13 @@ export const NAV = withoutHeld([
         path: '/admin/audit-log',
         icon: ScrollText,
         description: 'Every change, who made it and when',
+        roles: ADMIN_ONLY,
+      },
+      {
+        label: 'File storage',
+        path: '/admin/files',
+        icon: HardDrive,
+        description: 'The space the files on Ledgers take, and the biggest ones',
         roles: ADMIN_ONLY,
       },
     ],
