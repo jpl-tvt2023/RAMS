@@ -32,7 +32,7 @@ const USAGE = {
     {
       id: 7, name: 'DN scan.jpg', kind: 'image', size: 900000, stored_size: 900000, uploaded_by_name: 'Asha', uploaded_at: '2026-11-02 09:00:00', company_id: 2, company: 'MH',
       on: {
-        type: 'entry', entry_kind: 'debit_note', number: 'FKIDN51803946', date: '2026-05-20', party: 'ZEPTO (PUNE)', party_guid: 'Z1', vendor: 'Zepto',
+        type: 'voucher', voucher_type: 'Credit Note', number: '951', date: '2026-05-20', party: 'ZEPTO (PUNE)', party_guid: 'Z1', vendor: 'Zepto',
       },
     },
     {
@@ -58,7 +58,7 @@ describe('File storage', () => {
     expect(screen.getByText('85% of 40 MB as picked')).toBeInTheDocument();
     expect(screen.getByText('10 kept, as some are on more than one row')).toBeInTheDocument();
     const scan = screen.getByText('DN scan.jpg').closest('tr');
-    expect(scan).toHaveTextContent('MH · Marketplace DN FKIDN51803946 · ZEPTO (PUNE) · 20 May 2026');
+    expect(scan).toHaveTextContent('MH · Credit Note 951 · ZEPTO (PUNE) · 20 May 2026');
     // An email downloads rather than opens; a party with no marketplace can't open on Ledgers.
     const mail = screen.getByText('mail.eml').closest('tr');
     expect(within(mail).getByRole('button', { name: 'View mail.eml' })).toHaveTextContent('Download');

@@ -22,7 +22,6 @@ export const PERM_SCREENS = {
   'reports.settings': ['/admin/credit-terms', '/reports/receivables'],
   'sync.run': ['/sync'],
   'ledgers.view': ['/ledgers'],
-  'ledgers.entry': ['/ledgers'],
   'ledgers.files': ['/ledgers'],
   'ledgers.settings': ['/ledgers'],
 };

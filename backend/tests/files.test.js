@@ -10,10 +10,10 @@ const {
 const { sniff, CHUNK_BYTES } = require('../src/services/files');
 const { cleanName, disposition } = require('../src/controllers/files.controller');
 
-// Files on Ledgers rows end to end: a Zepto party with one sales invoice and
-// one credit note pushed by a Connector, debit notes typed in RAMS, and PDFs,
-// photos and emails attached to both -- stored once, compressed where it
-// helps, and downloaded byte for byte.
+// Files on Ledgers rows end to end: a Zepto party with a sales invoice and
+// credit notes pushed by a Connector, and PDFs, photos and emails attached to
+// those Tally rows -- stored once, compressed where it helps, and downloaded
+// byte for byte. Every row is a Tally voucher: nothing is typed in RAMS.
 
 let admin; let accountant; let viewer; let company;
 const Z = 'FL ZEPTO PRIVATE LIMITED ( PUNE ) - Dark Store';
@@ -31,14 +31,6 @@ const download = (token, id) => bearer(request(app).get(`/api/files/${id}`), tok
 const remove = (token, id) => bearer(request(app).delete(`/api/files/${id}`), token);
 const ledgers = (method, token, path) => bearer(request(app)[method](`/api/ledgers${path}`), token);
 const partyOf = (token) => ledgers('get', token, `/party?company_id=${company.id}&ledger_guid=${PARTY}&from=2026-08-01&to=2026-08-31`);
-const entry = async (number, date = '2026-08-10') => {
-  const res = await ledgers('post', accountant.token, '/entries').send({
-    company_id: company.id, ledger_guid: PARTY, kind: 'debit_note', number, amount_paise: 10000, date,
-  });
-  if (res.status !== 201) throw new Error(`entry ${res.status} ${res.body.message}`);
-  return res.body.id;
-};
-const onEntry = (id) => ({ company_id: company.id, entry_id: id });
 const onVoucher = (guid) => ({ company_id: company.id, voucher_guid: guid });
 const blobsOf = async (hash) => (await db.execute({ sql: 'SELECT * FROM file_blobs WHERE sha256 = ?', args: [hash] })).rows;
 
@@ -65,15 +57,17 @@ beforeAll(async () => {
   const line = (ledger, amount, bills = []) => ({
     ledger, amount, isParty: ledger === Z, debit: amount < 0, bills,
   });
+  // A credit note for the DN FKIDN5000000<n>, on 20 + n Aug: fl-cn1 ... fl-cn9.
+  const note = (n) => voucher(`fl-cn${n}`, 10 + n, {
+    type: 'Credit Note', baseType: 'Credit Note', invoice: false, number: String(950 + n), date: `2026-08-${20 + n - 1}`, party: Z, total: 100, narration: `FKIDN5000000${n}`, orders: [], inventoryLines: [],
+    ledgerLines: [line(Z, 100), line('FL SALES', -100)],
+  });
   const vouchers = [
     voucher('fl-s1', 10, {
       number: '501/FL/26-27', date: '2026-08-03', party: Z, total: 1180.5, narration: 'PO FL1', orders: [], inventoryLines: [],
       ledgerLines: [line(Z, -1180.5, [{ name: '501/FL/26-27', type: 'New Ref', amount: -1180.5 }]), line('FL SALES', 1180.5)],
     }),
-    voucher('fl-cn1', 11, {
-      type: 'Credit Note', baseType: 'Credit Note', invoice: false, number: '951', date: '2026-08-20', party: Z, total: 100, narration: 'FKIDN50000001', orders: [], inventoryLines: [],
-      ledgerLines: [line(Z, 100), line('FL SALES', -100)],
-    }),
+    ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(note),
   ];
   await agentPost(agent.token, `/runs/${run}/vouchers`, { vouchers });
   await agentPost(agent.token, `/runs/${run}/reconcile`, { from: '2026-08-01', to: '2026-08-31', vouchers: vouchers.map((v) => ({ guid: v.guid, alterId: v.alterId })) });
@@ -111,7 +105,6 @@ describe('What a file is', () => {
 
 describe('Adding and downloading', () => {
   test('a PDF, a photo, a gzipped .eml and a .msg come back byte for byte', async () => {
-    const id = await entry('FKIDN50000002');
     const sent = [
       ['dn.pdf', PDF, false],
       ['photo.jpg', JPEG, false],
@@ -120,7 +113,7 @@ describe('Adding and downloading', () => {
     ];
     for (const [name, bytes, gz] of sent) {
       const res = await upload(accountant.token, {
-        ...onEntry(id), name, ...(gz ? { gzip: 1 } : {}), original_size: bytes.length,
+        ...onVoucher('fl-cn2'), name, ...(gz ? { gzip: 1 } : {}), original_size: bytes.length,
       }, gz ? zlib.gzipSync(bytes) : bytes);
       expect(res.status).toBe(201);
       expect(res.body).toMatchObject({ name, size: bytes.length, uploaded_by_name: expect.any(String) });
@@ -140,8 +133,7 @@ describe('Adding and downloading', () => {
 
   test('a file over 512 KB is stored in pieces and still comes back whole', async () => {
     const big = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xdb]), crypto.randomBytes(CHUNK_BYTES * 2 + 1234)]);
-    const id = await entry('FKIDN50000003');
-    const res = await upload(accountant.token, { ...onEntry(id), name: 'big.jpg' }, big);
+    const res = await upload(accountant.token, { ...onVoucher('fl-cn3'), name: 'big.jpg' }, big);
     expect(res.status).toBe(201);
     const [blob] = await blobsOf(sha(big));
     const { rows: [{ n }] } = await db.execute({ sql: 'SELECT COUNT(*) AS n FROM file_chunks WHERE blob_id = ?', args: [blob.id] });
@@ -150,37 +142,38 @@ describe('Adding and downloading', () => {
   });
 
   test('refused: a file that isn’t a PDF, photo or email, one too big, and a gzip bomb', async () => {
-    const id = await entry('FKIDN50000004');
-    const exe = await upload(accountant.token, { ...onEntry(id), name: 'dn.pdf' }, Buffer.from('MZ\x90\x00 not a pdf'));
+    const row = onVoucher('fl-cn4');
+    const exe = await upload(accountant.token, { ...row, name: 'dn.pdf' }, Buffer.from('MZ\x90\x00 not a pdf'));
     expect(exe.status).toBe(415);
     expect(exe.body.message).toMatch(/PDFs, photos .* and emails/);
-    const huge = await upload(accountant.token, { ...onEntry(id), name: 'big.pdf' }, Buffer.alloc(4 * 1024 * 1024 + 10, 0x25));
+    const huge = await upload(accountant.token, { ...row, name: 'big.pdf' }, Buffer.alloc(4 * 1024 * 1024 + 10, 0x25));
     expect(huge.status).toBe(413);
     expect(huge.body.message).toMatch(/at most 4\.0 MB/);
     const bomb = zlib.gzipSync(Buffer.alloc(26 * 1024 * 1024));
-    const res = await upload(accountant.token, { ...onEntry(id), name: 'bomb.pdf', gzip: 1 }, bomb);
+    const res = await upload(accountant.token, { ...row, name: 'bomb.pdf', gzip: 1 }, bomb);
     expect(res.status).toBe(413);
-    const broken = await upload(accountant.token, { ...onEntry(id), name: 'dn.pdf', gzip: 1 }, Buffer.from('not gzip at all'));
+    const broken = await upload(accountant.token, { ...row, name: 'dn.pdf', gzip: 1 }, Buffer.from('not gzip at all'));
     expect(broken.status).toBe(400);
   });
 
-  test('the row must exist, and the same file once per row', async () => {
-    expect((await upload(accountant.token, { ...onEntry(99999999), name: 'dn.pdf' }, PDF)).status).toBe(404);
+  test('the row must be a Tally voucher in RAMS, and the same file goes once per row', async () => {
     expect((await upload(accountant.token, { ...onVoucher('no-such-guid'), name: 'dn.pdf' }, PDF)).status).toBe(404);
-    expect((await upload(accountant.token, { company_id: company.id, name: 'dn.pdf' }, PDF)).status).toBe(400);
-    const id = await entry('FKIDN50000005');
-    expect((await upload(accountant.token, { ...onEntry(id), name: 'a.pdf' }, PDF)).status).toBe(201);
-    const again = await upload(accountant.token, { ...onEntry(id), name: 'b.pdf' }, PDF);
+    const noRow = await upload(accountant.token, { company_id: company.id, name: 'dn.pdf' }, PDF);
+    expect(noRow.status).toBe(400);
+    expect(noRow.body.message).toMatch(/Files go on a Tally row/);
+    // Notes typed in RAMS are gone, and a file can't go on one.
+    expect((await upload(accountant.token, { company_id: company.id, entry_id: 1, name: 'dn.pdf' }, PDF)).status).toBe(400);
+    expect((await upload(accountant.token, { ...onVoucher('fl-cn5'), name: 'a.pdf' }, PDF)).status).toBe(201);
+    const again = await upload(accountant.token, { ...onVoucher('fl-cn5'), name: 'b.pdf' }, PDF);
     expect(again.status).toBe(409);
-    expect(again.body.message).toMatch(/already on Marketplace DN FKIDN50000005, as “a.pdf”/);
+    expect(again.body.message).toMatch(/already on Credit Note 955, as “a.pdf”/);
   });
 });
 
 describe('Who may', () => {
   test('a Viewer downloads but can’t add or remove', async () => {
-    const id = await entry('FKIDN50000006');
-    expect((await upload(viewer.token, { ...onEntry(id), name: 'dn.pdf' }, PDF)).status).toBe(403);
-    const added = await upload(accountant.token, { ...onEntry(id), name: 'dn.pdf' }, PDF);
+    expect((await upload(viewer.token, { ...onVoucher('fl-cn6'), name: 'dn.pdf' }, PDF)).status).toBe(403);
+    const added = await upload(accountant.token, { ...onVoucher('fl-cn6'), name: 'dn.pdf' }, PDF);
     expect((await download(viewer.token, added.body.id)).status).toBe(200);
     expect((await remove(viewer.token, added.body.id)).status).toBe(403);
   });
@@ -204,10 +197,9 @@ describe('Who may', () => {
 });
 
 describe('Stored once, freed when unused', () => {
-  test('the same email on a DN and on its Tally credit note is one blob, deleted with its last row', async () => {
+  test('the same email on two Tally rows is one blob, deleted with its last row', async () => {
     const mail = Buffer.concat([EML, Buffer.from('\r\nOnce only.\r\n')]);
-    const id = await entry('FKIDN50000007');
-    const a = await upload(accountant.token, { ...onEntry(id), name: 'dn.eml' }, mail);
+    const a = await upload(accountant.token, { ...onVoucher('fl-cn7'), name: 'dn.eml' }, mail);
     const b = await upload(accountant.token, { ...onVoucher('fl-cn1'), name: 'same dn.eml' }, mail);
     expect(b.body.stored_once).toBe(true);
     const [blob] = await blobsOf(sha(mail));
@@ -221,66 +213,55 @@ describe('Stored once, freed when unused', () => {
     expect((await download(viewer.token, b.body.id)).status).toBe(404);
   });
 
-  test('removing a typed note removes its files', async () => {
-    const pdf = Buffer.concat([PDF, Buffer.from('% removed with its entry')]);
-    const id = await entry('FKIDN50000008');
-    const added = await upload(accountant.token, { ...onEntry(id), name: 'dn.pdf' }, pdf);
-    const res = await ledgers('delete', accountant.token, `/entries/${id}`);
-    expect(res.body).toMatchObject({ deleted: true, files_removed: 1 });
-    expect(await blobsOf(sha(pdf))).toHaveLength(0);
-    expect((await download(viewer.token, added.body.id)).status).toBe(404);
-    const { rows: [log] } = await db.execute({ sql: "SELECT description FROM audit_logs WHERE action_type = 'LEDGER_ENTRY_DELETE' AND entity_id = ?", args: [id] });
-    expect(log.description).toMatch(/and its file \(dn\.pdf\)$/);
-  });
-
-  test('each add and remove is in the audit log, on the typed note itself', async () => {
+  test('each add and remove is in the audit log, on the Tally voucher', async () => {
     const pdf = Buffer.concat([PDF, Buffer.from('% audited')]);
-    const id = await entry('FKIDN50000009');
-    const added = await upload(accountant.token, { ...onEntry(id), name: 'audited.pdf' }, pdf);
+    const added = await upload(accountant.token, { ...onVoucher('fl-cn8'), name: 'audited.pdf' }, pdf);
     await remove(accountant.token, added.body.id);
+    const { rows: [v] } = await db.execute({ sql: "SELECT id FROM tally_vouchers WHERE company_id = ? AND guid = 'fl-cn8'", args: [company.id] });
     const { rows } = await db.execute({
-      sql: "SELECT action_type, description, entity_ref FROM audit_logs WHERE entity_type = 'ledger_entries' AND entity_id = ? AND action_type LIKE 'FILE_%' ORDER BY id",
-      args: [id],
+      sql: "SELECT action_type, description, entity_ref FROM audit_logs WHERE entity_type = 'tally_vouchers' AND entity_id = ? AND action_type LIKE 'FILE_%' ORDER BY id",
+      args: [v.id],
     });
     expect(rows.map((r) => r.action_type)).toEqual(['FILE_ADD', 'FILE_REMOVE']);
-    expect(rows[0].description).toBe(`File added — audited.pdf on Marketplace DN FKIDN50000009 (${Z})`);
+    expect(rows[0].description).toBe(`File added — audited.pdf on Credit Note 958 (${Z})`);
+    expect(rows[1].description).toBe(`File removed — audited.pdf from Credit Note 958 (${Z})`);
     expect(rows[0].entity_ref).toBe(Z);
   });
 });
 
 describe('On the screens', () => {
-  let bare; let filed;
   beforeAll(async () => {
-    bare = await entry('FKIDN50000010', '2026-08-25');
-    filed = await entry('FKIDN50000011', '2026-08-26');
-    await upload(accountant.token, { ...onEntry(filed), name: 'filed.pdf' }, Buffer.concat([PDF, Buffer.from('% filed')]));
-  });
-
-  test('the party: files on each typed note and each Tally voucher', async () => {
+    await upload(accountant.token, { ...onVoucher('fl-cn9'), name: 'filed.pdf' }, Buffer.concat([PDF, Buffer.from('% filed')]));
     await upload(accountant.token, { ...onVoucher('fl-s1'), name: 'party invoice.pdf' }, Buffer.concat([PDF, Buffer.from('% party')]));
+  });
+  const bare = (detail) => detail.vouchers.filter((v) => !v.files.length);
+
+  test('the party: files on each Tally row, and how many rows have none', async () => {
     const { status, body } = await partyOf(viewer.token);
     expect(status).toBe(200);
-    const byNumber = Object.fromEntries(body.entries.map((e) => [e.number, e]));
-    expect(byNumber.FKIDN50000010).toMatchObject({ has_file: false, files: [] });
-    expect(byNumber.FKIDN50000011).toMatchObject({ has_file: true, files: [{ name: 'filed.pdf', kind: 'pdf', size: expect.any(Number) }] });
-    const invoice = body.vouchers.find((v) => v.guid === 'fl-s1');
-    expect(invoice.files.map((f) => f.name)).toContain('party invoice.pdf');
-    expect(body.entries_without_file).toBe(body.entries.filter((e) => !e.files.length).length);
+    const byGuid = Object.fromEntries(body.vouchers.map((v) => [v.guid, v]));
+    expect(byGuid['fl-cn9'].files).toEqual([{
+      id: expect.any(Number), name: 'filed.pdf', kind: 'pdf', size: expect.any(Number), uploaded_by_name: expect.any(String), uploaded_at: expect.any(String),
+    }]);
+    expect(byGuid['fl-s1'].files.map((f) => f.name)).toEqual(['invoice.pdf', 'party invoice.pdf']);
+    expect(byGuid['fl-cn4'].files).toEqual([]); // every upload there was refused
+    expect(body.rows_without_file).toBe(bare(body).length);
+    expect(body.rows_without_file).toBeGreaterThan(0);
   });
 
-  test('the statement counts the typed notes without a file', async () => {
+  test('the statement counts every Tally row without a file', async () => {
     const { body } = await ledgers('get', viewer.token, `/statement?company_id=${company.id}&vendor=Zepto&states=all&parties=${company.id}:${PARTY}&from=2026-08-01&to=2026-08-31`);
     const detail = (await partyOf(viewer.token)).body;
-    expect(body.rows[0].entries_without_file).toBe(detail.entries.filter((e) => !e.files.length).length);
-    expect(body.rows[0].entries_without_file).toBeGreaterThan(0);
-    expect(body.totals.entries_without_file).toBe(body.rows[0].entries_without_file);
+    expect(body.rows[0].rows_without_file).toBe(bare(detail).length);
+    expect(body.totals.rows_without_file).toBe(body.rows[0].rows_without_file);
   });
 
-  test('Needs attention counts every typed note without a file', async () => {
+  test('Needs attention counts them too, since the oldest', async () => {
+    const detail = (await partyOf(viewer.token)).body;
     const { body } = await ledgers('get', viewer.token, '/parties');
     const mine = body.attention.find((a) => a.party.company_id === company.id && a.party.guid === PARTY);
-    expect(mine.counts.no_file).toBeGreaterThan(0);
-    expect(mine.since).toBe('2026-08-10');
+    expect(mine.counts).toEqual({ booked_twice: 0, no_file: bare(detail).length });
+    expect(mine.since).toBe(bare(detail).map((v) => v.date).sort()[0]);
   });
 
   test('Debtors shows an invoice’s files', async () => {
@@ -296,9 +277,8 @@ describe('On the screens', () => {
 describe('File storage', () => {
   test('space used, space saved, per kind, and the biggest files with where they are', async () => {
     const photo = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe1]), crypto.randomBytes(9000)]);
-    const id = await entry('FKIDN50000012');
     // The browser shrank a 3 MB photo to this one.
-    await upload(accountant.token, { ...onEntry(id), name: 'shrunk.jpg', original_size: 3000000 }, photo);
+    await upload(accountant.token, { ...onVoucher('fl-cn9'), name: 'shrunk.jpg', original_size: 3000000 }, photo);
     const { status, body } = await bearer(request(app).get('/api/files/usage'), admin.token);
     expect(status).toBe(200);
     const { rows: [t] } = await db.execute('SELECT COUNT(*) AS files FROM ledger_files');
@@ -309,13 +289,13 @@ describe('File storage', () => {
     expect(body.saved_bytes).toBe(body.picked_bytes - body.stored_bytes);
     expect(body.saved_bytes).toBeGreaterThan(3000000 - photo.length - 1);
     expect(body.kinds.map((k) => k.kind)).toEqual(['pdf', 'image', 'email']);
+    // Each file knows its Tally row, party and marketplace.
     const top = body.biggest.find((f) => f.name === 'shrunk.jpg');
     expect(top).toMatchObject({
       kind: 'image', size: photo.length, company_id: company.id, on: {
-        type: 'entry', entry_kind: 'debit_note', number: 'FKIDN50000012', party: Z, party_guid: PARTY, vendor: 'Zepto',
+        type: 'voucher', voucher_type: 'Credit Note', number: '959', date: '2026-08-28', party: Z, party_guid: PARTY, vendor: 'Zepto',
       },
     });
-    // A file on a Tally voucher knows its party and marketplace too.
     const onInvoice = body.biggest.find((f) => f.name === 'party invoice.pdf');
     expect(onInvoice.on).toMatchObject({
       type: 'voucher', voucher_type: 'Sales', number: '501/FL/26-27', party: Z, party_guid: PARTY, vendor: 'Zepto',

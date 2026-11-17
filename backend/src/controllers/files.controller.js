@@ -3,12 +3,10 @@ const { SYNC_FROM } = require('../config/env');
 const { logAction } = require('../services/auditLog.service');
 const files = require('../services/files');
 
-// Files on Ledgers rows (services/files.js). Adding and removing is
-// ledgers.files; viewing and downloading is ledgers.view or reports.view;
-// the storage figures are Admin and Owner only. Every add and remove is
-// audited -- on the typed note itself, so it shows in that note's History.
-
-const KIND_LABEL = { debit_note: 'Marketplace DN', credit_note: 'Our CN' };
+// Files on Ledgers rows (services/files.js): every row is a Tally voucher.
+// Adding and removing is ledgers.files; viewing and downloading is
+// ledgers.view or reports.view; the storage figures are Admin and Owner only.
+// Every add and remove is audited on the voucher.
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const sendError = (res, next, err) => (err.status && err.status < 500 ? res.status(err.status).json({ message: err.message }) : next(err));
@@ -43,23 +41,9 @@ function pickedSize(value) {
   return Number.isInteger(n) && n > 0 && n <= 1024 * 1048576 ? n : null;
 }
 
-// The row a file goes on: a live typed note, or a Tally voucher of the
-// company. { where, args, label, entityType, entityId, ref }.
-async function targetOf(client, { companyId, entryId, voucherGuid }) {
-  if (entryId) {
-    const [e] = await rowsOf(client, `SELECT e.id, e.company_id, e.kind, e.number, l.name AS party
-                                        FROM ledger_entries e LEFT JOIN tally_ledgers l ON l.company_id = e.company_id AND l.guid = e.ledger_guid
-                                       WHERE e.id = ? AND e.deleted_at IS NULL`, [entryId]);
-    if (!e || Number(e.company_id) !== companyId) throw fail(404, 'That entry isn’t there any more');
-    return {
-      where: 'entry_id = ?',
-      args: [entryId],
-      label: `${KIND_LABEL[e.kind] || e.kind} ${e.number || ''}`.trim(),
-      entityType: 'ledger_entries',
-      entityId: Number(e.id),
-      ref: e.party || null,
-    };
-  }
+// The row a file goes on: a Tally voucher of the company.
+// { where, args, label, entityType, entityId, ref }.
+async function targetOf(client, { companyId, voucherGuid }) {
   const [v] = await rowsOf(client, `SELECT id, voucher_type, number, party FROM tally_vouchers
                                      WHERE company_id = ? AND guid = ? AND deleted_at IS NULL`, [companyId, voucherGuid]);
   if (!v) throw fail(404, 'That Tally voucher isn’t in RAMS’s copy of Tally');
@@ -73,7 +57,7 @@ async function targetOf(client, { companyId, entryId, voucherGuid }) {
   };
 }
 
-// POST /api/files?company_id&entry_id|voucher_guid&name&gzip=1&original_size
+// POST /api/files?company_id&voucher_guid&name&gzip=1&original_size
 // The body is the file itself (application/octet-stream), gzip when gzip=1.
 async function upload(req, res, next) {
   try {
@@ -81,12 +65,10 @@ async function upload(req, res, next) {
     const name = cleanName(q.name);
     const companyId = Number(q.company_id);
     if (!Number.isInteger(companyId) || companyId <= 0) throw fail(400, 'Choose the company');
-    const entryId = q.entry_id ? Number(q.entry_id) : null;
     const voucherGuid = q.voucher_guid ? String(q.voucher_guid) : null;
-    if (entryId != null && (!Number.isInteger(entryId) || entryId <= 0)) throw fail(400, 'Unknown entry');
-    if (Boolean(entryId) === Boolean(voucherGuid)) throw fail(400, 'Name either the entry or the Tally voucher the file is for');
+    if (!voucherGuid || q.entry_id) throw fail(400, 'Files go on a Tally row: name the voucher the file is for');
     if (!Buffer.isBuffer(req.body) || !req.body.length) throw fail(400, 'Send the file itself as the request body');
-    const target = await targetOf(db, { companyId, entryId, voucherGuid });
+    const target = await targetOf(db, { companyId, voucherGuid });
 
     const out = await inTx(async (tx) => {
       const [{ n }] = await rowsOf(tx, `SELECT COUNT(*) AS n FROM ledger_files WHERE ${target.where}`, target.args);
@@ -95,9 +77,9 @@ async function upload(req, res, next) {
       const [dup] = await rowsOf(tx, `SELECT file_name FROM ledger_files WHERE blob_id = ? AND ${target.where}`, [blob.blobId, ...target.args]);
       if (dup) throw fail(409, `This file is already on ${target.label}${dup.file_name !== name ? `, as “${dup.file_name}”` : ''}`);
       const r = await tx.execute({
-        sql: `INSERT INTO ledger_files (blob_id, company_id, entry_id, voucher_guid, file_name, kind, original_size, uploaded_by)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [blob.blobId, companyId, entryId, voucherGuid, name, blob.kind, pickedSize(q.original_size), req.user.id],
+        sql: `INSERT INTO ledger_files (blob_id, company_id, voucher_guid, file_name, kind, original_size, uploaded_by)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        args: [blob.blobId, companyId, voucherGuid, name, blob.kind, pickedSize(q.original_size), req.user.id],
       });
       const id = Number(r.lastInsertRowid);
       await logAction({
@@ -146,14 +128,14 @@ async function download(req, res, next) {
 async function remove(req, res, next) {
   try {
     const id = Number(req.params.id) || 0;
-    const [f] = await rowsOf(db, 'SELECT id, company_id, entry_id, voucher_guid, file_name FROM ledger_files WHERE id = ?', [id]);
+    const [f] = await rowsOf(db, 'SELECT id, company_id, voucher_guid, file_name FROM ledger_files WHERE id = ?', [id]);
     if (!f) throw fail(404, 'That file isn’t there any more');
     let target;
     try {
-      target = await targetOf(db, { companyId: Number(f.company_id), entryId: f.entry_id != null ? Number(f.entry_id) : null, voucherGuid: f.voucher_guid });
+      target = await targetOf(db, { companyId: Number(f.company_id), voucherGuid: f.voucher_guid });
     } catch {
       target = {
-        label: 'a row no longer in RAMS', entityType: f.entry_id != null ? 'ledger_entries' : 'tally_vouchers', entityId: f.entry_id != null ? Number(f.entry_id) : null, ref: null,
+        label: 'a row no longer in RAMS', entityType: 'tally_vouchers', entityId: null, ref: null,
       };
     }
     await inTx(async (tx) => {

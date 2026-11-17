@@ -8,7 +8,7 @@
 
 Royal Mart keeps its **accounts in Tally** and its **marketplace orders in ROMS** (the Royal Mart portal). Until now, the two never spoke to each other. Someone had to read an invoice number in Tally and type it into ROMS, and nobody could easily see which order had been invoiced, paid or credited.
 
-**RAMS is the bridge between them.** It reads the books from Tally, matches each ROMS order to the Tally invoice that billed it, and each return to the credit note that settled it. With your permission, it then writes Tally's invoice and credit-note numbers into ROMS. Report screens, such as what every marketplace owes, follow one at a time. On **Ledgers**, your team records each party's day, and RAMS checks it against Tally.
+**RAMS is the bridge between them.** It reads the books from Tally, matches each ROMS order to the Tally invoice that billed it, and each return to the credit note that settled it. With your permission, it then writes Tally's invoice and credit-note numbers into ROMS. Report screens, such as what every marketplace owes, follow one at a time. On **Ledgers**, each bill-to-bill party's statement comes straight from Tally, and your team attaches each row's document.
 
 ```
    TALLY                      RAMS                         ROMS
@@ -217,7 +217,7 @@ Until the rest arrive, RAMS keeps working in the background: it copies the books
 |---|---|---|---|---|---|---|---|
 | 100 | +10 | −2 | −3 | −0.1 | +2 | −5 | 101.9 |
 
-**Every figure comes from Tally.** The invoices and receipts are not typed in RAMS any more. Opening plus the six columns is the closing, which is Tally's own balance at the end of the range and the next range's opening.
+**Every row and every figure comes from Tally. Nothing is typed in RAMS.** Opening plus the six columns is the closing, which is Tally's own balance at the end of the range and the next range's opening.
 
 | Column | From Tally |
 |---|---|
@@ -228,36 +228,31 @@ Until the rest arrive, RAMS keeps working in the background: it copies the books
 | Journal / Adjustment | Every other voucher, such as discount round-offs |
 | Receipt | Receipts. One receipt for several warehouses counts each warehouse's own part |
 
-**Debit and credit notes are also typed in RAMS**, from the marketplace's portal, and RAMS checks each one against Tally:
-- A **marketplace DN** is found by its number in a Tally credit note's narration, on any date: they are booked 6 to 46 days later. On your real books, each of the 16 DN numbers written in narrations finds exactly its own credit note.
-- **Our CN** is found by Tally's credit note number.
+**Debit and credit notes are no longer typed in RAMS** (since 17 November). We checked first: for every Minutes, Now and Zepto party, Tally's own list of entries from 8 June matches RAMS one for one: **559 of 559**, with the same amounts, and Tally's balances agree on all 52 parties. Typing the notes again in RAMS was double work.
+- There are no debit-note vouchers in Tally for these parties. A **marketplace DN** is booked as a credit note with the DN number in its narration (for example `FKIDN51463346`). Such a credit note is in the **DN** column, with the number shown beside it. Of the 81 credit notes since 8 June, 16 name a DN.
+- Any other credit note (a return, a monthly discount) is **ours**, in the **CN** column. So the accountants should always write the DN number in the narration.
+- **What RAMS no longer catches:** a DN the marketplace raised that nobody booked in Tally. That needed the typed notes. Compare the marketplace's DN report with the DN column now and then.
 
 Each colour means one thing:
 
 | Colour | Meaning |
 |---|---|
-| Green ✓ | Matches: RAMS and Tally agree |
-| Purple ≠ | Two sources disagree: an amount, a DN booked twice in Tally, or a party's state |
-| Blue ⚖ | Matched by amount only: Tally has a credit note for the same amount, but its narration doesn't name the DN |
-| Grey ⏳ | Waiting: not on the other side yet. A typed note waits up to 60 days for Tally; a Tally credit note waits 2 days to be typed (both are settings) |
-| Red ✗ | Missing: typed here but not in Tally, or in Tally but not typed here |
+| Purple ≠ | Two readings disagree: a marketplace DN on two credit notes in Tally (*DN booked twice*), or a party's state in Tally and in its GSTIN |
 | Yellow | No narration (see below) |
-| Orange | A debit or credit note typed here with no file yet (see below) |
+| Orange | A row with no file yet (see below) |
 
-Click a party to see the notes typed for it and every Tally voucher, with its narration and the running balance. *Needs attention* lists every party with something red or purple, or a note without a file.
-
-**What you type stays in RAMS.** It is never sent to Tally.
+Click a party to see every Tally voucher on it, with its narration, its files and the running balance. *Needs attention* lists every party with a DN booked twice, rows without a file, or a state that differs.
 
 **The opening balance comes from Tally**, as before: each sync reads every ledger's balance. If a sync can't read it, the party starts on a placeholder of ₹10,000 on 8 June, carried forward by Tally's real vouchers.
 
-### Files: the DN's PDF, photo or email
-Every row of a party can carry its proof: each debit or credit note typed here, and every Tally invoice, credit note, receipt or journal.
-- **Adding:** in the *Files* column, drag files in, choose them, or paste a screenshot with Ctrl+V. RAMS takes PDFs, photos (JPG, PNG, WebP) and emails saved from Gmail (.eml) or Outlook (.msg): up to 4 MB each after compression, and 10 per row. A DN can get its file in the same form it is typed in.
-- **A note typed here without a file is orange**, across the whole row, until a file is added. *Needs attention* counts them for every party, and *Without a file* shows just those notes. Tally's rows are never orange.
+### Files: each row's PDF, photo or email
+Every row of a party can carry its proof: the invoice, the marketplace's DN, our CN, the receipt's advice or the TDS certificate.
+- **Adding:** in the *Files* column, drag files in, choose them, or paste a screenshot with Ctrl+V. RAMS takes PDFs, photos (JPG, PNG, WebP) and emails saved from Gmail (.eml) or Outlook (.msg): up to 4 MB each after compression, and 10 per row.
+- **A row without a file is orange**, across the whole row, until a file is added: every row from 8 June. *Needs attention* counts them for every party, and *Without a file* shows just those rows.
 - **Viewing:** a PDF or a photo opens inside RAMS, and any file can be downloaded. PDFs and emails come back **exactly as they were added**. Emails are not opened in RAMS: they open in Outlook or your mail app, with their attachments.
 - **Small on purpose:** photos are made smaller before they are sent (at most 2,000 pixels across; a 1.6 MB photo became 146 KB in our test, still easy to read). PDFs and emails are compressed without losing anything, and a file attached to several rows is kept once. One file for every DN, CN and invoice comes to about 1 GB a year. *Admin → File storage* shows the space used and saved, and the biggest files.
 - An invoice's files also show on *Debtors*.
-- Adding and removing a file is in the Audit Log, and in the note's own history.
+- Adding and removing a file is in the Audit Log.
 
 **Later, once the NAS is bought:** a shared folder that RAMS checks every few minutes, attaching each file named by its DN, CN or invoice number to the right row by itself.
 
@@ -269,7 +264,7 @@ Each party has two states: the one on its ledger in Tally, and the one its GSTIN
 
 **To decide together:**
 - **Zepto's head-office ledgers.** Zepto pays into *ZEPTO PAYMENT* and *ZEPTO PVT LTD*, not each warehouse, so its warehouse rows show invoices but no receipts. Map those two ledgers to Zepto on *Matching → Party ledgers*. Three new Zepto dark stores (Coimbatore, Gurgaon Sohna, Hoogly) need mapping too.
-- **The 60-day booking window.** A DN typed here stays grey for up to 60 days before it turns red. Shorter, if you'd like the accountants nudged sooner.
+- **Files volume.** No document is attached yet, so every row since 8 June starts orange: 559 rows on Minutes, Now and Zepto today. They clear as documents are added.
 - **Narration volume.** Until narrations are written, most invoices and receipts are highlighted. The *Narration check* can narrow it.
 
 ## 12. Who can do what
@@ -281,10 +276,9 @@ There are four roles. **Admin and Owner can always do everything**, and they dec
 | See matching and auto-fill | ✓ | ✓ |
 | See Debtors (Reports) | ✓ | ✓ |
 | See Ledgers | ✓ | ✓ |
-| Enter, change and remove debit and credit notes on Ledgers | ✓ | – |
 | Add and remove files on Ledgers | ✓ | – |
 | View and download files (on Ledgers and Debtors) | ✓ | ✓ |
-| Change the ledger settings (marketplaces, days to wait, tolerance, placeholder opening) | – (Admin/Owner) | – |
+| Change the ledger settings (marketplaces, placeholder opening) | – (Admin/Owner) | – |
 | Change the credit days (*Admin → Credit terms*) | ✓ | – |
 | Change the narration check | – (Admin/Owner) | – |
 | Run matching, confirm or reject links, map ledgers, change matching rules | ✓ | – |
@@ -302,7 +296,7 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 - **Each vendor's handling:** match it, treat it as a stock transfer, or ignore it
 - **Which party ledger belongs to which marketplace**
 - **Auto-fill:** each field's mode, whether to rewrite short forms, and which Bill Date to keep
-- **Ledgers:** which marketplaces it covers, how long Tally may take to book a note, how long a credit note may wait to be typed, the amount tolerance and the placeholder opening
+- **Ledgers:** which marketplaces it covers and the placeholder opening
 - **Credit terms:** each marketplace's credit days and the default, on *Admin → Credit terms*, with a preview of what a change does before it is saved
 - **The narration check:** which voucher types need a narration, and from which date
 - **What Accountants and Viewers may do**
@@ -329,8 +323,9 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 | 5 | Matching, with review screens and rules | Done, live on the test setup |
 | 6 | Auto-fill into ROMS | Done, being tried on the test setup |
 | 7 | The report screens | Delivered one at a time, each after you have reviewed it. Debtors is out; the rest follow |
-| – | Ledgers: the bill-to-bill statement for Minutes, Now and Zepto, with debit and credit notes checked against Tally; narrations and states everywhere; Credit terms | Built and tested; goes on the test setup after your review, with Connector 0.7.0 |
-| – | Files on Ledgers: PDFs, photos and emails on each row, viewed in RAMS and shown on Debtors; *File storage* | Built and tested; goes on the test setup after your review (one database update first) |
+| – | Ledgers: the bill-to-bill statement for Minutes, Now and Zepto; narrations and states everywhere; Credit terms | Done, live on the test setup, with Connector 0.7.0 |
+| – | Files on Ledgers: PDFs, photos and emails on each row, viewed in RAMS and shown on Debtors; *File storage* | Built and tested; both databases updated for it (17 Nov) |
+| – | Ledgers from Tally only: debit and credit notes no longer typed in RAMS (559 of 559 entries checked against Tally first); every row without its document is orange | Built and tested; goes on the test setup after your review |
 | Later | A NAS folder RAMS checks every few minutes, attaching files by their DN, CN or invoice number | Designed; waits for the NAS |
 | 8 | Go-live: production database, Connector installed on the office PC, the trial weeks | Prepared (see *go-live.md*); needs the office PC and your go-ahead |
 

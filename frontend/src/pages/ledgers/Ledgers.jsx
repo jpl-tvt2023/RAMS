@@ -1,47 +1,35 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
 import { Settings2 } from 'lucide-react';
 import AppShell from '../../components/layout/AppShell';
 import HelpLink from '../../components/shared/HelpLink';
 import Button from '../../components/ui/Button';
-import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import MultiSelect from '../../components/ui/MultiSelect';
 import { ReportTable, selectCls, td } from '../../components/reports/ReportFrame';
 import StatementTable, { StateLine } from '../../components/ledgers/StatementTable';
 import PartyDetail from '../../components/ledgers/PartyDetail';
-import EntryForm from '../../components/ledgers/EntryForm';
 import LedgerSettings from '../../components/ledgers/LedgerSettings';
 import FilesDialog from '../../components/files/FilesDialog';
-import {
-  getLedgerParties, getLedgerStatement, getLedgerParty, deleteLedgerEntry,
-} from '../../api/ledgers.api';
+import { getLedgerParties, getLedgerStatement, getLedgerParty } from '../../api/ledgers.api';
 import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
 import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
-import { formatDay, formatRupees } from '../../utils/formatters';
-import { KIND } from '../../utils/ledgerText';
+import { formatDay } from '../../utils/formatters';
 import { FILTERS_KEY, DEFAULTS } from '../../utils/ledgerLinks';
 
 // Ledgers: the bill-to-bill statement. Choose a company, a marketplace, states
 // and parties (nothing is chosen at first, and each has "All"), and a range.
-// One row per party, every figure Tally's; a row opens the party's notes and
-// vouchers. Debit and credit notes are typed here and checked against Tally,
-// and any row can carry files (the DN's PDF, a photo, the email). A typed note
-// with no file is highlighted. Nothing is written to Tally. What is chosen
-// (FILTERS_KEY, DEFAULTS) is in utils/ledgerLinks.js.
+// One row per party, every figure Tally's; a row opens the party's Tally
+// vouchers. Nothing is typed here: a credit note whose narration names a
+// marketplace DN is in the DN column. Any row can carry files (the invoice,
+// the DN's PDF, a photo, the email), and a row without one is highlighted.
+// Nothing is written to Tally. What is chosen (FILTERS_KEY, DEFAULTS) is in
+// utils/ledgerLinks.js.
 const statementOrNothing = (p) => (p.company_id && p.vendor && p.states && p.parties ? getLedgerStatement(p) : Promise.resolve(null));
 const partyOrNothing = (p) => (p.ledger_guid ? getLedgerParty(p) : Promise.resolve(null));
-const minusDays = (iso, days) => {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() - days);
-  return d.toISOString().slice(0, 10);
-};
 const keyOf = (p) => `${p.company_id}:${p.guid}`;
-const COUNT_WORDS = {
-  missing: 'not in Tally', not_entered: 'in Tally, not entered here', amount_differs: 'amount differs', booked_twice: 'DN booked twice', no_file: 'DN/CN without a file',
-};
+const COUNT_WORDS = { booked_twice: 'DN booked twice', no_file: 'without a file' };
 
 function Field({ label, children }) {
   return (
@@ -79,10 +67,7 @@ function Attention({ rows, total, onOpen }) {
 export default function Ledgers() {
   const { can } = useAuth();
   const [pick, setPick] = useSessionState(FILTERS_KEY, DEFAULTS);
-  const [editing, setEditing] = useState(null); // 'new' or an entry
-  const [removing, setRemoving] = useState(null);
-  const [filesOf, setFilesOf] = useState(null); // { entryId } or { voucherGuid }
-  const [busy, setBusy] = useState(false);
+  const [filesOf, setFilesOf] = useState(null); // { voucherGuid }
   const [settingsOpen, setSettingsOpen] = useState(false);
   const parties = useKeyedLoad(getLedgerParties, {});
   const p = parties.last;
@@ -115,13 +100,10 @@ export default function Ledgers() {
     company_id: openCompany, ledger_guid: openGuid, from: pick.from, to: pick.to,
   } : {});
   const day = detail.data;
-  const canEnter = can(PERM.LEDGERS_ENTRY);
   const canFiles = can(PERM.LEDGERS_FILES);
 
   // The row whose files are open, from the party as last loaded.
-  const filesRow = day && filesOf
-    ? (filesOf.entryId ? day.entries.find((e) => e.id === filesOf.entryId) : day.vouchers.find((v) => v.guid === filesOf.voucherGuid))
-    : null;
+  const filesRow = day && filesOf ? day.vouchers.find((v) => v.guid === filesOf.voucherGuid) : null;
 
   const set = (patch) => setPick((x) => ({ ...x, ...patch }));
   const setCompany = (v) => set({
@@ -139,7 +121,7 @@ export default function Ledgers() {
   };
   const reload = () => { parties.reload(); statement.reload(); detail.reload(); };
   // From the oldest problem (or the copy's start) to today. When the only
-  // thing off is notes without a file, just those are shown.
+  // thing off is rows without a file, just those are shown.
   const openAttention = (a) => set({
     company: String(a.party.company_id),
     vendor: a.party.vendor,
@@ -151,18 +133,6 @@ export default function Ledgers() {
     nofile: Boolean(a.counts.no_file) && !a.state_differs && Object.entries(a.counts).every(([k, c]) => k === 'no_file' || !c),
   });
 
-  const remove = async () => {
-    setBusy(true);
-    try {
-      await deleteLedgerEntry(removing.id);
-      toast.success('Note removed');
-      setRemoving(null);
-      reload();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Removing failed');
-    } finally { setBusy(false); }
-  };
-
   const noParty = p && pick.company && !inCompany.length;
 
   return (
@@ -173,7 +143,7 @@ export default function Ledgers() {
           <HelpLink section="ledgers" />
         </div>
         <p className="text-gray-500 text-sm mt-1">
-          The bill-to-bill statement per party: Tally’s opening, invoices, debit and credit notes, TDS, journals, receipts and closing. Debit and credit notes are also typed here and checked against Tally. RAMS never writes to Tally.
+          The bill-to-bill statement per party, all from Tally: opening, invoices, debit and credit notes, TDS, journals, receipts and closing. Nothing is typed here. Attach each row’s document (PDF, photo or email); a row without one is orange. RAMS never writes to Tally.
         </p>
       </div>
 
@@ -236,13 +206,9 @@ export default function Ledgers() {
           {day && (
             <PartyDetail
               day={day}
-              canEnter={canEnter}
               canFiles={canFiles}
               onlyNoFile={Boolean(pick.nofile)}
               onToggleNoFile={(v) => set({ nofile: v })}
-              onAdd={() => setEditing('new')}
-              onEdit={setEditing}
-              onRemove={setRemoving}
               onFiles={setFilesOf}
               onClose={() => set({ open: 'none', nofile: false })}
             />
@@ -256,42 +222,18 @@ export default function Ledgers() {
         </div>
       )}
 
-      {editing && day && (
-        <EntryForm
-          key={editing === 'new' ? 'new' : editing.id}
-          party={day.party.name}
-          companyId={day.party.company_id}
-          ledgerGuid={day.party.guid}
-          date={day.to}
-          entry={editing === 'new' ? null : editing}
-          minDate={minusDays(day.sync_from, 365)}
-          maxDate={day.today}
-          canFiles={canFiles}
-          onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); reload(); }}
-        />
-      )}
       {filesRow && (
         <FilesDialog
-          key={filesOf.entryId ? `e${filesOf.entryId}` : `v${filesOf.voucherGuid}`}
-          title={filesOf.entryId ? `${KIND[filesRow.kind]?.label || filesRow.kind} ${filesRow.number}` : `${filesRow.voucher_type} ${filesRow.number || ''}`.trim()}
+          key={filesOf.voucherGuid}
+          title={`${filesRow.voucher_type} ${filesRow.number || ''}`.trim()}
           subtitle={`${day.party.name} · ${formatDay(filesRow.date)}`}
           files={filesRow.files || []}
-          target={filesOf.entryId ? { companyId: day.party.company_id, entryId: filesOf.entryId } : { companyId: day.party.company_id, voucherGuid: filesOf.voucherGuid }}
+          target={{ companyId: day.party.company_id, voucherGuid: filesOf.voucherGuid }}
           canEdit={canFiles}
           onClose={() => setFilesOf(null)}
           onChanged={reload}
         />
       )}
-      <ConfirmDialog
-        isOpen={!!removing}
-        onClose={() => setRemoving(null)}
-        onConfirm={remove}
-        loading={busy}
-        title="Remove this note?"
-        message={removing ? `${KIND[removing.kind]?.label} ${removing.number} for ${formatRupees(removing.amount_paise)}, dated ${formatDay(removing.date)}.${(removing.files || []).length ? ` Its ${removing.files.length === 1 ? 'file is' : `${removing.files.length} files are`} removed with it.` : ''} It stays in the audit log.` : ''}
-        confirmLabel="Remove"
-      />
       {settingsOpen && <LedgerSettings syncFrom={p?.sync_from} onClose={() => setSettingsOpen(false)} onSaved={() => { setSettingsOpen(false); reload(); }} />}
     </AppShell>
   );

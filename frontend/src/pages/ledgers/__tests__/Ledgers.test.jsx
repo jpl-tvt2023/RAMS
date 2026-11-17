@@ -5,19 +5,14 @@ import Ledgers from '../Ledgers';
 import { renderWithProviders, ADMIN, ACCOUNTANT, VIEWER } from '../../../test/renderWithProviders';
 import * as ledgers from '../../../api/ledgers.api';
 import { NO_FILE } from '../../../utils/highlights';
-import toast from 'react-hot-toast';
 
 vi.mock('../../../api/ledgers.api', () => ({
   getLedgerParties: vi.fn(),
   getLedgerStatement: vi.fn(),
   getLedgerParty: vi.fn(),
-  createLedgerEntry: vi.fn(),
-  updateLedgerEntry: vi.fn(),
-  deleteLedgerEntry: vi.fn(),
   getLedgerSettings: vi.fn(),
   updateLedgerSettings: vi.fn(),
 }));
-vi.mock('../../../api/audit.api', () => ({ getEntityHistory: vi.fn().mockResolvedValue([]) }));
 vi.mock('../../../api/files.api', () => ({ uploadFile: vi.fn(), fetchFile: vi.fn(), deleteFile: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
@@ -43,12 +38,9 @@ const PARTIES = {
   ],
   parties: [Z1, Z2, M1],
   attention: [{
-    party: Z2, counts: { missing: 1, not_entered: 0, amount_differs: 0, booked_twice: 0 }, since: '2026-09-03', state_differs: true,
+    party: Z2, counts: { booked_twice: 1, no_file: 0 }, since: '2026-09-03', state_differs: true,
   }],
   attention_total: 1,
-};
-const blank = {
-  missing: 0, not_entered: 0, amount_differs: 0, booked_twice: 0, by_amount: 0, waiting: 0,
 };
 const COLUMNS = {
   invoice: 100000, dn: -20000, cn: -30000, tds: -1000, journal: 20000, receipt: -50000,
@@ -60,13 +52,14 @@ const STATEMENT = {
   as_of: '2026-11-07 10:00:00',
   rows: [{
     party: Z1, start: { source: 'tally', paise: 900000 }, opening_paise: 1000000, columns: COLUMNS, closing_paise: 1019000,
-    checks: { dn: { ...blank, amount_differs: 1 }, cn: blank }, narration_missing: 3,
+    checks: { dn: { booked_twice: 1 }, cn: { booked_twice: 0 } }, narration_missing: 3, rows_without_file: 4,
   }],
   totals: {
-    opening_paise: 1000000, columns: COLUMNS, closing_paise: 1019000, placeholders: 0, narration_missing: 3,
+    opening_paise: 1000000, columns: COLUMNS, closing_paise: 1019000, placeholders: 0, narration_missing: 3, rows_without_file: 4,
   },
-  settings: { grace_days: 2, match_window_days: 60, amount_tolerance_paise: 100 },
 };
+// Every row is Tally's: an invoice, a DN by its narration, the same DN booked
+// again, and our own CN.
 const DAY = {
   ...STATEMENT.rows[0],
   from: '2026-11-01',
@@ -74,36 +67,34 @@ const DAY = {
   today: '2026-11-07',
   sync_from: '2026-06-08',
   as_of: '2026-11-07 10:00:00',
-  started_on: '2026-07-20',
-  settings: STATEMENT.settings,
-  entries: [
-    {
-      id: 1, date: '2026-11-02', kind: 'debit_note', number: 'FKIDN51803946', reference: null, amount_paise: 20000, effect_paise: -20000, note: null,
-      status: 'in_tally', by: 'number', tally: {
-        guid: 'v2', number: '901', date: '2026-11-03', voucher_type: 'Credit Note', amount_paise: 20000,
-      },
-    },
-    {
-      id: 2, date: '2026-11-04', kind: 'debit_note', number: 'RTDN00019933', reference: null, amount_paise: 10000, effect_paise: -10000, note: null,
-      status: 'amount_differs', by: 'number', tally: {
-        guid: 'v3', number: '904', date: '2026-11-05', voucher_type: 'Credit Note', amount_paise: 12000,
-      },
-    },
-  ],
   vouchers: [
     {
       guid: 'v1', date: '2026-11-01', voucher_type: 'Sales', base_type: 'Sales', column: 'invoice', number: '201/RM/26-27',
-      narration: null, narration_missing: true, amount_paise: 100000, effect_paise: 100000, balance_paise: 1100000, note: null,
+      narration: null, narration_missing: true, amount_paise: 100000, effect_paise: 100000, balance_paise: 1100000, note: null, files: [],
     },
     {
       guid: 'v2', date: '2026-11-03', voucher_type: 'Credit Note', base_type: 'Credit Note', column: 'dn', number: '901',
       narration: 'FKIDN51803946 dT 20/7/2026', narration_missing: false, amount_paise: 20000, effect_paise: -20000, balance_paise: 1080000,
+      note: { status: null, also_on: null, named: ['FKIDN51803946'] }, files: [],
+    },
+    {
+      guid: 'v3', date: '2026-11-04', voucher_type: 'Credit Note', base_type: 'Credit Note', column: 'dn', number: '908',
+      narration: 'D499900DN2631041 again', narration_missing: false, amount_paise: 5000, effect_paise: -5000, balance_paise: 1075000,
       note: {
-        status: 'entered', also_on: null, named: ['FKIDN51803946'], entries: [{ id: 1, kind: 'debit_note', number: 'FKIDN51803946', date: '2026-11-02', amount_paise: 20000 }],
+        status: 'booked_twice', named: ['D499900DN2631041'], also_on: {
+          guid: 'v0', number: '907', date: '2026-11-02', voucher_type: 'Credit Note', amount_paise: 5000,
+        },
       },
+      files: [],
+    },
+    {
+      guid: 'v4', date: '2026-11-05', voucher_type: 'Credit Note', base_type: 'Credit Note', column: 'cn', number: '902',
+      narration: 'FOR THE MONTH OF OCT 2026', narration_missing: false, amount_paise: 30000, effect_paise: -30000, balance_paise: 1045000,
+      note: { status: null, also_on: null, named: [] }, files: [],
     },
   ],
 };
+const rowOf = (detail, number) => within(detail).getByText(number).closest('tr');
 
 // The companies arrive with the parties, after the Company box is drawn.
 async function chooseCompany(user, code) {
@@ -135,7 +126,7 @@ describe('Ledgers', () => {
   test('nothing is chosen at first, each filter waits for the one before, and Needs attention shows meanwhile', async () => {
     renderWithProviders(<Ledgers />, { user: VIEWER });
     const attention = (await screen.findByText(Z2.name)).closest('tr');
-    expect(within(attention).getByText('1 not in Tally')).toBeInTheDocument();
+    expect(within(attention).getByText('1 DN booked twice')).toBeInTheDocument();
     expect(within(attention).getByText(/State differs: Tally says Maharashtra/)).toBeInTheDocument();
     expect(screen.getByLabelText('Company')).toHaveValue('');
     expect(screen.getByLabelText('Marketplace')).toBeDisabled();
@@ -155,7 +146,7 @@ describe('Ledgers', () => {
     expect(screen.getByRole('button', { name: 'State' })).toBeDisabled();
   });
 
-  test('states list both readings; the statement row is Tally’s, with the check in its cells', async () => {
+  test('states list both readings; the statement row is Tally’s, with what RAMS found in its cells', async () => {
     renderWithProviders(<Ledgers />, { user: VIEWER });
     const user = userEvent.setup();
     await chooseCompany(user, 'MH');
@@ -177,50 +168,30 @@ describe('Ledgers', () => {
     expect(within(row).getByText('−₹10.00')).toBeInTheDocument();
     expect(within(row).getByText('₹10,190.00 Dr')).toBeInTheDocument();
     expect(within(row).getByText('3 without narration')).toBeInTheDocument();
-    expect(within(row).getByTitle('1 amount differs')).toHaveClass('bg-purple-50');
+    expect(within(row).getByText('4 without a file')).toBeInTheDocument();
+    expect(within(row).getByTitle('1 DN booked twice')).toHaveClass('bg-purple-50');
     expect(screen.getAllByRole('note', { name: 'What the colours mean' }).length).toBeGreaterThan(0);
   });
 
-  test('one party opens by itself: the notes typed here against Tally, and Tally’s vouchers with their narrations', async () => {
-    renderWithProviders(<Ledgers />, { user: VIEWER });
+  test('one party opens by itself: every row is Tally’s, a DN read from its narration, a DN booked twice', async () => {
+    renderWithProviders(<Ledgers />, { user: ACCOUNTANT });
     await chooseZeptoPune(userEvent.setup());
     await waitFor(() => expect(ledgers.getLedgerParty).toHaveBeenCalledWith({ company_id: '2', ledger_guid: 'Z1' }));
     const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
-    const dn = within(detail).getByText('FKIDN51803946', { selector: 'span' }).closest('tr');
-    expect(within(dn).getByText('In Tally')).toBeInTheDocument();
-    expect(within(within(detail).getByText('RTDN00019933').closest('tr')).getByText('Amount differs')).toBeInTheDocument();
-    expect(within(within(detail).getByText('201/RM/26-27').closest('tr')).getByText('No narration')).toBeInTheDocument();
-    expect(within(within(detail).getByText('901').closest('tr')).getByText('Entered here')).toBeInTheDocument();
+    expect(within(detail).getByRole('heading', { name: 'In Tally' })).toBeInTheDocument();
+    expect(within(rowOf(detail, '901')).getByText('DN FKIDN51803946')).toBeInTheDocument();
+    expect(within(rowOf(detail, '901')).getByText('DN')).toBeInTheDocument(); // the column
+    const twice = rowOf(detail, '908');
+    expect(within(twice).getByText('DN booked twice')).toBeInTheDocument();
+    expect(within(twice).getByText('Also on CN 907 of 02 Nov 2026')).toBeInTheDocument();
+    expect(within(rowOf(detail, '902')).getByText('CN')).toBeInTheDocument();
+    expect(within(rowOf(detail, '902')).queryByText(/^DN /)).not.toBeInTheDocument(); // our own CN names no DN
+    expect(within(rowOf(detail, '201/RM/26-27')).getByText('No narration')).toBeInTheDocument();
     expect(within(detail).getByText('FKIDN51803946 dT 20/7/2026')).toBeInTheDocument();
-    // A Viewer only looks.
-    expect(within(detail).queryByRole('button', { name: /Add a DN or CN/ })).not.toBeInTheDocument();
-    expect(within(detail).queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
-  });
-
-  test('an Accountant adds a marketplace DN; a short DN number is refused first', async () => {
-    ledgers.createLedgerEntry.mockResolvedValue({ id: 9 });
-    renderWithProviders(<Ledgers />, { user: ACCOUNTANT });
-    const user = userEvent.setup();
-    await chooseZeptoPune(user);
-    await user.click(await screen.findByRole('button', { name: /Add a DN or CN/ }));
-    const dialog = screen.getByRole('dialog', { name: 'Add a DN or CN' });
-    expect(within(dialog).getByRole('button', { name: 'Marketplace DN' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(dialog).queryByRole('button', { name: 'Invoice' })).not.toBeInTheDocument();
-    await user.type(within(dialog).getByPlaceholderText('e.g. FKIDN51463346'), 'DN12');
-    await user.type(within(dialog).getByPlaceholderText('e.g. 1180.50'), '150');
-    expect(within(dialog).getByText('₹150.00')).toBeInTheDocument(); // "Takes ₹150.00 off what this party owes."
-    await user.click(within(dialog).getByRole('button', { name: 'Add' }));
-    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/at least 6 letters and digits/));
-    expect(ledgers.createLedgerEntry).not.toHaveBeenCalled();
-
-    const number = within(dialog).getByPlaceholderText('e.g. FKIDN51463346');
-    await user.clear(number);
-    await user.type(number, 'FKIDN52103453');
-    await user.click(within(dialog).getByRole('button', { name: 'Add' }));
-    expect(ledgers.createLedgerEntry).toHaveBeenCalledWith({
-      kind: 'debit_note', number: 'FKIDN52103453', reference: '', amount_paise: 15000, date: '2026-11-07', note: '', company_id: 2, ledger_guid: 'Z1',
-    });
-    await waitFor(() => expect(ledgers.getLedgerStatement).toHaveBeenCalledTimes(2)); // reloaded
+    // Nothing is typed here, even by an Accountant.
+    expect(within(detail).queryByText(/entered here/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add a DN or CN/ })).not.toBeInTheDocument();
+    expect(within(detail).queryByRole('button', { name: /^(Change|Remove) / })).not.toBeInTheDocument();
   });
 
   test('Needs attention opens the party, from its oldest problem', async () => {
@@ -242,21 +213,22 @@ describe('Ledgers', () => {
     expect(screen.getByRole('link', { name: 'Matching → Party ledgers' })).toHaveAttribute('href', '/matching/parties');
   });
 
-  test('Admin opens the settings: the marketplaces and how long Tally may take', async () => {
+  test('Admin opens the settings: the marketplaces and the placeholder opening, nothing about typed notes', async () => {
     ledgers.getLedgerSettings.mockResolvedValue({
-      grace_days: 2, match_window_days: 60, amount_tolerance_paise: 100, default_opening_paise: 1000000,
-      marketplaces: ['Minutes', 'Now', 'Zepto'], known_marketplaces: ['Blinkit', 'Minutes', 'Now', 'Zepto'], updated_at: null, updated_by_name: null,
+      default_opening_paise: 1000000, marketplaces: ['Minutes', 'Now', 'Zepto'], known_marketplaces: ['Blinkit', 'Minutes', 'Now', 'Zepto'], updated_at: null, updated_by_name: null,
     });
     ledgers.updateLedgerSettings.mockResolvedValue({});
     renderWithProviders(<Ledgers />, { user: ADMIN });
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: /Ledger settings/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Ledger settings' });
-    expect(await within(dialog).findByLabelText('Days Tally may take')).toHaveValue('60');
+    expect(await within(dialog).findByLabelText('Placeholder opening')).toHaveValue('10000.00');
+    expect(within(dialog).queryByLabelText('Days Tally may take')).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText('Amount tolerance')).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole('checkbox', { name: 'Blinkit' }));
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
     expect(ledgers.updateLedgerSettings).toHaveBeenCalledWith({
-      marketplaces: ['Minutes', 'Now', 'Zepto', 'Blinkit'], match_window_days: 60, grace_days: 2, amount_tolerance_paise: 100, default_opening_paise: 1000000,
+      marketplaces: ['Minutes', 'Now', 'Zepto', 'Blinkit'], default_opening_paise: 1000000,
     });
   });
 
@@ -272,12 +244,16 @@ describe('Ledgers files', () => {
     id: 31, name: 'FKIDN51803946.pdf', kind: 'pdf', size: 120000, uploaded_by_name: 'Asha', uploaded_at: '2026-11-02 09:00:00',
   };
   const INVOICE_SCAN = { ...PDF, id: 32, name: 'invoice 201.jpg', kind: 'image' };
-  // The first DN has its file, the second has none; the invoice has a scan.
+  // The invoice and the DN 901 have their files; 908 and 902 have none.
   const withFiles = {
     ...DAY,
-    entries_without_file: 1,
-    entries: [{ ...DAY.entries[0], files: [PDF] }, { ...DAY.entries[1], files: [] }],
-    vouchers: [{ ...DAY.vouchers[0], files: [INVOICE_SCAN] }, { ...DAY.vouchers[1], files: [] }],
+    rows_without_file: 2,
+    vouchers: [
+      { ...DAY.vouchers[0], files: [INVOICE_SCAN] },
+      { ...DAY.vouchers[1], files: [PDF] },
+      DAY.vouchers[2],
+      DAY.vouchers[3],
+    ],
   };
 
   beforeEach(() => {
@@ -286,28 +262,30 @@ describe('Ledgers files', () => {
     ledgers.getLedgerParties.mockResolvedValue({
       ...PARTIES,
       attention: [...PARTIES.attention, {
-        party: Z1, counts: { missing: 0, not_entered: 0, amount_differs: 0, booked_twice: 0, no_file: 2 }, since: '2026-10-02', state_differs: false,
+        party: Z1, counts: { booked_twice: 0, no_file: 2 }, since: '2026-10-02', state_differs: false,
       }],
       attention_total: 2,
     });
-    ledgers.getLedgerStatement.mockResolvedValue({ ...STATEMENT, rows: [{ ...STATEMENT.rows[0], entries_without_file: 1 }] });
+    ledgers.getLedgerStatement.mockResolvedValue({ ...STATEMENT, rows: [{ ...STATEMENT.rows[0], rows_without_file: 2 }] });
     ledgers.getLedgerParty.mockResolvedValue(withFiles);
   });
 
-  test('a DN or CN typed here with no file is orange and says so; Tally rows and filed notes are not', async () => {
+  test('any Tally row with no file is orange and says so; a row with its file is not', async () => {
     renderWithProviders(<Ledgers />, { user: VIEWER });
     await chooseZeptoPune(userEvent.setup());
     const statementRow = (await screen.findByRole('button', { name: Z1.name })).closest('tr');
-    expect(within(statementRow).getByText('1 DN/CN without a file')).toBeInTheDocument();
+    expect(within(statementRow).getByText('2 without a file')).toBeInTheDocument();
 
     const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
-    const bare = within(detail).getByText('RTDN00019933').closest('tr');
-    expect(bare).toHaveClass(NO_FILE.row);
-    expect(within(bare).getByText('No file')).toBeInTheDocument();
-    const filed = within(detail).getByText('FKIDN51803946', { selector: 'span' }).closest('tr');
+    for (const number of ['902', '908']) {
+      const bare = rowOf(detail, number);
+      expect(bare).toHaveClass(NO_FILE.row);
+      expect(within(bare).getByText('No file')).toBeInTheDocument();
+    }
+    const filed = rowOf(detail, '901');
     expect(filed).not.toHaveClass(NO_FILE.row);
-    expect(within(filed).getByRole('button', { name: 'Files on Marketplace DN FKIDN51803946' })).toHaveTextContent('1 file');
-    const invoice = within(detail).getByText('201/RM/26-27').closest('tr');
+    expect(within(filed).getByRole('button', { name: 'Files on Credit Note 901' })).toHaveTextContent('1 file');
+    const invoice = rowOf(detail, '201/RM/26-27');
     expect(invoice).not.toHaveClass(NO_FILE.row);
     expect(within(invoice).getByRole('button', { name: 'Files on Sales 201/RM/26-27' })).toBeInTheDocument();
     // A Viewer can open files but not add them.
@@ -315,25 +293,28 @@ describe('Ledgers files', () => {
     expect(within(detail).getByRole('note', { name: 'What the colours mean' })).toHaveTextContent('No file');
   });
 
-  test('“Without a file” shows just those notes', async () => {
+  test('“Without a file” shows just those rows', async () => {
     renderWithProviders(<Ledgers />, { user: VIEWER });
-    await chooseZeptoPune(userEvent.setup());
+    const user = userEvent.setup();
+    await chooseZeptoPune(user);
     const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
-    const toggle = within(detail).getByRole('button', { name: 'Without a file (1)' });
-    await userEvent.setup().click(toggle);
+    const toggle = within(detail).getByRole('button', { name: 'Without a file (2)' });
+    await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    expect(within(detail).queryByText('FKIDN51803946', { selector: 'span' })).not.toBeInTheDocument();
-    expect(within(detail).getByText('RTDN00019933')).toBeInTheDocument();
+    expect(within(detail).queryByText('901')).not.toBeInTheDocument();
+    expect(within(detail).queryByText('201/RM/26-27')).not.toBeInTheDocument();
+    expect(within(detail).getByText('902')).toBeInTheDocument();
+    expect(within(detail).getByText('908')).toBeInTheDocument();
   });
 
-  test('Needs attention counts the notes without a file, and opens just those', async () => {
+  test('Needs attention counts the rows without a file, and opens just those', async () => {
     renderWithProviders(<Ledgers />, { user: VIEWER });
     const user = userEvent.setup();
     const row = (await screen.findByRole('button', { name: Z1.name })).closest('tr');
-    expect(within(row).getByText('2 DN/CN without a file')).toBeInTheDocument();
+    expect(within(row).getByText('2 without a file')).toBeInTheDocument();
     await user.click(within(row).getByRole('button', { name: Z1.name }));
     const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
-    expect(within(detail).getByRole('button', { name: 'Without a file (1)' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(detail).getByRole('button', { name: 'Without a file (2)' })).toHaveAttribute('aria-pressed', 'true');
     expect(ledgers.getLedgerStatement).toHaveBeenCalledWith(expect.objectContaining({ parties: ['2:Z1'], from: '2026-10-02' }));
   });
 
@@ -342,17 +323,9 @@ describe('Ledgers files', () => {
     const user = userEvent.setup();
     await chooseZeptoPune(user);
     const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
-    await user.click(within(detail).getByRole('button', { name: 'Add a file to Marketplace DN RTDN00019933' }));
-    const dialog = screen.getByRole('dialog', { name: 'Files — Marketplace DN RTDN00019933' });
+    await user.click(within(detail).getByRole('button', { name: 'Add a file to Credit Note 902' }));
+    const dialog = screen.getByRole('dialog', { name: 'Files — Credit Note 902' });
     expect(within(dialog).getByText('No file yet.')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: /Choose files/ })).toBeInTheDocument();
-  });
-
-  test('removing a note warns that its files go with it', async () => {
-    renderWithProviders(<Ledgers />, { user: ACCOUNTANT });
-    const user = userEvent.setup();
-    await chooseZeptoPune(user);
-    await user.click(await screen.findByRole('button', { name: 'Remove FKIDN51803946' }));
-    expect(screen.getByRole('dialog', { name: 'Remove this note?' })).toHaveTextContent('Its file is removed with it.');
   });
 });

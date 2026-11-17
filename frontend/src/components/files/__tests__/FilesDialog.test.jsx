@@ -28,13 +28,13 @@ const FILES = [
     id: 3, name: 'mail.eml', kind: 'email', size: 45000, uploaded_by_name: 'Keshav', uploaded_at: at,
   },
 ];
-const TARGET = { companyId: 2, entryId: 7 };
+const TARGET = { companyId: 2, voucherGuid: 'g-cn-951' };
 
 function open(props = {}) {
   const onChanged = vi.fn();
   const onClose = vi.fn();
-  render(<FilesDialog title="Marketplace DN FKIDN51803946" subtitle="ZEPTO (PUNE) · 02 Nov 2026" files={FILES} target={TARGET} canEdit onChanged={onChanged} onClose={onClose} {...props} />);
-  return { onChanged, onClose, dialog: screen.getByRole('dialog', { name: 'Files — Marketplace DN FKIDN51803946' }) };
+  render(<FilesDialog title="Credit Note 951" subtitle="ZEPTO (PUNE) · 02 Nov 2026" files={FILES} target={TARGET} canEdit onChanged={onChanged} onClose={onClose} {...props} />);
+  return { onChanged, onClose, dialog: screen.getByRole('dialog', { name: 'Files — Credit Note 951' }) };
 }
 
 describe('a row’s files', () => {
@@ -97,20 +97,20 @@ describe('a row’s files', () => {
     await userEvent.setup().upload(within(dialog).getByLabelText('Choose files to add'), pdfFile);
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     expect(filesApi.uploadFile).toHaveBeenCalledWith(expect.objectContaining({
-      companyId: 2, entryId: 7, name: 'FKIDN51803946.pdf', originalSize: pdfFile.size, gzip: expect.any(Boolean), blob: expect.any(Blob),
+      companyId: 2, voucherGuid: 'g-cn-951', name: 'FKIDN51803946.pdf', originalSize: pdfFile.size, gzip: expect.any(Boolean), blob: expect.any(Blob),
     }), expect.any(Function));
     expect(toast.success).toHaveBeenCalledWith('Added FKIDN51803946.pdf');
   });
 
   test('a file RAMS can’t take, or one the server refuses, says why and stays out', async () => {
-    filesApi.uploadFile.mockRejectedValue({ response: { data: { message: 'This file is already on Marketplace DN FKIDN51803946' } } });
+    filesApi.uploadFile.mockRejectedValue({ response: { data: { message: 'This file is already on Credit Note 951' } } });
     const { dialog, onChanged } = open();
     const user = userEvent.setup({ applyAccept: false });
     await user.upload(within(dialog).getByLabelText('Choose files to add'), new File(['x'], 'IMG_0001.HEIC'));
     expect(await within(dialog).findByText(/Not added: .*HEIC photo/)).toBeInTheDocument();
     expect(filesApi.uploadFile).not.toHaveBeenCalled();
     await user.upload(within(dialog).getByLabelText('Choose files to add'), new File(['%PDF-1.4'], 'again.pdf', { type: 'application/pdf' }));
-    expect(await within(dialog).findByText('Not added: This file is already on Marketplace DN FKIDN51803946')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Not added: This file is already on Credit Note 951')).toBeInTheDocument();
     expect(onChanged).not.toHaveBeenCalled();
     await user.click(within(dialog).getByRole('button', { name: 'Dismiss again.pdf' }));
     expect(within(dialog).queryByText(/already on/)).not.toBeInTheDocument();
@@ -132,7 +132,7 @@ describe('a row’s files', () => {
     const user = userEvent.setup();
     await user.click(within(dialog).getByRole('button', { name: 'Remove dn.pdf' }));
     const confirm = screen.getByRole('dialog', { name: 'Remove this file?' });
-    expect(confirm).toHaveTextContent('dn.pdf comes off Marketplace DN FKIDN51803946');
+    expect(confirm).toHaveTextContent('dn.pdf comes off Credit Note 951');
     await user.click(within(confirm).getByRole('button', { name: 'Remove' }));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     expect(filesApi.deleteFile).toHaveBeenCalledWith(1);

@@ -40,7 +40,6 @@ export const PERM = {
   REPORTS_VIEW: 'reports.view',
   REPORTS_SETTINGS: 'reports.settings',
   LEDGERS_VIEW: 'ledgers.view',
-  LEDGERS_ENTRY: 'ledgers.entry',
   LEDGERS_FILES: 'ledgers.files',
   LEDGERS_SETTINGS: 'ledgers.settings',
   SYNC_COMPANIES: 'sync.companies',

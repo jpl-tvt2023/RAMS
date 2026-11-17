@@ -1,6 +1,7 @@
 // Files on Ledgers rows (migration 019): PDFs, photos and emails attached to a
-// debit or credit note typed in RAMS, or to a Tally voucher. Debtors shows an
-// invoice's files too.
+// Tally voucher in a party's section -- an invoice, a DN or CN, a receipt, a
+// TDS or other journal. Debtors shows an invoice's files too. (Notes typed in
+// RAMS were dropped on 2026-11-17, so ledger_files.entry_id stays empty.)
 //
 // Kept small three ways:
 //   - the browser shrinks photos before they are sent (frontend utils/files.js)
@@ -159,33 +160,24 @@ const fileOut = (r) => ({
   uploaded_by_name: r.uploaded_by_name ?? null,
   uploaded_at: r.uploaded_at,
 });
-const SELECT_FILES = `SELECT f.id, f.company_id, f.entry_id, f.voucher_guid, f.file_name, f.kind, f.uploaded_at, b.size, u.name AS uploaded_by_name
+const SELECT_FILES = `SELECT f.id, f.company_id, f.voucher_guid, f.file_name, f.kind, f.uploaded_at, b.size, u.name AS uploaded_by_name
                         FROM ledger_files f JOIN file_blobs b ON b.id = f.blob_id LEFT JOIN users u ON u.id = f.uploaded_by`;
 
 /**
- * The files on many rows at once: entryIds are typed notes, vouchers are
- * [companyId, guid] pairs. Returns { entry(id), voucher(companyId, guid) },
- * each giving that row's files, oldest first.
+ * The files on many Tally vouchers at once, given as [companyId, guid] pairs.
+ * Returns { voucher(companyId, guid) }, giving that row's files, oldest first.
  */
-async function filesFor(client, { entryIds = [], vouchers = [] }) {
-  const ofEntry = new Map();
+async function filesFor(client, { vouchers = [] }) {
   const ofVoucher = new Map();
-  const add = (map, key, r) => {
-    if (!map.has(key)) map.set(key, []);
-    map.get(key).push(fileOut(r));
-  };
-  for (const part of chunks([...new Set(entryIds.map(Number))])) {
-    const rows = await rowsOf(client, `${SELECT_FILES} WHERE f.entry_id IN (${marks(part.length)}) ORDER BY f.id`, part);
-    for (const r of rows) add(ofEntry, Number(r.entry_id), r);
-  }
   for (const part of chunks([...new Set(vouchers.map(([, g]) => g).filter(Boolean))])) {
     const rows = await rowsOf(client, `${SELECT_FILES} WHERE f.voucher_guid IN (${marks(part.length)}) ORDER BY f.id`, part);
-    for (const r of rows) add(ofVoucher, `${Number(r.company_id)}|${r.voucher_guid}`, r);
+    for (const r of rows) {
+      const key = `${Number(r.company_id)}|${r.voucher_guid}`;
+      if (!ofVoucher.has(key)) ofVoucher.set(key, []);
+      ofVoucher.get(key).push(fileOut(r));
+    }
   }
-  return {
-    entry: (id) => ofEntry.get(Number(id)) || [],
-    voucher: (companyId, guid) => ofVoucher.get(`${Number(companyId)}|${guid}`) || [],
-  };
+  return { voucher: (companyId, guid) => ofVoucher.get(`${Number(companyId)}|${guid}`) || [] };
 }
 
 // ------------------------------------------------------------ removing
@@ -209,14 +201,6 @@ async function unlink(tx, fileId) {
   return f;
 }
 
-// Takes every file off a typed note. Returns the removed rows.
-async function unlinkEntry(tx, entryId) {
-  const rows = await rowsOf(tx, 'SELECT id FROM ledger_files WHERE entry_id = ? ORDER BY id', [Number(entryId)]);
-  const out = [];
-  for (const r of rows) out.push(await unlink(tx, r.id));
-  return out.filter(Boolean);
-}
-
 // ------------------------------------------------------------ usage
 
 /**
@@ -234,21 +218,16 @@ async function usage(client) {
     rowsOf(client, `SELECT kind, COALESCE(SUM(stored_size), 0) AS stored
                       FROM (SELECT DISTINCT f.kind, b.id, b.stored_size FROM ledger_files f JOIN file_blobs b ON b.id = f.blob_id)
                      GROUP BY kind`),
-    // Where each file is: the typed note or Tally voucher, its party, and the
-    // party's marketplace (as Ledgers decides it: the mapping, else the
-    // suggestion), so File storage can open it on Ledgers.
-    rowsOf(client, `SELECT f.id, f.file_name, f.kind, f.company_id, f.entry_id, f.voucher_guid, f.uploaded_at,
+    // Where each file is: the Tally voucher, its party, and the party's
+    // marketplace (as Ledgers decides it: the mapping, else the suggestion),
+    // so File storage can open it on Ledgers.
+    rowsOf(client, `SELECT f.id, f.file_name, f.kind, f.company_id, f.voucher_guid, f.uploaded_at,
                            b.size, b.stored_size, u.name AS uploaded_by_name, c.code AS company,
-                           e.kind AS entry_kind, e.number AS entry_number, e.date AS entry_date, e.ledger_guid AS entry_ledger, el.name AS entry_party,
-                           CASE WHEN ep.kind = 'vendor' THEN ep.vendor WHEN ep.kind IS NULL THEN ep.suggested_vendor END AS entry_vendor,
                            v.voucher_type, v.number AS voucher_number, v.date AS voucher_date, v.party AS voucher_party, vl.guid AS voucher_ledger,
                            CASE WHEN vp.kind = 'vendor' THEN vp.vendor WHEN vp.kind IS NULL THEN vp.suggested_vendor END AS voucher_vendor
                       FROM ledger_files f JOIN file_blobs b ON b.id = f.blob_id
                       LEFT JOIN users u ON u.id = f.uploaded_by
                       LEFT JOIN tally_companies c ON c.id = f.company_id
-                      LEFT JOIN ledger_entries e ON e.id = f.entry_id
-                      LEFT JOIN tally_ledgers el ON el.company_id = e.company_id AND el.guid = e.ledger_guid
-                      LEFT JOIN party_ledgers ep ON ep.company_id = e.company_id AND ep.ledger_guid = e.ledger_guid
                       LEFT JOIN tally_vouchers v ON v.company_id = f.company_id AND v.guid = f.voucher_guid
                       LEFT JOIN tally_ledgers vl ON vl.company_id = v.company_id AND vl.name = v.party AND vl.deleted_at IS NULL
                       LEFT JOIN party_ledgers vp ON vp.company_id = v.company_id AND vp.ledger_guid = vl.guid
@@ -280,13 +259,9 @@ async function usage(client) {
       uploaded_at: r.uploaded_at,
       company_id: Number(r.company_id),
       company: r.company ?? null,
-      on: r.entry_id != null
-        ? {
-          type: 'entry', entry_kind: r.entry_kind, number: r.entry_number, date: r.entry_date, party: r.entry_party ?? null, party_guid: r.entry_ledger ?? null, vendor: r.entry_vendor ?? null,
-        }
-        : {
-          type: 'voucher', voucher_type: r.voucher_type ?? null, number: r.voucher_number ?? null, date: r.voucher_date ?? null, party: r.voucher_party ?? null, party_guid: r.voucher_ledger ?? null, vendor: r.voucher_vendor ?? null,
-        },
+      on: {
+        type: 'voucher', voucher_type: r.voucher_type ?? null, number: r.voucher_number ?? null, date: r.voucher_date ?? null, party: r.voucher_party ?? null, party_guid: r.voucher_ledger ?? null, vendor: r.voucher_vendor ?? null,
+      },
     })),
   };
 }
@@ -302,6 +277,5 @@ module.exports = {
   readFile,
   filesFor,
   unlink,
-  unlinkEntry,
   usage,
 };
