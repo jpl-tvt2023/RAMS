@@ -6,6 +6,12 @@ import { useState, useEffect } from 'react';
 const VERSION = 'v1';
 const storageKeyOf = (key) => `rams:${key}:${VERSION}`;
 
+// Sets what a page's useSessionState(key) starts from the next time it opens
+// in this tab -- for a link that opens another page on a given choice.
+export function writeSessionState(key, value) {
+  try { sessionStorage.setItem(storageKeyOf(key), JSON.stringify(value)); } catch { /* ignore */ }
+}
+
 export function useSessionState(key, initial) {
   const storageKey = storageKeyOf(key);
   const [value, setValue] = useState(() => {

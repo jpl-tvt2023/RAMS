@@ -12,6 +12,7 @@ import StatementTable, { StateLine } from '../../components/ledgers/StatementTab
 import PartyDetail from '../../components/ledgers/PartyDetail';
 import EntryForm from '../../components/ledgers/EntryForm';
 import LedgerSettings from '../../components/ledgers/LedgerSettings';
+import FilesDialog from '../../components/files/FilesDialog';
 import {
   getLedgerParties, getLedgerStatement, getLedgerParty, deleteLedgerEntry,
 } from '../../api/ledgers.api';
@@ -21,15 +22,15 @@ import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
 import { formatDay, formatRupees } from '../../utils/formatters';
 import { KIND } from '../../utils/ledgerText';
+import { FILTERS_KEY, DEFAULTS } from '../../utils/ledgerLinks';
 
 // Ledgers: the bill-to-bill statement. Choose a company, a marketplace, states
 // and parties (nothing is chosen at first, and each has "All"), and a range.
 // One row per party, every figure Tally's; a row opens the party's notes and
-// vouchers. Debit and credit notes are typed here and checked against Tally.
-// Nothing is written to Tally.
-const DEFAULTS = {
-  company: null, vendor: null, states: null, parties: null, from: '', to: '', open: null,
-};
+// vouchers. Debit and credit notes are typed here and checked against Tally,
+// and any row can carry files (the DN's PDF, a photo, the email). A typed note
+// with no file is highlighted. Nothing is written to Tally. What is chosen
+// (FILTERS_KEY, DEFAULTS) is in utils/ledgerLinks.js.
 const statementOrNothing = (p) => (p.company_id && p.vendor && p.states && p.parties ? getLedgerStatement(p) : Promise.resolve(null));
 const partyOrNothing = (p) => (p.ledger_guid ? getLedgerParty(p) : Promise.resolve(null));
 const minusDays = (iso, days) => {
@@ -39,7 +40,7 @@ const minusDays = (iso, days) => {
 };
 const keyOf = (p) => `${p.company_id}:${p.guid}`;
 const COUNT_WORDS = {
-  missing: 'not in Tally', not_entered: 'in Tally, not entered here', amount_differs: 'amount differs', booked_twice: 'DN booked twice',
+  missing: 'not in Tally', not_entered: 'in Tally, not entered here', amount_differs: 'amount differs', booked_twice: 'DN booked twice', no_file: 'DN/CN without a file',
 };
 
 function Field({ label, children }) {
@@ -77,9 +78,10 @@ function Attention({ rows, total, onOpen }) {
 
 export default function Ledgers() {
   const { can } = useAuth();
-  const [pick, setPick] = useSessionState('ledgers.filters', DEFAULTS);
+  const [pick, setPick] = useSessionState(FILTERS_KEY, DEFAULTS);
   const [editing, setEditing] = useState(null); // 'new' or an entry
   const [removing, setRemoving] = useState(null);
+  const [filesOf, setFilesOf] = useState(null); // { entryId } or { voucherGuid }
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const parties = useKeyedLoad(getLedgerParties, {});
@@ -114,13 +116,19 @@ export default function Ledgers() {
   } : {});
   const day = detail.data;
   const canEnter = can(PERM.LEDGERS_ENTRY);
+  const canFiles = can(PERM.LEDGERS_FILES);
+
+  // The row whose files are open, from the party as last loaded.
+  const filesRow = day && filesOf
+    ? (filesOf.entryId ? day.entries.find((e) => e.id === filesOf.entryId) : day.vouchers.find((v) => v.guid === filesOf.voucherGuid))
+    : null;
 
   const set = (patch) => setPick((x) => ({ ...x, ...patch }));
   const setCompany = (v) => set({
-    company: v || null, vendor: null, states: null, parties: null, open: null,
+    company: v || null, vendor: null, states: null, parties: null, open: null, nofile: false,
   });
   const setVendor = (v) => set({
-    vendor: v || null, states: null, parties: null, open: null,
+    vendor: v || null, states: null, parties: null, open: null, nofile: false,
   });
   // Ticked parties that the new states leave out are dropped.
   const setStates = (states) => {
@@ -130,7 +138,8 @@ export default function Ledgers() {
     set({ states, parties: states && (partiesNow === 'all' || partiesNow?.length) ? partiesNow : null, open: null });
   };
   const reload = () => { parties.reload(); statement.reload(); detail.reload(); };
-  // From the oldest problem (or the copy's start) to today.
+  // From the oldest problem (or the copy's start) to today. When the only
+  // thing off is notes without a file, just those are shown.
   const openAttention = (a) => set({
     company: String(a.party.company_id),
     vendor: a.party.vendor,
@@ -139,6 +148,7 @@ export default function Ledgers() {
     from: a.since ? (a.since < p.sync_from ? p.sync_from : a.since) : '',
     to: '',
     open: keyOf(a.party),
+    nofile: Boolean(a.counts.no_file) && !a.state_differs && Object.entries(a.counts).every(([k, c]) => k === 'no_file' || !c),
   });
 
   const remove = async () => {
@@ -190,7 +200,7 @@ export default function Ledgers() {
             disabled={!pick.vendor || Boolean(soon)} />
         </Field>
         <Field label="Party">
-          <MultiSelect label="Party" options={partyOptions} value={pick.parties} onChange={(v) => set({ parties: v, open: null })} placeholder="Choose parties" allLabel="All parties" noun="parties"
+          <MultiSelect label="Party" options={partyOptions} value={pick.parties} onChange={(v) => set({ parties: v, open: null, nofile: false })} placeholder="Choose parties" allLabel="All parties" noun="parties"
             disabled={!pick.states || Boolean(soon)} />
         </Field>
         <Field label="Dates">
@@ -222,15 +232,19 @@ export default function Ledgers() {
       {ready && (
         <>
           <StatementTable data={statement.data} loading={statement.loading} selected={openKey} showCompany={pick.company === 'all'}
-            onOpen={(r) => set({ open: keyOf(r.party) })} />
+            onOpen={(r) => set({ open: keyOf(r.party), nofile: false })} />
           {day && (
             <PartyDetail
               day={day}
               canEnter={canEnter}
+              canFiles={canFiles}
+              onlyNoFile={Boolean(pick.nofile)}
+              onToggleNoFile={(v) => set({ nofile: v })}
               onAdd={() => setEditing('new')}
               onEdit={setEditing}
               onRemove={setRemoving}
-              onClose={() => set({ open: 'none' })}
+              onFiles={setFilesOf}
+              onClose={() => set({ open: 'none', nofile: false })}
             />
           )}
         </>
@@ -252,8 +266,21 @@ export default function Ledgers() {
           entry={editing === 'new' ? null : editing}
           minDate={minusDays(day.sync_from, 365)}
           maxDate={day.today}
+          canFiles={canFiles}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); reload(); }}
+        />
+      )}
+      {filesRow && (
+        <FilesDialog
+          key={filesOf.entryId ? `e${filesOf.entryId}` : `v${filesOf.voucherGuid}`}
+          title={filesOf.entryId ? `${KIND[filesRow.kind]?.label || filesRow.kind} ${filesRow.number}` : `${filesRow.voucher_type} ${filesRow.number || ''}`.trim()}
+          subtitle={`${day.party.name} · ${formatDay(filesRow.date)}`}
+          files={filesRow.files || []}
+          target={filesOf.entryId ? { companyId: day.party.company_id, entryId: filesOf.entryId } : { companyId: day.party.company_id, voucherGuid: filesOf.voucherGuid }}
+          canEdit={canFiles}
+          onClose={() => setFilesOf(null)}
+          onChanged={reload}
         />
       )}
       <ConfirmDialog
@@ -262,7 +289,7 @@ export default function Ledgers() {
         onConfirm={remove}
         loading={busy}
         title="Remove this note?"
-        message={removing ? `${KIND[removing.kind]?.label} ${removing.number} for ${formatRupees(removing.amount_paise)}, dated ${formatDay(removing.date)}. It stays in the audit log.` : ''}
+        message={removing ? `${KIND[removing.kind]?.label} ${removing.number} for ${formatRupees(removing.amount_paise)}, dated ${formatDay(removing.date)}.${(removing.files || []).length ? ` Its ${removing.files.length === 1 ? 'file is' : `${removing.files.length} files are`} removed with it.` : ''} It stays in the audit log.` : ''}
         confirmLabel="Remove"
       />
       {settingsOpen && <LedgerSettings syncFrom={p?.sync_from} onClose={() => setSettingsOpen(false)} onSaved={() => { setSettingsOpen(false); reload(); }} />}

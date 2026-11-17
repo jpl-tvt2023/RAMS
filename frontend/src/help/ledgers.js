@@ -5,8 +5,8 @@ export const ledgersHelp = {
   path: '/ledgers',
   area: 'Ledgers',
   title: 'Ledgers',
-  who: 'Seeing it: "See Ledgers". Adding, changing and removing debit and credit notes: "Record ledger entries". The settings: "Change ledger settings". Admin and Owner always can. Accountants can see and record by default, and Viewers can see.',
-  summary: 'The statement of each party of the marketplaces that pay bill to bill (Minutes, Now and Zepto to start), over the dates you choose: its opening balance, invoices, debit notes, credit notes, TDS, journals, receipts and closing. Every figure comes from Tally. Debit and credit notes are also typed here from the marketplace’s portal, and RAMS checks each one against Tally’s credit notes. RAMS never writes anything into Tally.',
+  who: 'Seeing it, and viewing and downloading files: "See Ledgers". Adding, changing and removing debit and credit notes: "Record ledger entries". Adding and removing files: "Attach files". The settings: "Change ledger settings". Admin and Owner always can. Accountants can see, record and attach files by default, and Viewers can see.',
+  summary: 'The statement of each party of the marketplaces that pay bill to bill (Minutes, Now and Zepto to start), over the dates you choose: its opening balance, invoices, debit notes, credit notes, TDS, journals, receipts and closing. Every figure comes from Tally. Debit and credit notes are also typed here from the marketplace’s portal, and RAMS checks each one against Tally’s credit notes. Any row can carry files: the DN’s PDF, a photo of it, or the email it came in. RAMS never writes anything into Tally.',
   flows: [
     {
       title: 'Open the statement',
@@ -39,6 +39,7 @@ export const ledgersHelp = {
         'Grey ⏳ waiting: not on the other side yet, but still within the days allowed.',
         'Red ✗ missing: on one side only — typed here but not in Tally, or in Tally but not typed here.',
         'Yellow “No narration”: Tally has no narration on that record.',
+        'Orange “No file”: a DN or CN typed here has no file yet. The whole row is orange until one is added.',
         'A DN or CN figure is tinted with its most urgent colour, with a count per kind under it. Hover over it for the sentence.',
       ],
     },
@@ -60,6 +61,58 @@ export const ledgersHelp = {
         'Our CN: a credit note we issued, for example a monthly discount. Type Tally’s credit note number, for example 709.',
         'Against invoice is optional: the invoice it is for, for example 556/RM/26-27. It helps when several credit notes look alike.',
         'Type the amount in rupees and click Add. Both take the balance down. The note appears with what RAMS found in Tally.',
+        'To attach its file at the same time, click Choose files in the form (or press Ctrl+V to paste a screenshot). The files are added when you click Add.',
+      ],
+    },
+    {
+      title: 'Attach the DN’s email or PDF',
+      steps: [
+        'Open the party. A DN or CN typed here without a file is orange, and its Files column says “No file”.',
+        'Click Add in the Files column. A window opens for that note.',
+        'Drag the files onto the window, or click Choose files. You can pick several at once: PDFs, photos (JPG, PNG or WebP) and emails (.eml or .msg).',
+        'To keep an email: in Gmail, open it, click ⋮ and choose Download message (an .eml file). In Outlook, drag the email onto the desktop or use File → Save As (an .msg file). Then add that file.',
+        'Each file shows “Sending…” and then appears in the list. The row stops being orange.',
+      ],
+    },
+    {
+      title: 'Paste a screenshot',
+      steps: [
+        'Copy a screenshot or a snip (for example with Windows + Shift + S).',
+        'Open the files window of the row, or the Add / Change form of a note, and press Ctrl+V.',
+        'It is added as “Screenshot” with the date and time, and made smaller like any photo.',
+      ],
+    },
+    {
+      title: 'Attach a file to a Tally row',
+      steps: [
+        'In the “In Tally” list, click Add (or the file count) in the Files column of the invoice, credit note, receipt or journal.',
+        'Add the files as above. Tally rows are never orange: only the notes typed here need a file.',
+        'A file on an invoice also shows on Reports → Debtors.',
+      ],
+    },
+    {
+      title: 'View or download a file',
+      steps: [
+        'Click the file count in the Files column (for example “2 files”).',
+        'Click View to see a PDF or a photo inside RAMS. Use the arrows (or the ← → keys) to go through the row’s files, and Esc to close.',
+        'Click Download to save it. A PDF or an email comes back exactly as it was added; an email is opened in Outlook or your mail app.',
+      ],
+    },
+    {
+      title: 'Remove a file',
+      steps: [
+        'Open the row’s files and click the bin next to the file, then Remove.',
+        'The removal is kept in the audit log and in the note’s history (the clock icon).',
+        'Removing a DN or CN removes its files with it.',
+      ],
+    },
+    {
+      title: 'Find the DN/CN without a file',
+      steps: [
+        'Before choosing parties, “Needs attention” lists every party with notes typed here that have no file, with how many.',
+        'Click the party. When missing files are all that is off, it opens showing just those notes.',
+        'In a party, click “Without a file” above the notes to show only those; click it again to show every note.',
+        'In the statement, the orange count under a party’s name says how many of its notes in the dates chosen have no file.',
       ],
     },
     {
@@ -75,7 +128,7 @@ export const ledgersHelp = {
     {
       title: 'See what needs attention',
       steps: [
-        'Open Ledgers before choosing parties. “Needs attention” lists every party with a red or purple finding, and every party whose state differs, with since when.',
+        'Open Ledgers before choosing parties. “Needs attention” lists every party with a red or purple finding, a DN or CN without a file, or a state that differs, with since when.',
         'Click a party to open it, from its oldest problem to today.',
       ],
     },
@@ -91,7 +144,15 @@ export const ledgersHelp = {
     },
   ],
   faq: [
-    { q: 'What do the colours and icons mean?', a: 'Green ✓ matches, purple ≠ differs, blue ⚖ matched by amount, grey ⏳ waiting, red ✗ missing, and the yellow highlight is a record with no narration. Each colour means only that, on this page, and the legend under the table repeats it.' },
+    { q: 'What do the colours and icons mean?', a: 'Green ✓ matches, purple ≠ differs, blue ⚖ matched by amount, grey ⏳ waiting, red ✗ missing, the yellow highlight is a record with no narration, and an orange row is a DN or CN typed here with no file. Each colour means only that, on this page, and the legend under the table repeats it.' },
+    { q: 'Why is a row orange?', a: 'It is a debit or credit note typed here with no file on it. Add the marketplace’s DN (its PDF, a photo, or the email) or our CN, and the orange goes. Tally’s rows can carry files too, but they are never orange.' },
+    { q: 'Which files can I add?', a: 'PDFs, photos (JPG, PNG or WebP) and emails saved as .eml (Gmail’s Download message) or .msg (Outlook). Up to 4 MB each after RAMS compresses it, and up to 10 on one row. iPhone HEIC photos can’t be read by browsers: share them as JPEG, or take a screenshot.' },
+    { q: 'Does RAMS change my files?', a: 'PDFs and emails come back exactly as they were added. Photos are made smaller before they are sent (at most 2000 pixels across, as JPEG), which keeps them readable at a fraction of the size. Keep the original yourself if you need it at full size.' },
+    { q: 'Why can’t I open an email inside RAMS?', a: 'RAMS keeps the email exactly as it was saved, with its attachments, and doesn’t open it. Download it and it opens in Outlook or your mail app.' },
+    { q: 'A file is too big. What can I do?', a: 'For a PDF, save it smaller (for example “Reduce file size”, or print it to PDF again). For an email with large attachments, save the email without them and add the PDFs separately.' },
+    { q: 'I added the same file to two rows. Does it take twice the space?', a: 'No. RAMS keeps each file once, however many rows it is on, and deletes it only when the last of those rows lets it go.' },
+    { q: 'Who can add and remove files?', a: 'Anyone with “Attach files”: Admin and Owner always, Accountants by default. Anyone who can see Ledgers or Debtors can view and download them. An Admin or Owner can change this on Roles & permissions.' },
+    { q: 'I attached a file to a Tally invoice. Where else does it show?', a: 'On every party that voucher is on, and on that invoice in Reports → Debtors.' },
     { q: 'Why aren’t invoices and receipts typed any more?', a: 'They come straight from Tally. Only debit and credit notes are typed here, because the marketplaces raise them on their portals and they reach Tally later.' },
     { q: 'Where do the TDS and Journal / Adj figures come from?', a: 'From Tally. TDS is a journal with a TDS ledger on it (TDS Receivable), the same rule the invoice reports use. Journal / Adj is every other voucher on the party, such as discount round-offs.' },
     { q: 'Why is a marketplace’s debit note a credit note in Tally?', a: 'A debit note the marketplace raises takes down what it owes us, so the accountants book it in Tally as a credit note, with the DN number in the narration. RAMS looks for the number typed here in those narrations, on any date: they are often booked weeks later.' },

@@ -197,6 +197,7 @@ The report screens (what has been invoiced, what has been paid, and what is stil
 | Amount | The invoice total |
 | CN | The credit notes set against it in Tally. Click the amount to see each credit note: its number, date, amount and the ROMS return (RTV) it belongs to |
 | Outstanding | What is still owed after receipts, credit notes, TDS and adjustments, and how many days it is overdue |
+| Files | The invoice's files (PDF, photo or email), added on *Ledgers*. Click to view or download them |
 
 It opens on **MH**, with all marketplaces and all statuses. You can switch to another company or to all companies together, and filter by Open, Overdue, Settled or No PO. You can search by invoice, party or either PO number, and download it for Excel.
 
@@ -241,12 +242,24 @@ Each colour means one thing:
 | Grey ⏳ | Waiting: not on the other side yet. A typed note waits up to 60 days for Tally; a Tally credit note waits 2 days to be typed (both are settings) |
 | Red ✗ | Missing: typed here but not in Tally, or in Tally but not typed here |
 | Yellow | No narration (see below) |
+| Orange | A debit or credit note typed here with no file yet (see below) |
 
-Click a party to see the notes typed for it and every Tally voucher, with its narration and the running balance. *Needs attention* lists every party with something red or purple.
+Click a party to see the notes typed for it and every Tally voucher, with its narration and the running balance. *Needs attention* lists every party with something red or purple, or a note without a file.
 
 **What you type stays in RAMS.** It is never sent to Tally.
 
 **The opening balance comes from Tally**, as before: each sync reads every ledger's balance. If a sync can't read it, the party starts on a placeholder of ₹10,000 on 8 June, carried forward by Tally's real vouchers.
+
+### Files: the DN's PDF, photo or email
+Every row of a party can carry its proof: each debit or credit note typed here, and every Tally invoice, credit note, receipt or journal.
+- **Adding:** in the *Files* column, drag files in, choose them, or paste a screenshot with Ctrl+V. RAMS takes PDFs, photos (JPG, PNG, WebP) and emails saved from Gmail (.eml) or Outlook (.msg): up to 4 MB each after compression, and 10 per row. A DN can get its file in the same form it is typed in.
+- **A note typed here without a file is orange**, across the whole row, until a file is added. *Needs attention* counts them for every party, and *Without a file* shows just those notes. Tally's rows are never orange.
+- **Viewing:** a PDF or a photo opens inside RAMS, and any file can be downloaded. PDFs and emails come back **exactly as they were added**. Emails are not opened in RAMS: they open in Outlook or your mail app, with their attachments.
+- **Small on purpose:** photos are made smaller before they are sent (at most 2,000 pixels across; a 1.6 MB photo became 146 KB in our test, still easy to read). PDFs and emails are compressed without losing anything, and a file attached to several rows is kept once. One file for every DN, CN and invoice comes to about 1 GB a year. *Admin → File storage* shows the space used and saved, and the biggest files.
+- An invoice's files also show on *Debtors*.
+- Adding and removing a file is in the Audit Log, and in the note's own history.
+
+**Later, once the NAS is bought:** a shared folder that RAMS checks every few minutes, attaching each file named by its DN, CN or invoice number to the right row by itself.
 
 ### Narrations, everywhere
 Every Tally record RAMS shows (on Ledgers, Debtors, Match review and Auto-fill, and on the report screens still to come) now shows its **narration**. A record without one is **highlighted in yellow**, so the accountants can add it in Tally. Today almost no invoice or receipt has a narration (362 of 362 invoices on Minutes, Now and Zepto), so a lot will be highlighted at first. Which voucher types need a narration, and from which date, is a setting on *Admin → Tally companies* (*Narration check*).
@@ -269,13 +282,15 @@ There are four roles. **Admin and Owner can always do everything**, and they dec
 | See Debtors (Reports) | ✓ | ✓ |
 | See Ledgers | ✓ | ✓ |
 | Enter, change and remove debit and credit notes on Ledgers | ✓ | – |
+| Add and remove files on Ledgers | ✓ | – |
+| View and download files (on Ledgers and Debtors) | ✓ | ✓ |
 | Change the ledger settings (marketplaces, days to wait, tolerance, placeholder opening) | – (Admin/Owner) | – |
 | Change the credit days (*Admin → Credit terms*) | ✓ | – |
 | Change the narration check | – (Admin/Owner) | – |
 | Run matching, confirm or reject links, map ledgers, change matching rules | ✓ | – |
 | Approve auto-fill writes | ✓ | – |
 | Switch auto-fill modes, write over a different value in ROMS | – (Admin/Owner) | – |
-| Users, Audit Log, Roles & permissions | Never: Admin/Owner only | Never |
+| Users, Audit Log, Roles & permissions, File storage | Never: Admin/Owner only | Never |
 
 Every change anyone makes in RAMS is recorded in the **Audit Log**, with who made it and when.
 
@@ -300,6 +315,7 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 - **Sessions** expire, and a password reset or role change signs that person out.
 - **The Connector and ROMS** each use a private key. The key can be withdrawn at any time, which stops the connection.
 - **The data** is held in a database in **Mumbai**. The website is set to run in Mumbai too, which also makes it faster.
+- **Files** on Ledgers are kept in that same database, never on a public link: only people signed in to RAMS who can see Ledgers or Debtors can open them. RAMS checks each file is really a PDF, photo or email before keeping it.
 - **Every change** in RAMS is in the Audit Log; every change in ROMS is in ROMS's history.
 
 ## 15. Progress and next steps
@@ -314,6 +330,8 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 | 6 | Auto-fill into ROMS | Done, being tried on the test setup |
 | 7 | The report screens | Delivered one at a time, each after you have reviewed it. Debtors is out; the rest follow |
 | – | Ledgers: the bill-to-bill statement for Minutes, Now and Zepto, with debit and credit notes checked against Tally; narrations and states everywhere; Credit terms | Built and tested; goes on the test setup after your review, with Connector 0.7.0 |
+| – | Files on Ledgers: PDFs, photos and emails on each row, viewed in RAMS and shown on Debtors; *File storage* | Built and tested; goes on the test setup after your review (one database update first) |
+| Later | A NAS folder RAMS checks every few minutes, attaching files by their DN, CN or invoice number | Designed; waits for the NAS |
 | 8 | Go-live: production database, Connector installed on the office PC, the trial weeks | Prepared (see *go-live.md*); needs the office PC and your go-ahead |
 
 **Still to be decided:** how to link Flipkart and Amazon stock transfers to their ROMS rows.

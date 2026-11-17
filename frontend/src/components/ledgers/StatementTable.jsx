@@ -1,9 +1,10 @@
-import { Highlighter } from 'lucide-react';
+import { Highlighter, Paperclip } from 'lucide-react';
 import { ReportTable, td, num } from '../reports/ReportFrame';
 import Legend from '../shared/Legend';
 import {
   COLUMNS, LEGEND, STATE_DIFFERS, cellFindings, balance, signed,
 } from '../../utils/ledgerText';
+import { NO_FILE } from '../../utils/highlights';
 
 // Written out whole, so Tailwind keeps them.
 const CHIP_TEXT = {
@@ -87,8 +88,15 @@ export default function StatementTable({
                 {showCompany && `${r.party.company} · `}
                 <StateLine party={r.party} />
               </p>
-              {r.narration_missing > 0 && (
-                <p className="mt-0.5"><span className="inline-flex items-center gap-1 px-1.5 rounded text-xs font-medium bg-yellow-200 text-yellow-900"><Highlighter size={11} aria-hidden="true" />{r.narration_missing} without narration</span></p>
+              {(r.narration_missing > 0 || r.entries_without_file > 0) && (
+                <p className="mt-0.5 flex flex-wrap gap-1">
+                  {r.narration_missing > 0 && (
+                    <span className="inline-flex items-center gap-1 px-1.5 rounded text-xs font-medium bg-yellow-200 text-yellow-900"><Highlighter size={11} aria-hidden="true" />{r.narration_missing} without narration</span>
+                  )}
+                  {r.entries_without_file > 0 && (
+                    <span title={NO_FILE.help} className={`inline-flex items-center gap-1 px-1.5 rounded text-xs font-medium ${NO_FILE.className}`}><Paperclip size={11} aria-hidden="true" />{r.entries_without_file} DN/CN without a file</span>
+                  )}
+                </p>
               )}
             </td>
             <td className={num}>
@@ -103,7 +111,7 @@ export default function StatementTable({
         ))}
       </ReportTable>
       <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
-        <Legend items={LEGEND} withNarration />
+        <Legend items={LEGEND} withNarration withNoFile />
         <p className="text-xs text-gray-500">+ adds to what the party owes, − takes it off. Every figure is Tally’s.</p>
       </div>
     </>

@@ -6,7 +6,7 @@
 // A screen still held (utils/releases.js) has its section left out.
 import { signingIn, dashboard } from './gettingStarted';
 import {
-  users, auditLog, tallyCompanies, creditTerms, rolesPermissions,
+  users, auditLog, tallyCompanies, creditTerms, rolesPermissions, fileStorage,
 } from './admin';
 import { matchReview, matchingRules, partyLedgers, generalFaq } from './matching';
 import { autoFill } from './autofill';
@@ -36,6 +36,7 @@ export const HELP_SECTIONS = [
   rolesPermissions,
   users,
   auditLog,
+  fileStorage,
   generalFaq,
 ].filter((s) => !s.path || isReleased(s.path));
 

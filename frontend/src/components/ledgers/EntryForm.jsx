@@ -1,10 +1,17 @@
-import { useState } from 'react';
+import {
+  useEffect, useEffectEvent, useRef, useState,
+} from 'react';
 import toast from 'react-hot-toast';
+import { Paperclip, X } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { createLedgerEntry, updateLedgerEntry } from '../../api/ledgers.api';
 import { KINDS, KIND, paiseFrom } from '../../utils/ledgerText';
 import { formatRupees } from '../../utils/formatters';
+import {
+  ACCEPT, pastedFiles, refusal, sizeText,
+} from '../../utils/files';
+import { sendFile, reasonOf } from '../files/useFileUploads';
 
 const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand';
 const blank = (date) => ({
@@ -18,16 +25,44 @@ const fromEntry = (e) => ({
 const MIN_DN = 6;
 
 // Add or change one debit or credit note of a party: what it is, its number,
-// the invoice it is against, the amount and the date. Mounted afresh for each
-// entry (the parent keys it), so the form starts from that entry.
+// the invoice it is against, the amount and the date -- and, for whoever may
+// attach files, the DN's PDF, photo or email, sent once the note is saved.
+// Mounted afresh for each entry (the parent keys it), so the form starts from
+// that entry.
 export default function EntryForm({
-  party, companyId, ledgerGuid, date, entry, minDate, maxDate, onClose, onSaved,
+  party, companyId, ledgerGuid, date, entry, minDate, maxDate, canFiles = false, onClose, onSaved,
 }) {
   const [f, setF] = useState(() => (entry ? fromEntry(entry) : blank(date)));
+  const [files, setFiles] = useState([]);
   const [saving, setSaving] = useState(false);
+  const input = useRef(null);
   const set = (patch) => setF((x) => ({ ...x, ...patch }));
   const kind = KIND[f.kind] || KINDS[0];
   const paise = paiseFrom(f.amount);
+
+  // Picked or pasted files wait here until Save. One RAMS can't take is
+  // refused at once, with what to do.
+  const addFiles = (picked) => {
+    const ok = [];
+    for (const file of picked) {
+      const why = refusal(file);
+      if (why) toast.error(why);
+      else ok.push(file);
+    }
+    if (ok.length) setFiles((list) => [...list, ...ok]);
+  };
+  const onPaste = useEffectEvent((e) => {
+    const picked = pastedFiles(e.clipboardData);
+    if (!picked.length) return;
+    e.preventDefault();
+    addFiles(picked);
+  });
+  useEffect(() => {
+    if (!canFiles) return undefined;
+    const handler = (e) => onPaste(e);
+    document.addEventListener('paste', handler);
+    return () => document.removeEventListener('paste', handler);
+  }, [canFiles]);
 
   const save = async (e) => {
     e.preventDefault();
@@ -43,9 +78,19 @@ export default function EntryForm({
     };
     setSaving(true);
     try {
+      let id = entry?.id;
       if (entry) await updateLedgerEntry(entry.id, body);
-      else await createLedgerEntry({ ...body, company_id: companyId, ledger_guid: ledgerGuid });
+      else ({ id } = await createLedgerEntry({ ...body, company_id: companyId, ledger_guid: ledgerGuid }));
       toast.success(entry ? 'Note changed' : 'Note added');
+      // The note is saved: each file follows it. One that fails says why; it
+      // can be added again from the Files column.
+      for (const file of files) {
+        try {
+          await sendFile(file, { companyId, entryId: id });
+        } catch (err) {
+          toast.error(`${file.name} wasn’t added: ${reasonOf(err)} Add it again from the Files column.`);
+        }
+      }
       onSaved(f.date);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Saving failed');
@@ -94,6 +139,29 @@ export default function EntryForm({
           <span className="font-medium text-gray-700">Note (optional)</span>
           <input value={f.note} onChange={(e) => set({ note: e.target.value })} maxLength={500} className={`${inputCls} mt-1`} />
         </label>
+        {canFiles && (
+          <div className="text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-gray-700">{entry ? 'Add files (optional)' : 'Files (optional)'}</span>
+              <Button type="button" size="sm" variant="outline" onClick={() => input.current?.click()}><Paperclip size={14} /> Choose files</Button>
+              <input ref={input} type="file" multiple accept={ACCEPT} className="hidden" aria-label="Choose files for this note"
+                onChange={(e) => { const list = [...(e.target.files || [])]; e.target.value = ''; addFiles(list); }} />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">The DN’s PDF, a photo of it, or the email it came in. Ctrl+V pastes a screenshot. They’re added when you save.</p>
+            {files.length > 0 && (
+              <ul aria-label="Files to add" className="mt-2 space-y-1">
+                {files.map((file, i) => (
+                  <li key={`${file.name}-${i}`} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5">
+                    <Paperclip size={14} className="text-gray-400 shrink-0" aria-hidden="true" />
+                    <span className="truncate flex-1" title={file.name}>{file.name}</span>
+                    <span className="text-xs text-gray-500">{sizeText(file.size)}</span>
+                    <button type="button" aria-label={`Don’t add ${file.name}`} onClick={() => setFiles((list) => list.filter((_, j) => j !== i))} className="p-1 rounded hover:bg-gray-200 text-gray-500"><X size={14} /></button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         <p className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
           {paise
             ? <>Takes <strong>{formatRupees(paise)}</strong> off what this party owes.</>

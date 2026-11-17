@@ -17,6 +17,7 @@ vi.mock('../../../api/reports.api', () => ({
 }));
 vi.mock('../../../api/sync.api', () => ({ getSyncStatus: vi.fn(), getSyncRuns: vi.fn(), syncNow: vi.fn() }));
 vi.mock('../../../api/audit.api', () => ({ getEntityHistory: vi.fn().mockResolvedValue([]) }));
+vi.mock('../../../api/files.api', () => ({ uploadFile: vi.fn(), fetchFile: vi.fn(), deleteFile: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 const COMPANIES = [{ id: 2, code: 'MH', name: 'Roymax MH' }];
@@ -109,6 +110,28 @@ describe('Debtors', () => {
     await waitFor(() => expect(reports.getDebtors).toHaveBeenLastCalledWith(expect.objectContaining({ vendor: 'Blinkit', status: 'overdue' })));
     await user.selectOptions(screen.getByLabelText('Company'), 'All companies (consolidated)');
     await waitFor(() => expect(reports.getDebtors).toHaveBeenLastCalledWith(expect.not.objectContaining({ company_id: expect.anything() })));
+  });
+
+  test('an invoice’s files, added on Ledgers, can be viewed here but not changed', async () => {
+    const scan = {
+      id: 5, name: 'invoice 607.pdf', kind: 'pdf', size: 90000, uploaded_by_name: 'Asha', uploaded_at: '2026-11-02 09:00:00',
+    };
+    reports.getDebtors.mockResolvedValue({
+      rows: [{ ...DEBTOR, files: [scan] }, { ...DEBTOR, guid: 'g6', number: '6/RM/26-27', files: [] }],
+      total: 2, page: 1, page_size: 50, companies: COMPANIES, company_id: 2, tabs: [], all: 2, unknown: 0,
+      totals: { invoices: 2, total_paise: 0, credit_notes_paise: 0, outstanding_paise: 0, overdue_paise: 0 },
+    });
+    renderWithProviders(<Debtors />, { user: ACCOUNTANT });
+    const user = userEvent.setup();
+    expect(await screen.findByRole('columnheader', { name: 'Files' })).toBeInTheDocument();
+    expect(within(screen.getByText('6/RM/26-27').closest('tr')).queryByRole('button', { name: /^Files on/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Files on 607/RM/26-27' }));
+    const dialog = screen.getByRole('dialog', { name: 'Files — Invoice 607/RM/26-27' });
+    expect(within(dialog).getByText('invoice 607.pdf')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Files are added on Ledgers/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'View invoice 607.pdf' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: /Choose files/ })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: /^Remove / })).not.toBeInTheDocument();
   });
 
   test('clicking a CN amount opens each credit note’s details', async () => {

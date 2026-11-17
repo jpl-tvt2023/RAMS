@@ -346,7 +346,8 @@ async function loadCompany(client, companyId, parties) {
                        WHERE company_id = ? AND ledger_guid IN (${marks(part.length)})
                          AND run_id = (SELECT MAX(id) FROM tally_sync_runs WHERE company_id = ? AND status = 'ok')`, [companyId, ...part, companyId]),
       rowsOf(client, `SELECT ledger_guid, amount_paise, loaded_at FROM ledger_openings WHERE company_id = ? AND ledger_guid IN (${marks(part.length)})`, [companyId, ...part]),
-      rowsOf(client, `SELECT e.*, cu.name AS created_by_name, uu.name AS updated_by_name
+      rowsOf(client, `SELECT e.*, cu.name AS created_by_name, uu.name AS updated_by_name,
+                             EXISTS (SELECT 1 FROM ledger_files f WHERE f.entry_id = e.id) AS has_file
                         FROM ledger_entries e LEFT JOIN users cu ON cu.id = e.created_by LEFT JOIN users uu ON uu.id = e.updated_by
                        WHERE e.company_id = ? AND e.ledger_guid IN (${marks(part.length)}) AND e.deleted_at IS NULL
                          AND e.kind IN (${marks(KINDS.length)})
@@ -367,6 +368,7 @@ async function loadCompany(client, companyId, parties) {
         created_at: e.created_at ?? null,
         updated_by_name: e.updated_by_name ?? null,
         updated_at: e.updated_at ?? null,
+        has_file: Boolean(Number(e.has_file)),
       });
     }
   }
@@ -437,14 +439,17 @@ function rangeOf(figures, entries, { from, to }) {
       checks[v.note.column][s] += 1;
     }
   }
+  // A note typed here with no file (its PDF, photo or email) is flagged.
+  let withoutFile = 0;
   for (const e of entries) {
     if (!inRange(e.date, from, to)) continue;
+    if (!e.has_file) withoutFile += 1;
     const s = figures.pairing.entries.get(e.id).status;
     if (s !== 'in_tally') checks[e.kind === 'debit_note' ? 'dn' : 'cn'][s] += 1;
   }
   const closing = opening + COLUMNS.reduce((a, c) => a + columns[c], 0);
   return {
-    opening_paise: opening, columns, closing_paise: closing, checks, narration_missing: narrationMissing,
+    opening_paise: opening, columns, closing_paise: closing, checks, narration_missing: narrationMissing, entries_without_file: withoutFile,
   };
 }
 
@@ -517,6 +522,7 @@ async function statementOf(client, {
     closing_paise: rows.reduce((a, r) => a + r.closing_paise, 0),
     placeholders: rows.filter((r) => r.start.source === 'placeholder').length,
     narration_missing: rows.reduce((a, r) => a + r.narration_missing, 0),
+    entries_without_file: rows.reduce((a, r) => a + r.entries_without_file, 0),
   };
   const known = asOfs.filter(Boolean).sort();
   return {
@@ -578,7 +584,8 @@ async function partyDetailOf(client, {
 /**
  * Needs attention: each bill-to-bill party with something for a person --
  * a red or purple DN/CN status from its first entry to today, a DN booked
- * twice, or a state that differs -- with what is off and since when.
+ * twice, a DN/CN typed here with no file, or a state that differs -- with
+ * what is off and since when.
  */
 async function attentionOf(client, { parties, today = todayIst() }) {
   const [settings, rule] = await Promise.all([loadSettings(client), loadNarrationRule(client)]);
@@ -586,11 +593,12 @@ async function attentionOf(client, { parties, today = todayIst() }) {
   for (const [companyId, list] of byCompany(parties)) {
     const all = await figuresFor(client, companyId, list, { settings, rule, today });
     for (const { party, entries, figures } of all) {
-      const counts = Object.fromEntries(PROBLEMS.map((s) => [s, 0]));
+      const counts = { ...Object.fromEntries(PROBLEMS.map((s) => [s, 0])), no_file: 0 };
       const dates = [];
       for (const e of entries) {
         const s = figures.pairing.entries.get(e.id).status;
         if (PROBLEMS.includes(s)) { counts[s] += 1; dates.push(e.date); }
+        if (!e.has_file) { counts.no_file += 1; dates.push(e.date); }
       }
       for (const v of figures.rows) {
         if (!v.note || !['not_entered', 'booked_twice'].includes(v.note.status)) continue;
