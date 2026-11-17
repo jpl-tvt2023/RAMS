@@ -1,21 +1,19 @@
 import api from './axios';
 
 // Files on Ledgers rows (backend controllers/files.controller.js): PDFs,
-// photos and emails on a debit or credit note typed here, or on a Tally
-// voucher. Adding and removing is ledgers.files; seeing and downloading is
-// ledgers.view or reports.view (Debtors shows an invoice's files); the
-// storage figures are Admin and Owner only.
+// photos and emails on a Tally voucher. Adding and removing is ledgers.files;
+// seeing and downloading is ledgers.view or reports.view (Debtors shows an
+// invoice's files); the storage figures are Admin and Owner only.
 
 // The file goes as the request body, after utils/files.js prepared it
 // (gzip when `gzip`). -> { id, name, kind, size, uploaded_by_name, uploaded_at, stored_once }
 export async function uploadFile({
-  companyId, entryId, voucherGuid, name, blob, gzip, originalSize,
+  companyId, voucherGuid, name, blob, gzip, originalSize,
 }, onProgress) {
   const { data } = await api.post('/files', blob, {
     params: {
       company_id: companyId,
-      entry_id: entryId || undefined,
-      voucher_guid: voucherGuid || undefined,
+      voucher_guid: voucherGuid,
       name,
       gzip: gzip ? 1 : undefined,
       original_size: originalSize || undefined,

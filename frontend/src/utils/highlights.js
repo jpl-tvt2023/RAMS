@@ -19,13 +19,14 @@ export const NO_NARRATION = {
   className: 'bg-yellow-200 text-yellow-900',
 };
 
-// A debit or credit note typed on Ledgers with no file on it (the DN's PDF,
-// photo or email): the whole row gets a warm orange fill, with these words in
-// its Files cell. Like the narration highlight it is a fill, never a status
-// badge, and nothing else on the screen is orange.
+// A Tally row on Ledgers with no file on it (its document: the invoice, the
+// marketplace's DN, our CN, the payment or TDS advice): the whole row gets a
+// warm orange fill, with these words in its Files cell. Like the narration
+// highlight it is a fill, never a status badge, and nothing else on the screen
+// is orange.
 export const NO_FILE = {
   label: 'No file',
-  help: 'No PDF, photo or email is attached to this note yet. Add the marketplace’s DN, or our CN, as a file.',
+  help: 'No PDF, photo or email on this row yet. Add its document: the invoice, the marketplace’s DN, our CN, or the payment or TDS advice.',
   className: 'bg-orange-200 text-orange-900',
   row: 'bg-orange-100',
 };

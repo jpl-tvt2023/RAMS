@@ -1,9 +1,8 @@
 import api from './axios';
 
 // Ledgers (backend controllers/ledgers.controller.js): the bill-to-bill
-// statement per party, checked against the debit and credit notes typed here.
-// Seeing it is ledgers.view, recording notes is ledgers.entry, the settings
-// are ledgers.settings.
+// statement per party, every row Tally's. Seeing it is ledgers.view, the
+// settings are ledgers.settings. Files on its rows are api/files.api.js.
 
 // { today, sync_from, month_start, companies, marketplaces: [{ vendor, parties, bill_to_bill }],
 //   parties: [{ company_id, company, guid, name, vendor, suggested, state, tally_state, gst_state, state_differs }],
@@ -19,7 +18,7 @@ const listParam = (v) => (v === 'all' ? 'all' : [...v].sort().join(','));
 
 // { company_id: 'all' | id, vendor: 'all' | name, states: 'all' | [names],
 //   parties: 'all' | ['companyId:guid'], from?, to? }
-// -> { from, to, today, as_of, rows: [{ party, start, opening_paise, columns, closing_paise, checks, narration_missing }], totals, settings }
+// -> { from, to, today, as_of, rows: [{ party, start, opening_paise, columns, closing_paise, checks, narration_missing, rows_without_file }], totals }
 export async function getLedgerStatement({
   company_id, vendor, states, parties, from, to,
 }) {
@@ -31,31 +30,14 @@ export async function getLedgerStatement({
   return data;
 }
 
-// One party over a range: the statement row, the notes typed for it, and
-// Tally's vouchers with narration and running balance.
+// One party over a range: the statement row, and Tally's vouchers with
+// narration, files and running balance.
 export async function getLedgerParty(params) {
   const { data } = await api.get('/ledgers/party', { params });
   return data;
 }
 
-// { company_id, ledger_guid, date, kind, number, reference?, amount_paise, note? } -> { id }
-export async function createLedgerEntry(body) {
-  const { data } = await api.post('/ledgers/entries', body);
-  return data;
-}
-
-export async function updateLedgerEntry(id, body) {
-  const { data } = await api.put(`/ledgers/entries/${id}`, body);
-  return data;
-}
-
-export async function deleteLedgerEntry(id) {
-  const { data } = await api.delete(`/ledgers/entries/${id}`);
-  return data;
-}
-
-// { grace_days, match_window_days, amount_tolerance_paise, default_opening_paise, marketplaces,
-//   known_marketplaces, updated_at, updated_by_name }
+// { default_opening_paise, marketplaces, known_marketplaces, updated_at, updated_by_name }
 export async function getLedgerSettings() {
   const { data } = await api.get('/ledgers/settings');
   return data;

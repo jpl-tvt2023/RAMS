@@ -9,7 +9,6 @@ import FileViewer from '../../components/files/FileViewer';
 import { KIND_ICON } from '../../components/files/icons';
 import { getFileUsage } from '../../api/files.api';
 import { KINDS, sizeText } from '../../utils/files';
-import { KIND } from '../../utils/ledgerText';
 import { openLedgersAt } from '../../utils/ledgerLinks';
 import { formatDay, formatDateTime } from '../../utils/formatters';
 
@@ -28,10 +27,11 @@ function Tile({ label, value, detail }) {
   );
 }
 
-// "Marketplace DN FKIDN… · ZEPTO (PUNE) · 10 Aug 2026"
+// "MH · Credit Note 951 · ZEPTO (PUNE) · 20 Aug 2026" -- every file is on a
+// Tally voucher.
 const whereOf = (f) => {
   const o = f.on || {};
-  const row = o.type === 'entry' ? `${KIND[o.entry_kind]?.label || 'Note'} ${o.number || ''}` : `${o.voucher_type || 'Tally voucher'} ${o.number || ''}`;
+  const row = `${o.voucher_type || 'Tally voucher'} ${o.number || ''}`;
   return [f.company, row.trim(), o.party, o.date ? formatDay(o.date) : null].filter(Boolean).join(' · ');
 };
 

@@ -57,19 +57,15 @@ const CATALOG = [
   },
   {
     key: 'ledgers.view', area: 'Ledgers', label: 'See Ledgers',
-    description: 'The bill-to-bill statement per party: Tally\'s opening, invoices, notes, TDS, journals, receipts and closing, and the check on the notes typed in RAMS',
-  },
-  {
-    key: 'ledgers.entry', area: 'Ledgers', label: 'Record ledger entries',
-    description: 'Add, change and remove a party\'s marketplace debit notes and our credit notes on Ledgers',
+    description: 'The bill-to-bill statement per party, all from Tally: opening, invoices, debit and credit notes, TDS, journals, receipts and closing',
   },
   {
     key: 'ledgers.files', area: 'Ledgers', label: 'Attach files',
-    description: 'Add and remove PDFs, photos and emails on a party\'s rows. Anyone who sees Ledgers or Debtors can view and download them',
+    description: 'Add and remove PDFs, photos and emails on a party\'s Tally rows. Anyone who sees Ledgers or Debtors can view and download them',
   },
   {
     key: 'ledgers.settings', area: 'Ledgers', label: 'Change ledger settings',
-    description: 'Which marketplaces Ledgers covers, how long Tally may take to book a note, the amount tolerance and the placeholder opening',
+    description: 'Which marketplaces Ledgers covers, and the placeholder opening',
   },
   {
     key: 'sync.companies', area: 'Tally sync', label: 'Turn company sync on or off',

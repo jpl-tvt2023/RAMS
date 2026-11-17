@@ -108,7 +108,7 @@ A running order for showing the client what RAMS does today, on production (http
   3. Click **Cancel**, unless the client wants the change. Every save is audited.
 
 ### 8. Ledgers: the bill-to-bill statement (Minutes, Now, Zepto)
-- **Show:** one row per party: **Opening | Invoice | DN | CN | TDS | Journal/Adj | Receipt | Closing**. All of it is Tally's figures, and typed DNs/CNs are checked against Tally.
+- **Show:** one row per party: **Opening | Invoice | DN | CN | TDS | Journal/Adj | Receipt | Closing**. Every row is Tally's: nothing is typed in RAMS. Each row carries its document, and a row without one is orange.
 - **Steps:**
   1. Click **Ledgers** in the top bar. Before anything is chosen, **Needs attention** lists the parties with a problem.
   2. Choose:
@@ -126,19 +126,15 @@ A running order for showing the client what RAMS does today, on production (http
   4. Pick **Blinkit** to show *"coming soon"*. Only marketplaces that pay bill to bill are on Ledgers for now.
   5. Click a party. The detail shows:
      - both states (Tally's and the GSTIN's);
-     - the notes typed here;
-     - every Tally voucher with its narration and running balance.
-  6. Click **Add a DN or CN** → **Marketplace DN**. Type the real DN number from the portal, its date and amount, then click **Add**. RAMS finds it in a Tally credit note's narration: ✓ *In Tally — CN … on …*.
+     - every Tally voucher with its narration, files and running balance. A credit note naming a marketplace DN (FKIDN…) is in the DN column, with the DN number under its own.
+  6. On an orange row, click **Add** in the *Files* column and drop in a PDF (or paste a screenshot with Ctrl+V). The row stops being orange; **View** opens it inside RAMS.
   7. Explain the legend:
-     - green ✓ matches;
-     - purple ≠ differs;
-     - blue ⚖ matched by amount only;
-     - grey ⏳ waiting;
-     - red ✗ missing;
-     - yellow highlighter means no narration.
-  8. After the demo, remove the test DN (**Remove** on its row), unless it was a real one.
+     - purple ≠ differs (a DN booked twice, or a state that differs);
+     - yellow highlighter means no narration;
+     - orange means no file yet.
+  8. After the demo, remove the test file (the bin in its files window), unless it was a real one.
 - **Say:**
-  - "Accountants type the marketplace's DNs as they arrive. RAMS tells you when Tally hasn't booked one, booked it twice, or booked a different amount."
+  - "Nothing is typed twice any more: Ledgers is Tally's own entries. We checked every Minutes, Now and Zepto party: RAMS holds all 559 of Tally's entries. Your team attaches each row's document; RAMS flags a DN booked twice and a row without its document."
 
 ### 9. Users, roles and permissions, audit log
 - **Show:** who can do what, and that every change is recorded.

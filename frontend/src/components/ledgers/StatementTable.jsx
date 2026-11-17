@@ -7,14 +7,12 @@ import {
 import { NO_FILE } from '../../utils/highlights';
 
 // Written out whole, so Tailwind keeps them.
-const CHIP_TEXT = {
-  red: 'text-red-700', purple: 'text-purple-700', blue: 'text-blue-700', gray: 'text-gray-500', green: 'text-green-700',
-};
+const CHIP_TEXT = { purple: 'text-purple-700' };
 
-// A DN or CN figure: Tally's, tinted with the most urgent thing the check found
-// there, with an icon and count per kind of finding.
-function NoteCell({ value, counts, kind }) {
-  const f = cellFindings(counts, kind);
+// A DN or CN figure: Tally's, tinted when RAMS found something there (a DN
+// booked twice), with an icon and count per kind of finding.
+function NoteCell({ value, counts }) {
+  const f = cellFindings(counts);
   return (
     <td className={`${num} ${f.tint}`} title={f.sentence || undefined}>
       {signed(value)}
@@ -88,13 +86,13 @@ export default function StatementTable({
                 {showCompany && `${r.party.company} · `}
                 <StateLine party={r.party} />
               </p>
-              {(r.narration_missing > 0 || r.entries_without_file > 0) && (
+              {(r.narration_missing > 0 || r.rows_without_file > 0) && (
                 <p className="mt-0.5 flex flex-wrap gap-1">
                   {r.narration_missing > 0 && (
                     <span className="inline-flex items-center gap-1 px-1.5 rounded text-xs font-medium bg-yellow-200 text-yellow-900"><Highlighter size={11} aria-hidden="true" />{r.narration_missing} without narration</span>
                   )}
-                  {r.entries_without_file > 0 && (
-                    <span title={NO_FILE.help} className={`inline-flex items-center gap-1 px-1.5 rounded text-xs font-medium ${NO_FILE.className}`}><Paperclip size={11} aria-hidden="true" />{r.entries_without_file} DN/CN without a file</span>
+                  {r.rows_without_file > 0 && (
+                    <span title={NO_FILE.help} className={`inline-flex items-center gap-1 px-1.5 rounded text-xs font-medium ${NO_FILE.className}`}><Paperclip size={11} aria-hidden="true" />{r.rows_without_file} without a file</span>
                   )}
                 </p>
               )}
@@ -104,7 +102,7 @@ export default function StatementTable({
               {r.start.source === 'placeholder' && <p className="text-xs text-gray-400">placeholder</p>}
             </td>
             {COLUMNS.map((c) => (c.key === 'dn' || c.key === 'cn'
-              ? <NoteCell key={c.key} value={r.columns[c.key]} counts={r.checks[c.key]} kind={c.key === 'dn' ? 'DN' : 'CN'} />
+              ? <NoteCell key={c.key} value={r.columns[c.key]} counts={r.checks[c.key]} />
               : <td key={c.key} className={num}>{signed(r.columns[c.key])}</td>))}
             <td className={`${num} font-medium`}>{balance(r.closing_paise)}</td>
           </tr>

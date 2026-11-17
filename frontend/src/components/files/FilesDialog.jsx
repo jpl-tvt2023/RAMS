@@ -20,9 +20,9 @@ import { formatDateTime } from '../../utils/formatters';
 
 /**
  * One row's files: view, download and -- for whoever may attach files --
- * add (choose, drop, or paste with Ctrl+V) and remove. `target` is where new
- * files go: { companyId, entryId } or { companyId, voucherGuid }. `files` comes
- * from the page, which reloads it through onChanged.
+ * add (choose, drop, or paste with Ctrl+V) and remove. `target` is the Tally
+ * voucher new files go on: { companyId, voucherGuid }. `files` comes from the
+ * page, which reloads it through onChanged.
  */
 export default function FilesDialog({
   title, subtitle, files, target, canEdit = false, onClose, onChanged,

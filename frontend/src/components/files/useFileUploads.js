@@ -7,10 +7,10 @@ export const reasonOf = (err) => err?.response?.data?.message || err?.message ||
 
 /**
  * Gets one picked file ready (a photo shrunk, a PDF or email compressed) and
- * sends it to its row. target: { companyId, entryId } or { companyId,
- * voucherGuid }. Resolves to the stored file; rejects with what to do.
+ * sends it to its row. target: { companyId, voucherGuid } -- every row is a
+ * Tally voucher. Resolves to the stored file; rejects with what to do.
  */
-export async function sendFile(file, target, onProgress) {
+async function sendFile(file, target, onProgress) {
   const ready = await prepareFile(file);
   return uploadFile({
     ...target, name: ready.name, blob: ready.blob, gzip: ready.gzip, originalSize: ready.originalSize,

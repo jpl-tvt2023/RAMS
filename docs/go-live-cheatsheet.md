@@ -34,7 +34,7 @@ RAMS production started as a copy of the test database (13 Oct). It still holds 
 |---|---|
 | Tally books: vouchers and their lines, balances, sync state and runs | Users, roles and permissions |
 | The copy of ROMS, every match and auto-fill result | Every setting: sync schedule, matching rules, credit terms, Ledgers and narration settings |
-| Ledgers' typed DN/CN and loaded openings | Party ledger maps (which ledger is which marketplace) |
+| Ledgers' files, loaded openings and any old typed DN/CN | Party ledger maps (which ledger is which marketplace) |
 | Every Connector token | Companies switched on (MH, HR, WB) and the default star |
 | Companies switched off (the dev PC's "Test Company") | Tally's ledger list. The first load refreshes it |
 | The audit log. One new row records the reset | Auto-fill is set to **Off** for both fields |

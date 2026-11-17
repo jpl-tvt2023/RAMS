@@ -5,16 +5,14 @@ const { signIn, bearer } = require('./helpers/auth');
 const {
   newAgent, agentPost, tallyCompany, voucher, enabledCompanies, startRun,
 } = require('./helpers/agent');
-const {
-  sameNumber, findsNumber, dnNumbersIn, columnOf, pairNotes,
-} = require('../src/ledgers/ledger');
+const { dnNumbersIn, columnOf, notesOf } = require('../src/ledgers/ledger');
 
-// Ledgers v2 end to end: a Zepto party's Tally vouchers pushed by a Connector,
-// the debit and credit notes typed in RAMS, and the bill-to-bill statement RAMS
-// works out from both. Every request names this suite's company, so other
-// suites' data never mixes in. Its August is your example row (opening 100,
-// invoice 10, DN 2, CN 3, TDS 0.1, journal 2, receipt 5, closing 101.9) in
-// hundreds of rupees.
+// Ledgers end to end: a Zepto party's Tally vouchers pushed by a Connector,
+// and the bill-to-bill statement RAMS works out from them alone -- nothing is
+// typed in RAMS. Every request names this suite's company, so other suites'
+// data never mixes in. Its August is your example row (opening 100, invoice
+// 10, DN 2, CN 3, TDS 0.1, journal 2, receipt 5, closing 101.9) in hundreds
+// of rupees.
 const api = (method, token, path) => bearer(request(app)[method](`/api/ledgers${path}`), token);
 
 let admin; let accountant; let viewer; let agent; let company;
@@ -64,8 +62,8 @@ const LEDGERS = (z2State = 'Maharashtra') => [
 const pick = (p) => `company_id=${company.id}&vendor=Zepto&states=all&parties=${company.id}:${p}`;
 const statementOf = (token, query) => api('get', token, `/statement?${query}`);
 const partyOf = (token, guid, from, to) => api('get', token, `/party?company_id=${company.id}&ledger_guid=${guid}&from=${from}&to=${to}`);
-const entry = (token, body) => api('post', token, '/entries').send({ company_id: company.id, ledger_guid: 'LGZ1', ...body });
-const ids = {};
+const attentionOf = async (guid) => (await api('get', viewer.token, '/parties')).body.attention
+  .find((a) => a.party.guid === guid && a.party.company_id === company.id);
 
 beforeAll(async () => {
   [admin, accountant, viewer] = await Promise.all([signIn('admin'), signIn('accountant'), signIn('viewer')]);
@@ -90,14 +88,14 @@ beforeAll(async () => {
     // Neither counts: an order doesn't post, and a cancelled voucher is gone.
     simple('so', 'Sales Order', 'SO1', '2026-08-05', 999900),
     simple('x1', 'Sales', '299/LG/26-27', '2026-08-06', 999900, { cancelled: true }),
-    // Later notes, for the check.
+    // Later credit notes: DNs by their narration, our CNs, a DN booked twice.
     simple('cn3', 'Credit Note', '903', '2026-10-17', -15000, { narration: 'FKIDN52103453' }),
     simple('cn4', 'Credit Note', '904', '2026-09-30', -12000, { narration: 'RTDN00019933 10/09/2026' }),
     simple('cn5', 'Credit Note', '905', '2026-09-29', -7000, { narration: 'RTDN00019763' }),
     simple('cn6', 'Credit Note', '906', '2026-09-15', -4000),
     simple('cn7', 'Credit Note', '907', '2026-10-01', -5000, { narration: 'D499900DN2631041' }),
     simple('cn8', 'Credit Note', '908', '2026-10-03', -5000, { narration: 'D499900DN2631041 again' }),
-    simple('cn9', 'Credit Note', '909', '2026-09-20', -2500, { narration: 'shortage' }),
+    simple('cn9', 'Credit Note', '909', '2026-09-20', -2500, { narration: 'RETURN BILL NO- 201/LG/26-27' }),
     simple('b1', 'Sales', '301/LG/26-27', '2026-08-04', 50000, { ledger: B1 }),
   ];
   await agentPost(agent.token, `/runs/${run}/vouchers`, { vouchers });
@@ -112,7 +110,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.execute('UPDATE ledger_settings SET grace_days = 2, match_window_days = 60, amount_tolerance_paise = 100, default_opening_paise = 1000000 WHERE id = 1');
+  await db.execute('UPDATE ledger_settings SET default_opening_paise = 1000000 WHERE id = 1');
   await db.execute('DELETE FROM ledger_marketplaces');
   await db.execute("INSERT INTO ledger_marketplaces (vendor) VALUES ('Minutes'), ('Now'), ('Zepto')");
   await db.execute("UPDATE narration_settings SET types = NULL, required_from = '2026-06-08' WHERE id = 1");
@@ -151,7 +149,13 @@ describe('The statement', () => {
     });
     expect(row.closing_paise).toBe(1019000);
     expect(row.narration_missing).toBe(4); // the invoice, both journals, the receipt
-    expect(body.totals).toMatchObject({ opening_paise: 1000000, closing_paise: 1019000, placeholders: 1 });
+    expect(row.checks).toEqual({ dn: { booked_twice: 0 }, cn: { booked_twice: 0 } });
+    // Every Tally row should carry its document, and none has a file yet.
+    expect(row.rows_without_file).toBe(6);
+    expect(body.totals).toMatchObject({
+      opening_paise: 1000000, closing_paise: 1019000, placeholders: 1, rows_without_file: 6,
+    });
+    expect(body.settings).toBeUndefined();
   });
 
   test('each range closes on the next one’s opening', async () => {
@@ -183,75 +187,29 @@ describe('The statement', () => {
   });
 });
 
-describe('Debit and credit notes typed here', () => {
-  test('an Accountant adds them; each is audited', async () => {
-    const add = async (key, body) => {
-      const res = await entry(accountant.token, body);
-      expect(res.status).toBe(201);
-      ids[key] = res.body.id;
-    };
-    await add('e1', { kind: 'debit_note', number: 'FKIDN51803946', date: '2026-07-20', amount_paise: 20000 }); // booked 31 days later
-    await add('e2', { kind: 'credit_note', number: '902', date: '2026-08-21', amount_paise: 30000 });
-    await add('e3', { kind: 'debit_note', number: 'fkidn 52103453', date: '2026-09-01', amount_paise: 15000 }); // booked 46 days later
-    await add('e4', { kind: 'debit_note', number: 'RTDN00019933', date: '2026-09-02', amount_paise: 10000 }); // Tally has ₹120
-    await add('e5', { kind: 'debit_note', number: 'RTDN0001976', date: '2026-09-03', amount_paise: 7000 }); // a typo
-    await add('e6', { kind: 'debit_note', number: 'ZPDN123456', date: '2026-09-10', amount_paise: 4000, reference: '201/LG/26-27' }); // by amount only
-    await add('e7', { kind: 'debit_note', number: 'D28838DN26001385', date: '2026-04-27', amount_paise: 9000 }); // older than RAMS's copy
-    const { rows } = await db.execute({ sql: "SELECT COUNT(*) AS n FROM audit_logs WHERE action_type = 'LEDGER_ENTRY_CREATE' AND entity_ref = ?", args: [Z1] });
-    expect(Number(rows[0].n)).toBe(7);
-  });
-
-  test('what is refused, and why', async () => {
-    const bad = async (body, status, message) => {
-      const res = await entry(accountant.token, { date: '2026-09-05', ...body });
-      expect(res.status).toBe(status);
-      expect(res.body.message).toMatch(message);
-    };
-    await bad({ kind: 'invoice', number: '7', amount_paise: 100 }, 400, /Invoices and receipts come from Tally/);
-    await bad({ kind: 'debit_note', number: 'DN123', amount_paise: 100 }, 400, /at least 6 letters and digits/);
-    await bad({ kind: 'credit_note', amount_paise: 100 }, 400, /credit note number/);
-    await bad({ kind: 'credit_note', number: '7', amount_paise: 0 }, 400, /more than ₹0/);
-    await bad({ kind: 'credit_note', number: '7', amount_paise: 100, date: '2025-06-07' }, 400, /before 2025-06-08/);
-    await bad({ kind: 'credit_note', number: '7', amount_paise: 100, date: '2099-01-01' }, 400, /future/);
-    await bad({ kind: 'debit_note', number: 'DN26001385', amount_paise: 100 }, 409, /D28838DN26001385 is already entered/);
-    await bad({ kind: 'credit_note', number: '0902', amount_paise: 100 }, 409, /902 is already entered/);
-    await bad({ kind: 'credit_note', number: '7', amount_paise: 100, ledger_guid: 'LGB1' }, 400, /coming soon/);
-    await bad({ kind: 'credit_note', number: '7', amount_paise: 100, ledger_guid: 'nope' }, 400, /Choose a party/);
-  });
-
-  test('a Viewer can see but not record; the settings need ledgers.settings', async () => {
-    expect((await partyOf(viewer.token, 'LGZ1', '2026-08-01', '2026-08-31')).status).toBe(200);
-    expect((await entry(viewer.token, { kind: 'credit_note', number: '1', amount_paise: 100, date: '2026-09-05' })).status).toBe(403);
-    expect((await api('put', accountant.token, '/settings').send({ grace_days: 5 })).status).toBe(403);
-    expect((await api('get', viewer.token, '/settings')).status).toBe(200);
-  });
-});
-
-describe('The check', () => {
-  test('each typed note against Tally’s credit notes, and Tally’s against them', async () => {
+describe('Debit and credit notes come from Tally', () => {
+  test('a credit note naming a marketplace DN is in the DN column, any other in CN', async () => {
     const { status, body } = await partyOf(viewer.token, 'LGZ1', '2026-06-08', '2026-10-31');
     expect(status).toBe(200);
-    const byId = Object.fromEntries(body.entries.map((e) => [e.id, e]));
-    expect(byId[ids.e1]).toMatchObject({ status: 'in_tally', by: 'number', tally: { number: '901', date: '2026-08-20' } });
-    expect(byId[ids.e2]).toMatchObject({ status: 'in_tally', tally: { number: '902' } });
-    expect(byId[ids.e3]).toMatchObject({ status: 'in_tally', tally: { number: '903', date: '2026-10-17' } });
-    expect(byId[ids.e4]).toMatchObject({ status: 'amount_differs', tally: { number: '904', amount_paise: 12000 } });
-    expect(byId[ids.e5].tally).toBeNull(); // RTDN0001976 doesn't find RTDN00019763
-    expect(byId[ids.e6]).toMatchObject({ status: 'by_amount', by: 'amount', tally: { number: '906' } });
-    expect(body.entries.map((e) => e.id)).not.toContain(ids.e7); // dated before the range
+    const row = (number) => body.vouchers.find((v) => v.number === number);
+    expect(row('901')).toMatchObject({ column: 'dn', note: { status: null, named: ['FKIDN51803946'], also_on: null } });
+    expect(row('904')).toMatchObject({ column: 'dn', note: { named: ['RTDN00019933'] } });
+    expect(row('902')).toMatchObject({ column: 'cn', note: { named: [] } }); // a monthly discount
+    expect(row('906').column).toBe('cn'); // no narration
+    expect(row('909').column).toBe('cn'); // a return
+    expect(row('201/LG/26-27')).toMatchObject({ column: 'invoice', note: null, files: [] });
+    // Nothing typed here any more.
+    expect(body.entries).toBeUndefined();
+    expect(body.started_on).toBeUndefined();
+  });
 
+  test('a DN on two credit notes marks the later one booked twice, counted in its column', async () => {
+    const { body } = await partyOf(viewer.token, 'LGZ1', '2026-06-08', '2026-10-31');
     const note = (number) => body.vouchers.find((v) => v.number === number).note;
-    expect(note('901')).toMatchObject({ status: 'entered', entries: [expect.objectContaining({ id: ids.e1, kind: 'debit_note' })] });
-    expect(note('904').status).toBe('amount_differs');
-    expect(note('906').status).toBe('by_amount');
-    expect(note('908')).toMatchObject({ status: 'booked_twice', also_on: { number: '907' } });
-    expect(note('909').status).toBe('not_entered');
-    const column = (number) => body.vouchers.find((v) => v.number === number).column;
-    expect(column('901')).toBe('dn'); // names a DN, and a DN is paired
-    expect(column('902')).toBe('cn');
-    expect(column('906')).toBe('dn'); // paired with a DN by amount
-    expect(column('909')).toBe('cn');
-    expect(body.started_on).toBe('2026-07-20');
+    expect(note('908')).toMatchObject({ status: 'booked_twice', also_on: { number: '907', date: '2026-10-01' } });
+    expect(note('907').status).toBeNull();
+    const sepOct = (await statementOf(viewer.token, `${pick('LGZ1')}&from=2026-09-01&to=2026-10-31`)).body.rows[0];
+    expect(sepOct.checks).toEqual({ dn: { booked_twice: 1 }, cn: { booked_twice: 0 } });
   });
 
   test('Tally’s vouchers run from the opening to the closing, each with its narration', async () => {
@@ -262,35 +220,38 @@ describe('The check', () => {
     expect(body.vouchers[0]).toMatchObject({ narration: null, narration_missing: true, column: 'invoice' });
     expect(body.vouchers[1]).toMatchObject({ narration: 'FKIDN51803946 dT 20/7/2026', narration_missing: false });
     expect(body.vouchers.find((v) => v.number === 'J1').column).toBe('tds');
+    expect(body.rows_without_file).toBe(6);
   });
 
-  test('the statement counts each problem once, in the column it belongs to', async () => {
-    const { body } = await statementOf(viewer.token, `${pick('LGZ1')}&from=2026-09-01&to=2026-10-31`);
-    const { checks } = body.rows[0];
-    expect(checks.dn).toMatchObject({ amount_differs: 1, by_amount: 1, booked_twice: 1 });
-    expect(checks.dn.missing + checks.dn.waiting).toBe(1); // e5, by today's date
-    expect(checks.cn.not_entered).toBe(1); // 909
+  test('typing a debit or credit note is gone', async () => {
+    const body = {
+      company_id: company.id, ledger_guid: 'LGZ1', kind: 'debit_note', number: 'FKIDN51803946', date: '2026-08-10', amount_paise: 100,
+    };
+    expect((await api('post', accountant.token, '/entries').send(body)).status).toBe(404);
+    expect((await api('put', accountant.token, '/entries/1').send({ amount_paise: 200 })).status).toBe(404);
+    expect((await api('delete', accountant.token, '/entries/1')).status).toBe(404);
   });
 });
 
-describe('Changing and removing notes', () => {
-  test('a corrected amount pairs; the change is audited with its fields', async () => {
-    const res = await api('put', accountant.token, `/entries/${ids.e4}`).send({ amount_paise: 12000 });
-    expect(res.body).toEqual({ id: ids.e4, changed: true });
-    const { body } = await partyOf(viewer.token, 'LGZ1', '2026-09-01', '2026-09-30');
-    expect(body.entries.find((e) => e.id === ids.e4)).toMatchObject({ status: 'in_tally', updated_by_name: expect.any(String) });
-    const { rows: [log] } = await db.execute({ sql: "SELECT changes FROM audit_logs WHERE action_type = 'LEDGER_ENTRY_UPDATE' AND entity_id = ?", args: [ids.e4] });
-    expect(JSON.parse(log.changes)).toEqual([{ field: 'amount_paise', old: 10000, new: 12000 }]);
-    expect((await api('put', accountant.token, `/entries/${ids.e4}`).send({ amount_paise: 12000 })).body.changed).toBe(false);
-    expect((await api('put', accountant.token, `/entries/${ids.e4}`).send({ party: 'x' })).status).toBe(400);
+describe('Needs attention', () => {
+  test('every Tally row since the copy starts without its file, and DNs booked twice, since the oldest', async () => {
+    const z1 = await attentionOf('LGZ1');
+    // 13 rows on the party (the order and the cancelled invoice don't count).
+    expect(z1).toMatchObject({ counts: { booked_twice: 1, no_file: 13 }, since: '2026-08-03', state_differs: false });
+    expect(await attentionOf('LGM1')).toMatchObject({ counts: { booked_twice: 0, no_file: 1 }, since: '2026-08-28' });
   });
 
-  test('a removed note leaves the check; the row stays for the audit trail', async () => {
-    expect((await api('delete', accountant.token, `/entries/${ids.e5}`)).status).toBe(200);
-    const { body } = await partyOf(viewer.token, 'LGZ1', '2026-09-01', '2026-09-30');
-    expect(body.entries.map((e) => e.id)).not.toContain(ids.e5);
-    const { rows: [row] } = await db.execute({ sql: 'SELECT deleted_at FROM ledger_entries WHERE id = ?', args: [ids.e5] });
-    expect(row.deleted_at).not.toBeNull();
+  test('a file on a row takes it off the counts', async () => {
+    const pdf = Buffer.from(`%PDF-1.4\n${'1 0 obj << /Type /Page >> endobj\n'.repeat(20)}%%EOF\n`);
+    const added = await bearer(request(app).post(`/api/files?company_id=${company.id}&voucher_guid=lg-s1&name=invoice.pdf`), accountant.token)
+      .set('Content-Type', 'application/octet-stream').send(pdf);
+    expect(added.status).toBe(201);
+    const row = (await statementOf(viewer.token, `${pick('LGZ1')}&from=2026-08-01&to=2026-08-31`)).body.rows[0];
+    expect(row.rows_without_file).toBe(5);
+    const z1 = await attentionOf('LGZ1');
+    expect(z1).toMatchObject({ counts: { booked_twice: 1, no_file: 12 }, since: '2026-08-20' });
+    const { body } = await partyOf(viewer.token, 'LGZ1', '2026-08-01', '2026-08-31');
+    expect(body.vouchers[0].files).toEqual([expect.objectContaining({ name: 'invoice.pdf', kind: 'pdf' })]);
   });
 });
 
@@ -321,14 +282,26 @@ describe('The narration check', () => {
 });
 
 describe('Settings', () => {
-  test('Admin changes them, marketplaces too (audited); out-of-range values are refused', async () => {
+  test('who may: anyone who sees Ledgers reads them, ledgers.settings changes them', async () => {
+    expect((await api('get', viewer.token, '/settings')).status).toBe(200);
+    expect((await api('put', accountant.token, '/settings').send({ default_opening_paise: 500000 })).status).toBe(403);
+  });
+
+  test('Admin changes the marketplaces and the placeholder opening (audited); the typed notes’ settings are gone', async () => {
     const put = (body) => api('put', admin.token, '/settings').send(body);
-    let res = await put({ grace_days: 31, match_window_days: 45 });
+    let res = await put({ default_opening_paise: 500000 });
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ grace_days: 31, match_window_days: 45, marketplaces: ['Minutes', 'Now', 'Zepto'] });
+    expect(res.body).toMatchObject({ default_opening_paise: 500000, marketplaces: ['Minutes', 'Now', 'Zepto'] });
+    expect(res.body).not.toHaveProperty('grace_days');
+    expect(res.body).not.toHaveProperty('match_window_days');
+    expect(res.body).not.toHaveProperty('amount_tolerance_paise');
     expect(res.body.known_marketplaces).toEqual(expect.arrayContaining(['Blinkit', 'Minutes', 'Zepto']));
-    expect((await put({ grace_days: 91 })).status).toBe(400);
-    expect((await put({ match_window_days: 0 })).status).toBe(400);
+    for (const gone of [{ grace_days: 5 }, { match_window_days: 30 }, { amount_tolerance_paise: 100 }]) {
+      const refused = await put(gone);
+      expect(refused.status).toBe(400);
+      expect(refused.body.message).toMatch(/Unknown setting/);
+    }
+    expect((await put({ default_opening_paise: 1.5 })).status).toBe(400);
     expect((await put({ marketplaces: ['Nobody'] })).status).toBe(400);
 
     res = await put({ marketplaces: ['Blinkit', 'Minutes', 'Now', 'Zepto'] });
@@ -337,9 +310,7 @@ describe('Settings', () => {
     expect(parties.body.parties.some((p) => p.guid === 'LGB1' && p.company_id === company.id)).toBe(true);
     const { rows: [log] } = await db.execute("SELECT changes FROM audit_logs WHERE action_type = 'LEDGER_SETTINGS_UPDATE' ORDER BY id DESC LIMIT 1");
     expect(JSON.parse(log.changes)).toEqual([{ field: 'marketplaces', old: 'Minutes, Now, Zepto', new: 'Blinkit, Minutes, Now, Zepto' }]);
-    await put({
-      grace_days: 2, match_window_days: 60, marketplaces: ['Minutes', 'Now', 'Zepto'],
-    });
+    await put({ default_opening_paise: 1000000, marketplaces: ['Minutes', 'Now', 'Zepto'] });
   });
 });
 
@@ -376,27 +347,18 @@ describe('Openings and Tally’s readings', () => {
   });
 });
 
-describe('The check itself', () => {
-  const settings = {
-    grace_days: 2, match_window_days: 60, amount_tolerance_paise: 100, default_opening_paise: 0,
-  };
-  const today = '2026-11-07';
-  const cn = (id, date, effect, extra = {}) => ({
-    id, date, number: String(id), reference: null, narration: null, effect_paise: -effect, ...extra,
-  });
-  const dn = (id, date, number, amount, extra = {}) => ({
-    id, date, kind: 'debit_note', number, reference: null, amount_paise: amount, ...extra,
+describe('DN numbers and columns', () => {
+  const cn = (id, date, narration = null) => ({
+    id, date, number: String(id), reference: null, narration, effect_paise: -100,
   });
 
-  test('finding a DN number: spacing and case don’t matter, a longer run of digits does', () => {
-    expect(findsNumber('fkidn 51803946', 'FKIDN51803946 dT 20/7/2026')).toBe(true);
-    expect(findsNumber('RTDN00019933', 'RTDN00019933 10/09/2026')).toBe(true);
-    expect(findsNumber('RTDN0001993', 'RTDN00019933 10/09/2026')).toBe(false);
-    expect(findsNumber('DN26001385', 'D28838DN26001385 Dt :27/04/2026')).toBe(true);
-    expect(findsNumber('2026', 'FOR THE MONTH OF JUNE 2026')).toBe(false); // too short
+  test('a marketplace DN number in a narration, whatever else is there', () => {
     expect(dnNumbersIn('RTDN00019933 10/09/2026 and FKIDN51463346')).toEqual(['RTDN00019933', 'FKIDN51463346']);
     expect(dnNumbersIn('CAD-DN734673 Vandana')).toEqual(['DN734673']);
+    expect(dnNumbersIn('D28838DN26001385 Dt :27/04/2026')).toEqual(['D28838DN26001385']);
     expect(dnNumbersIn('395/RM/26-27_QD')).toEqual([]);
+    expect(dnNumbersIn('FOR THE MONTH OF JUNE 2026')).toEqual([]);
+    expect(dnNumbersIn(null)).toEqual([]);
   });
 
   test('columns: by base type, TDS journals apart', () => {
@@ -408,71 +370,24 @@ describe('The check itself', () => {
     expect(columnOf({ base_type: 'Payment' })).toBe('journal');
   });
 
-  test('a DN waits for Tally across the booking window, then is missing; a credit note waits days to type it', () => {
-    const notes = [cn(1, '2026-11-06', 500), cn(2, '2026-10-01', 500)];
-    const entries = [dn(10, '2026-10-01', 'ZZDN111111', 300), dn(11, '2026-08-01', 'ZZDN222222', 300)];
-    const p = pairNotes({
-      entries, notes, settings, today,
-    });
-    expect(p.entries.get(10).status).toBe('waiting'); // 37 days
-    expect(p.entries.get(11).status).toBe('missing'); // 98 days
-    expect(p.notes.get(1).status).toBe('waiting'); // 1 day
-    expect(p.notes.get(2).status).toBe('not_entered');
-  });
-
-  test('by amount: forward only, within the window, never a credit note naming a DN', () => {
+  test('a credit note naming a DN is a DN; one naming it again, later, is booked twice', () => {
     const notes = [
-      cn(1, '2026-09-05', 400), // before the DN
-      cn(2, '2026-09-20', 400, { narration: 'RTDN00011111' }), // names a DN
-      cn(3, '2026-12-30', 400), // past the window
-      cn(4, '2026-10-20', 400),
+      cn(1, '2026-09-20', 'FKIDN11111111 & FKIDN22222222'),
+      cn(2, '2026-09-25', 'FKIDN33333333 again'),
+      cn(3, '2026-09-21', 'FKIDN33333333'),
+      cn(4, '2026-09-26', 'RETURN BILL NO- 935/RM/26-27'),
+      cn(5, '2026-09-27'),
     ];
-    const p = pairNotes({
-      entries: [dn(10, '2026-09-10', 'ZZDN333333', 400)], notes, settings, today: '2027-01-30',
+    const p = notesOf(notes);
+    expect(p.get(1)).toEqual({
+      status: null, column: 'dn', named: ['FKIDN11111111', 'FKIDN22222222'], also_on: null,
     });
-    expect(p.entries.get(10)).toMatchObject({ status: 'by_amount', by: 'amount', note: expect.objectContaining({ id: 4 }) });
-  });
-
-  test('our CN by Tally’s number, in the same financial year only', () => {
-    const notes = [cn(1, '2027-04-05', 300, { number: '709' }), cn(2, '2026-11-01', 300, { number: '709' })];
-    const p = pairNotes({
-      entries: [{ id: 10, date: '2026-11-01', kind: 'credit_note', number: '709', amount_paise: 300 }], notes, settings, today,
+    // The earlier of the two is the first booking, whatever the ids.
+    expect(p.get(3)).toMatchObject({ status: null, column: 'dn' });
+    expect(p.get(2)).toMatchObject({ status: 'booked_twice', column: 'dn', also_on: expect.objectContaining({ id: 3 }) });
+    expect(p.get(4)).toEqual({
+      status: null, column: 'cn', named: [], also_on: null,
     });
-    expect(p.entries.get(10).note.id).toBe(2);
-    expect(p.notes.get(1).status).not.toBe('entered');
-  });
-
-  test('one credit note for two DNs pairs with both and compares the total; a DN booked twice is flagged', () => {
-    const notes = [
-      cn(1, '2026-09-20', 700, { narration: 'FKIDN11111111 & FKIDN22222222' }),
-      cn(2, '2026-09-21', 300, { narration: 'FKIDN33333333' }),
-      cn(3, '2026-09-25', 300, { narration: 'FKIDN33333333 again' }),
-    ];
-    const entries = [dn(10, '2026-09-01', 'FKIDN11111111', 400), dn(11, '2026-09-01', 'FKIDN22222222', 300), dn(12, '2026-09-02', 'FKIDN33333333', 300)];
-    const p = pairNotes({
-      entries, notes, settings, today,
-    });
-    expect(p.entries.get(10).status).toBe('in_tally');
-    expect(p.entries.get(11).status).toBe('in_tally');
-    expect(p.notes.get(1)).toMatchObject({ status: 'entered', column: 'dn' });
-    expect(p.notes.get(3)).toMatchObject({ status: 'booked_twice', also_on: expect.objectContaining({ id: 2 }) });
-  });
-
-  test('a party is checked from its first entry; one older than RAMS’s copy doesn’t widen that', () => {
-    const notes = [cn(1, '2026-07-01', 500), cn(2, '2026-09-01', 500)];
-    const p = pairNotes({
-      entries: [dn(10, '2026-04-01', 'ZZDN444444', 100), dn(11, '2026-08-01', 'ZZDN555555', 100)], notes, settings, today,
-    });
-    expect(p.started_on).toBe('2026-08-01');
-    expect(p.notes.get(1).status).toBe('not_checked');
-    expect(p.notes.get(2).status).toBe('not_entered');
-  });
-
-  test('numbers: the serial, leading zeros, separators', () => {
-    expect(sameNumber('607', '607/RM/26-27')).toBe(true);
-    expect(sameNumber('0607', '607/RM/26-27')).toBe(true);
-    expect(sameNumber('607/RM/26-27', '607/rm/26-27')).toBe(true);
-    expect(sameNumber('608', '607/RM/26-27')).toBe(false);
-    expect(sameNumber('', '607')).toBe(false);
+    expect(p.get(5).column).toBe('cn');
   });
 });
