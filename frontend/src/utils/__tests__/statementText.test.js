@@ -1,19 +1,19 @@
 import { describe, test, expect } from 'vitest';
 import {
   CHECK, LEGEND, noteStatus, dnNumbers, cellFindings, paiseFrom, balance, signed,
-} from '../ledgerText';
+} from '../statementText';
 import { AUTOFILL_LEGEND } from '../autofillText';
 import { OUTCOMES } from '../matchReasons';
 import { NO_NARRATION, NO_FILE } from '../highlights';
 
 describe('ledger text', () => {
-  test('one colour, one meaning: no colour stands for two things on Ledgers', () => {
+  test('one colour, one meaning: no colour stands for two things on Party Statements', () => {
     const colors = Object.values(CHECK).map((c) => c.color);
     expect(new Set(colors).size).toBe(colors.length);
     expect(LEGEND.map((l) => l.key)).toEqual(Object.keys(CHECK));
     // Every row is Tally's, so the only finding is two readings that disagree.
     expect(noteStatus({ status: 'booked_twice', also_on: { number: '907', date: '2026-10-01' } })).toMatchObject({ color: 'purple', label: 'DN booked twice' });
-    // Nothing is missing on the other side any more: no red on Ledgers.
+    // Nothing is missing on the other side any more: no red on Party Statements.
     expect(colors).not.toContain('red');
     // The yellow highlight is nobody's badge colour.
     expect(NO_NARRATION.className).toMatch(/yellow/);

@@ -5,7 +5,7 @@ import Legend from '../shared/Legend';
 import { ReportTable, td, num } from '../reports/ReportFrame';
 import {
   COLUMN, LEGEND, STATE_DIFFERS, OPENING_SOURCE, noteStatus, dnNumbers, balance, signed,
-} from '../../utils/ledgerText';
+} from '../../utils/statementText';
 import { NO_FILE } from '../../utils/highlights';
 import { formatDay, formatDateTime } from '../../utils/formatters';
 
@@ -64,7 +64,7 @@ export default function PartyDetail({
   const noFile = day.vouchers.filter((v) => !(v.files || []).length);
   const rows = onlyNoFile ? noFile : day.vouchers;
   return (
-    <section aria-label={`Ledger of ${party.name}`} className="mt-6 bg-white rounded-xl border border-gray-200 p-4">
+    <section aria-label={`Statement of ${party.name}`} className="mt-6 bg-white rounded-xl border border-gray-200 p-4">
       <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold text-gray-900">{party.name}</h2>

@@ -1,8 +1,8 @@
 import api from './axios';
 
-// Files on Ledgers rows (backend controllers/files.controller.js): PDFs,
-// photos and emails on a Tally voucher. Adding and removing is ledgers.files;
-// seeing and downloading is ledgers.view or reports.view (Debtors shows an
+// Files on Party Statements rows (backend controllers/files.controller.js): PDFs,
+// photos and emails on a Tally voucher. Adding and removing is statements.files;
+// seeing and downloading is statements.view or reports.view (Bills Receivable shows an
 // invoice's files); the storage figures are Admin and Owner only.
 
 // The file goes as the request body, after utils/files.js prepared it

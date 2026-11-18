@@ -11,9 +11,9 @@ import {
 import { matchReview, matchingRules, partyLedgers, generalFaq } from './matching';
 import { autoFill } from './autofill';
 import {
-  debtorsHelp, invoicesHelp, notesHelp, transfersHelp, receivablesHelp, exceptionsHelp, syncHealthHelp,
+  billsReceivableHelp, invoicesHelp, notesHelp, transfersHelp, receivablesHelp, exceptionsHelp, syncHealthHelp,
 } from './reports';
-import { ledgersHelp } from './ledgers';
+import { partyStatementsHelp } from './statements';
 import { isReleased } from '../utils/releases';
 
 export const HELP_SECTIONS = [
@@ -23,8 +23,8 @@ export const HELP_SECTIONS = [
   matchingRules,
   partyLedgers,
   autoFill,
-  debtorsHelp,
-  ledgersHelp,
+  billsReceivableHelp,
+  partyStatementsHelp,
   invoicesHelp,
   notesHelp,
   transfersHelp,

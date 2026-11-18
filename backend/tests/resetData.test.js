@@ -85,7 +85,7 @@ describe('npm run reset-data', () => {
     expect((await client.execute('SELECT guid, is_default FROM tally_companies')).rows.map((x) => [x.guid, Number(x.is_default)])).toEqual([['g-mh', 1]]);
     expect(await n('SELECT COUNT(*) AS n FROM tally_ledgers')).toBe(1);
     expect(await n('SELECT COUNT(*) AS n FROM party_ledgers')).toBe(1);
-    expect(await n("SELECT COUNT(*) AS n FROM ledger_marketplaces WHERE vendor IN ('Minutes', 'Now', 'Zepto')")).toBe(3);
+    expect(await n("SELECT COUNT(*) AS n FROM statement_marketplaces WHERE vendor IN ('Minutes', 'Now', 'Zepto')")).toBe(3);
     const fill = (await client.execute('SELECT bill_mode, cn_mode FROM autofill_settings WHERE id = 1')).rows[0];
     expect([fill.bill_mode, fill.cn_mode]).toEqual(['off', 'off']);
     // The audit log keeps one row: the reset itself.

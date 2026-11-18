@@ -9,13 +9,13 @@ import FileViewer from '../../components/files/FileViewer';
 import { KIND_ICON } from '../../components/files/icons';
 import { getFileUsage } from '../../api/files.api';
 import { KINDS, sizeText } from '../../utils/files';
-import { openLedgersAt } from '../../utils/ledgerLinks';
+import { openStatementsAt } from '../../utils/statementLinks';
 import { formatDay, formatDateTime } from '../../utils/formatters';
 
 // Admin -> File storage (Admin and Owner): how much space the files on
-// Ledgers take in RAMS's database, how much shrinking photos, compressing PDFs
+// Party Statements take in RAMS's database, how much shrinking photos, compressing PDFs
 // and emails, and storing a file once saved, and the biggest files -- each
-// can be viewed, or opened on Ledgers where it is.
+// can be viewed, or opened on Party Statements where it is.
 
 function Tile({ label, value, detail }) {
   return (
@@ -43,11 +43,11 @@ export default function FileStorage() {
     getFileUsage().then(setData).catch(() => toast.error('Failed to load the file storage figures'));
   }, []);
 
-  const openOnLedgers = (f) => {
-    openLedgersAt({
+  const openOnStatements = (f) => {
+    openStatementsAt({
       companyId: f.company_id, vendor: f.on.vendor, guid: f.on.party_guid, date: f.on.date, syncFrom: data.sync_from,
     });
-    navigate('/ledgers');
+    navigate('/reports/party-statements');
   };
 
   const savedShare = data?.picked_bytes ? Math.round((data.saved_bytes / data.picked_bytes) * 100) : 0;
@@ -60,7 +60,7 @@ export default function FileStorage() {
           <HelpLink section="file-storage" />
         </div>
         <p className="text-gray-500 text-sm mt-1">
-          The PDFs, photos and emails attached on Ledgers are kept in RAMS’s database. Photos are made smaller, PDFs and emails are compressed without losing anything, and a file attached to several rows is kept once.
+          The PDFs, photos and emails attached on Party Statements are kept in RAMS’s database. Photos are made smaller, PDFs and emails are compressed without losing anything, and a file attached to several rows is kept once.
         </p>
       </div>
 
@@ -115,7 +115,7 @@ export default function FileStorage() {
                   <td className={`${td} whitespace-nowrap text-right`}>
                     <button type="button" onClick={() => setViewing(i)} aria-label={`View ${f.name}`} className="text-sm text-brand hover:underline">{f.kind === 'email' ? 'Download' : 'View'}</button>
                     {canOpen && (
-                      <button type="button" onClick={() => openOnLedgers(f)} aria-label={`Open ${f.name} on Ledgers`} className="ml-3 text-sm text-brand hover:underline">Open on Ledgers</button>
+                      <button type="button" onClick={() => openOnStatements(f)} aria-label={`Open ${f.name} on Party Statements`} className="ml-3 text-sm text-brand hover:underline">Open on Party Statements</button>
                     )}
                   </td>
                 </tr>
@@ -123,7 +123,7 @@ export default function FileStorage() {
             })}
           </ReportTable>
           <p className="text-xs text-gray-500 mt-3">
-            Your database plan’s storage limit is on the Turso dashboard; RAMS can’t read it from inside. To free space, remove files nobody needs on Ledgers.
+            Your database plan’s storage limit is on the Turso dashboard; RAMS can’t read it from inside. To free space, remove files nobody needs on Party Statements.
             A file goes once no row uses it.
           </p>
         </>

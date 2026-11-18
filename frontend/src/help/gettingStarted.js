@@ -57,7 +57,7 @@ export const dashboard = {
   faq: [
     { q: 'Why does the Connector show offline?', a: 'The office PC is off or asleep, or the Connector is not running on it. Nothing is lost: when it comes back it catches up with everything that changed in Tally.' },
     { q: 'How fresh is the data?', a: 'In office hours RAMS checks Tally every hour (the timing is on Admin → Tally companies). Changes made in Tally show after the next check; deletions show after the end-of-day check.' },
-    { q: 'Where are the reports?', a: 'In the top bar under Tally Reports: Debtors (what each invoice still owes) and Ledgers (the bill-to-bill statement per party). Both are worked out from Tally.' },
+    { q: 'Where are the reports?', a: 'In the top bar under Tally Reports: Bills Receivable (each invoice and what is still owed on it) and Party Statements (each party’s statement, opening to closing). They used to be called Debtors and Ledgers. Both are worked out from Tally.' },
     { q: 'What is Purchase Reports?', a: 'Reports on the purchase side are coming soon. Until then the entry in the top bar is greyed and can’t be clicked.' },
   ],
 };

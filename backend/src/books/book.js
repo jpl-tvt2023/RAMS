@@ -36,7 +36,7 @@ const addDays = (iso, days) => {
 };
 const bucketOf = (age) => BUCKETS.find((b) => age <= b.max).key;
 // TDS the party deducted: a Journal with a line on a TDS ledger (TDS
-// Receivable (FY 2026-27), say). Ledgers uses the same rule for its TDS column.
+// Receivable (FY 2026-27), say). Party Statements uses the same rule for its TDS column.
 const TDS_LEDGER = /\bTDS\b/i;
 const isTdsJournal = (baseType, ledgers) => baseType === 'Journal' && ledgers.some((l) => TDS_LEDGER.test(l));
 

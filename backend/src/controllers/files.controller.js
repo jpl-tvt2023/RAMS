@@ -3,9 +3,9 @@ const { SYNC_FROM } = require('../config/env');
 const { logAction } = require('../services/auditLog.service');
 const files = require('../services/files');
 
-// Files on Ledgers rows (services/files.js): every row is a Tally voucher.
-// Adding and removing is ledgers.files; viewing and downloading is
-// ledgers.view or reports.view; the storage figures are Admin and Owner only.
+// Files on Party Statements rows (services/files.js): every row is a Tally voucher.
+// Adding and removing is statements.files; viewing and downloading is
+// statements.view or reports.view; the storage figures are Admin and Owner only.
 // Every add and remove is audited on the voucher.
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
@@ -66,18 +66,18 @@ async function upload(req, res, next) {
     const companyId = Number(q.company_id);
     if (!Number.isInteger(companyId) || companyId <= 0) throw fail(400, 'Choose the company');
     const voucherGuid = q.voucher_guid ? String(q.voucher_guid) : null;
-    if (!voucherGuid || q.entry_id) throw fail(400, 'Files go on a Tally row: name the voucher the file is for');
+    if (!voucherGuid) throw fail(400, 'Files go on a Tally row: name the voucher the file is for');
     if (!Buffer.isBuffer(req.body) || !req.body.length) throw fail(400, 'Send the file itself as the request body');
     const target = await targetOf(db, { companyId, voucherGuid });
 
     const out = await inTx(async (tx) => {
-      const [{ n }] = await rowsOf(tx, `SELECT COUNT(*) AS n FROM ledger_files WHERE ${target.where}`, target.args);
+      const [{ n }] = await rowsOf(tx, `SELECT COUNT(*) AS n FROM voucher_files WHERE ${target.where}`, target.args);
       if (Number(n) >= files.MAX_PER_ROW) throw fail(409, `A row can have at most ${files.MAX_PER_ROW} files. Remove one first.`);
       const blob = await files.storeBlob(tx, { bytes: req.body, gzip: q.gzip === '1' }, name);
-      const [dup] = await rowsOf(tx, `SELECT file_name FROM ledger_files WHERE blob_id = ? AND ${target.where}`, [blob.blobId, ...target.args]);
+      const [dup] = await rowsOf(tx, `SELECT file_name FROM voucher_files WHERE blob_id = ? AND ${target.where}`, [blob.blobId, ...target.args]);
       if (dup) throw fail(409, `This file is already on ${target.label}${dup.file_name !== name ? `, as “${dup.file_name}”` : ''}`);
       const r = await tx.execute({
-        sql: `INSERT INTO ledger_files (blob_id, company_id, voucher_guid, file_name, kind, original_size, uploaded_by)
+        sql: `INSERT INTO voucher_files (blob_id, company_id, voucher_guid, file_name, kind, original_size, uploaded_by)
               VALUES (?, ?, ?, ?, ?, ?, ?)`,
         args: [blob.blobId, companyId, voucherGuid, name, blob.kind, pickedSize(q.original_size), req.user.id],
       });
@@ -91,7 +91,7 @@ async function upload(req, res, next) {
         entityId: target.entityId,
         entityRef: target.ref,
       });
-      const [row] = await rowsOf(tx, 'SELECT uploaded_at FROM ledger_files WHERE id = ?', [id]);
+      const [row] = await rowsOf(tx, 'SELECT uploaded_at FROM voucher_files WHERE id = ?', [id]);
       return {
         id, name, kind: blob.kind, size: blob.size, uploaded_by_name: req.user.name || req.user.username, uploaded_at: row.uploaded_at, stored_once: blob.reused,
       };
@@ -128,7 +128,7 @@ async function download(req, res, next) {
 async function remove(req, res, next) {
   try {
     const id = Number(req.params.id) || 0;
-    const [f] = await rowsOf(db, 'SELECT id, company_id, voucher_guid, file_name FROM ledger_files WHERE id = ?', [id]);
+    const [f] = await rowsOf(db, 'SELECT id, company_id, voucher_guid, file_name FROM voucher_files WHERE id = ?', [id]);
     if (!f) throw fail(404, 'That file isn’t there any more');
     let target;
     try {

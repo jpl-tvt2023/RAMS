@@ -1,6 +1,6 @@
 // The GST state codes (the first two digits of a GSTIN) and their states, as
 // Tally spells them. A party's state is read two ways -- from its GSTIN and
-// from Tally's ledger -- and the Ledgers and Party ledgers screens flag the
+// from Tally's ledger -- and the Party Statements and Party ledgers screens flag the
 // ledgers where the two disagree, so the accountants can correct Tally.
 
 const GST_STATES = {

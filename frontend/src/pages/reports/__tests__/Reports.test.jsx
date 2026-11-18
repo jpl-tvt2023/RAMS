@@ -2,7 +2,7 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route } from 'react-router-dom';
-import Debtors from '../Debtors';
+import BillsReceivable from '../BillsReceivable';
 import Invoices from '../Invoices';
 import Receivables from '../Receivables';
 import Exceptions from '../Exceptions';
@@ -15,7 +15,7 @@ import { downloadCsv } from '../../../utils/csv';
 import { NO_FILE } from '../../../utils/highlights';
 
 vi.mock('../../../api/reports.api', () => ({
-  getDebtors: vi.fn(), getInvoices: vi.fn(), getNotes: vi.fn(), getTransfers: vi.fn(), getReceivables: vi.fn(), getExceptions: vi.fn(),
+  getBillsReceivable: vi.fn(), getInvoices: vi.fn(), getNotes: vi.fn(), getTransfers: vi.fn(), getReceivables: vi.fn(), getExceptions: vi.fn(),
   getReportSettings: vi.fn(), updateReportSettings: vi.fn(), updateTerms: vi.fn(),
 }));
 vi.mock('../../../api/sync.api', () => ({ getSyncStatus: vi.fn(), getSyncRuns: vi.fn(), syncNow: vi.fn() }));
@@ -62,10 +62,10 @@ const DEBTOR = {
   outstanding_paise: 12948595, status: 'overdue', due_date: '2026-07-31', overdue_days: 67,
 };
 
-describe('Debtors', () => {
+describe('Bills Receivable', () => {
   beforeEach(() => {
     sessionStorage.clear();
-    reports.getDebtors.mockResolvedValue({
+    reports.getBillsReceivable.mockResolvedValue({
       rows: [DEBTOR, { ...DEBTOR, guid: 'g6', number: '6/RM/26-27', pos: [], vendor_pos: [], credit_notes: [], credit_notes_paise: 0, vendor: null }],
       total: 2, page: 1, page_size: 50, companies: [...COMPANIES, { id: 3, code: 'HR', name: 'Roymax HR' }], company_id: 2,
       tabs: [{ vendor: 'Amazon', count: 0 }, { vendor: 'Blinkit', count: 1 }], all: 2, unknown: 1,
@@ -74,7 +74,7 @@ describe('Debtors', () => {
   });
 
   test('each invoice shows its Tally narration; a missing one is highlighted', async () => {
-    reports.getDebtors.mockResolvedValue({
+    reports.getBillsReceivable.mockResolvedValue({
       rows: [
         { ...DEBTOR, narration: 'PO 4500123456' },
         {
@@ -84,15 +84,16 @@ describe('Debtors', () => {
       total: 2, page: 1, page_size: 50, companies: COMPANIES, company_id: 2, tabs: [], all: 2, unknown: 0,
       totals: { invoices: 2, total_paise: 0, credit_notes_paise: 0, outstanding_paise: 0, overdue_paise: 0 },
     });
-    renderWithProviders(<Debtors />, { user: VIEWER });
+    renderWithProviders(<BillsReceivable />, { user: VIEWER });
     expect(await screen.findByText('PO 4500123456')).toBeInTheDocument();
     expect(within(screen.getByText('6/RM/26-27').closest('tr')).getByText('No narration')).toBeInTheDocument();
   });
 
   test('opens on the default company; each invoice with its internal and vendor PO numbers, amount, CN and outstanding', async () => {
-    renderWithProviders(<Debtors />, { user: VIEWER });
+    renderWithProviders(<BillsReceivable />, { user: VIEWER });
     expect(await screen.findAllByText('607/RM/26-27')).not.toHaveLength(0);
-    expect(reports.getDebtors).toHaveBeenCalledWith(expect.objectContaining({ company_id: 'default', page: 1 }));
+    expect(reports.getBillsReceivable).toHaveBeenCalledWith(expect.objectContaining({ company_id: 'default', page: 1 }));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Bills Receivable');
     expect(screen.getByLabelText('Company')).toHaveValue('2');
     expect(screen.getByRole('columnheader', { name: 'Internal PO no' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Vendor PO no' })).toBeInTheDocument();
@@ -106,33 +107,33 @@ describe('Debtors', () => {
   });
 
   test('a marketplace tab and the status dropdown filter', async () => {
-    renderWithProviders(<Debtors />, { user: VIEWER });
+    renderWithProviders(<BillsReceivable />, { user: VIEWER });
     const user = userEvent.setup();
     await user.click(await screen.findByRole('tab', { name: 'Blinkit (1)' }));
-    await waitFor(() => expect(reports.getDebtors).toHaveBeenLastCalledWith(expect.objectContaining({ vendor: 'Blinkit', page: 1 })));
+    await waitFor(() => expect(reports.getBillsReceivable).toHaveBeenLastCalledWith(expect.objectContaining({ vendor: 'Blinkit', page: 1 })));
     await user.selectOptions(screen.getByLabelText('Status'), 'Overdue');
-    await waitFor(() => expect(reports.getDebtors).toHaveBeenLastCalledWith(expect.objectContaining({ vendor: 'Blinkit', status: 'overdue' })));
+    await waitFor(() => expect(reports.getBillsReceivable).toHaveBeenLastCalledWith(expect.objectContaining({ vendor: 'Blinkit', status: 'overdue' })));
     await user.selectOptions(screen.getByLabelText('Company'), 'All companies (consolidated)');
-    await waitFor(() => expect(reports.getDebtors).toHaveBeenLastCalledWith(expect.not.objectContaining({ company_id: expect.anything() })));
+    await waitFor(() => expect(reports.getBillsReceivable).toHaveBeenLastCalledWith(expect.not.objectContaining({ company_id: expect.anything() })));
   });
 
-  test('an invoice’s files, added on Ledgers, can be viewed here but not changed', async () => {
+  test('an invoice’s files, added on Party Statements, can be viewed here but not changed', async () => {
     const scan = {
       id: 5, name: 'invoice 607.pdf', kind: 'pdf', size: 90000, uploaded_by_name: 'Asha', uploaded_at: '2026-11-02 09:00:00',
     };
-    reports.getDebtors.mockResolvedValue({
+    reports.getBillsReceivable.mockResolvedValue({
       rows: [{ ...DEBTOR, files: [scan] }, { ...DEBTOR, guid: 'g6', number: '6/RM/26-27', files: [] }],
       total: 2, page: 1, page_size: 50, companies: COMPANIES, company_id: 2, tabs: [], all: 2, unknown: 0,
       totals: { invoices: 2, total_paise: 0, credit_notes_paise: 0, outstanding_paise: 0, overdue_paise: 0 },
     });
-    renderWithProviders(<Debtors />, { user: ACCOUNTANT });
+    renderWithProviders(<BillsReceivable />, { user: ACCOUNTANT });
     const user = userEvent.setup();
     expect(await screen.findByRole('columnheader', { name: 'Files' })).toBeInTheDocument();
     expect(within(screen.getByText('6/RM/26-27').closest('tr')).queryByRole('button', { name: /^Files on/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Files on 607/RM/26-27' }));
     const dialog = screen.getByRole('dialog', { name: 'Files — Invoice 607/RM/26-27' });
     expect(within(dialog).getByText('invoice 607.pdf')).toBeInTheDocument();
-    expect(within(dialog).getByText(/Files are added on Ledgers/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Files are added on Party Statements/)).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'View invoice 607.pdf' })).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: /Choose files/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: /^Remove / })).not.toBeInTheDocument();
@@ -142,8 +143,8 @@ describe('Debtors', () => {
     const PDF = {
       id: 7, name: 'CN 1502.pdf', kind: 'pdf', size: 90000, uploaded_by_name: 'Asha', uploaded_at: '2026-11-02 09:00:00',
     };
-    // A Zepto invoice (its party is on Ledgers) with one CN filed and one not,
-    // and a Blinkit invoice (not on Ledgers) whose CN has no file either.
+    // A Zepto invoice (its party is on Party Statements) with one CN filed and one not,
+    // and a Blinkit invoice (not on Party Statements) whose CN has no file either.
     const ZEPTO = {
       ...DEBTOR,
       guid: 'g700', number: '700/RM/26-27', party: 'ZEPTO PRIVATE LIMITED ( PUNE ) - Dark Store', vendor: 'Zepto', files: [],
@@ -165,10 +166,10 @@ describe('Debtors', () => {
     });
     const rowOf = (number) => screen.getByText(number).closest('tr');
 
-    beforeEach(() => { reports.getDebtors.mockResolvedValue(page([ZEPTO, BLINKIT])); });
+    beforeEach(() => { reports.getBillsReceivable.mockResolvedValue(page([ZEPTO, BLINKIT])); });
 
-    test('the invoice is orange and says how many; one not on Ledgers never is', async () => {
-      renderWithProviders(<Debtors />, { user: VIEWER });
+    test('the invoice is orange and says how many; one not on Party Statements never is', async () => {
+      renderWithProviders(<BillsReceivable />, { user: VIEWER });
       await screen.findByText('700/RM/26-27');
       expect(rowOf('700/RM/26-27')).toHaveClass(NO_FILE.row);
       expect(within(rowOf('700/RM/26-27')).getByText('1 without a file')).toBeInTheDocument();
@@ -178,21 +179,21 @@ describe('Debtors', () => {
     });
 
     test('no orange row, no legend', async () => {
-      reports.getDebtors.mockResolvedValue(page([BLINKIT]));
-      renderWithProviders(<Debtors />, { user: VIEWER });
+      reports.getBillsReceivable.mockResolvedValue(page([BLINKIT]));
+      renderWithProviders(<BillsReceivable />, { user: VIEWER });
       await screen.findByText('607/RM/26-27');
       expect(screen.queryByRole('note', { name: 'What the colours mean' })).not.toBeInTheDocument();
     });
 
     test('the CN popup says which note has no file, and opens the files of one that has', async () => {
-      renderWithProviders(<Debtors />, { user: VIEWER });
+      renderWithProviders(<BillsReceivable />, { user: VIEWER });
       const user = userEvent.setup();
       await user.click(await screen.findByRole('button', { name: 'Credit notes on 700/RM/26-27' }));
       const dialog = screen.getByRole('dialog', { name: 'Credit notes — 700/RM/26-27' });
       const bare = within(dialog).getByText('CN/1501').closest('tr');
       expect(bare).toHaveClass(NO_FILE.row);
       expect(within(bare).getByText('No file')).toBeInTheDocument();
-      expect(within(bare).getByRole('button', { name: 'Add it on Ledgers' })).toBeInTheDocument();
+      expect(within(bare).getByRole('button', { name: 'Add it on Party Statements' })).toBeInTheDocument();
       const filed = within(dialog).getByText('CN/1502').closest('tr');
       expect(filed).not.toHaveClass(NO_FILE.row);
       await user.click(within(filed).getByRole('button', { name: 'Files on Credit Note CN/1502' }));
@@ -202,7 +203,7 @@ describe('Debtors', () => {
     });
 
     test('a Blinkit note without a file is not flagged in the popup', async () => {
-      renderWithProviders(<Debtors />, { user: VIEWER });
+      renderWithProviders(<BillsReceivable />, { user: VIEWER });
       const user = userEvent.setup();
       await user.click(await screen.findByRole('button', { name: 'Credit notes on 607/RM/26-27' }));
       const dialog = screen.getByRole('dialog', { name: 'Credit notes — 607/RM/26-27' });
@@ -210,46 +211,47 @@ describe('Debtors', () => {
       expect(within(dialog).queryByText('No file')).not.toBeInTheDocument();
     });
 
-    test('“Add it on Ledgers” opens that party there, from the note’s date, showing the rows without a file', async () => {
+    test('“Add it on Party Statements” opens that party there, from the note’s date, showing the rows without a file', async () => {
       renderWithProviders(
         <Routes>
-          <Route path="/reports/debtors" element={<Debtors />} />
-          <Route path="/ledgers" element={<p>Ledgers page</p>} />
+          <Route path="/reports/bills-receivable" element={<BillsReceivable />} />
+          <Route path="/reports/party-statements" element={<p>Party Statements page</p>} />
         </Routes>,
-        { user: VIEWER, route: '/reports/debtors' },
+        { user: VIEWER, route: '/reports/bills-receivable' },
       );
       const user = userEvent.setup();
       await user.click(await screen.findByRole('button', { name: 'Credit notes on 700/RM/26-27' }));
-      await user.click(screen.getByRole('button', { name: 'Add it on Ledgers' }));
-      expect(screen.getByText('Ledgers page')).toBeInTheDocument();
-      expect(JSON.parse(sessionStorage.getItem('rams:ledgers.filters.v2:v1'))).toMatchObject({
+      await user.click(screen.getByRole('button', { name: 'Add it on Party Statements' }));
+      expect(screen.getByText('Party Statements page')).toBeInTheDocument();
+      expect(JSON.parse(sessionStorage.getItem('rams:statements.filters:v1'))).toMatchObject({
         company: '2', vendor: 'Zepto', states: 'all', parties: ['2:Z1'], from: '2026-07-20', to: '', open: '2:Z1', nofile: true,
       });
     });
 
-    test('without “See Ledgers” the note still says No file, with no link', async () => {
-      renderWithProviders(<Debtors />, { user: { ...VIEWER, permissions: VIEWER.permissions.filter((k) => k !== 'ledgers.view') } });
+    test('without “See Party Statements” the note still says No file, with no link', async () => {
+      renderWithProviders(<BillsReceivable />, { user: { ...VIEWER, permissions: VIEWER.permissions.filter((k) => k !== 'statements.view') } });
       const user = userEvent.setup();
       await user.click(await screen.findByRole('button', { name: 'Credit notes on 700/RM/26-27' }));
       const dialog = screen.getByRole('dialog', { name: 'Credit notes — 700/RM/26-27' });
       expect(within(dialog).getByText('No file')).toBeInTheDocument();
-      expect(within(dialog).queryByRole('button', { name: 'Add it on Ledgers' })).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole('button', { name: 'Add it on Party Statements' })).not.toBeInTheDocument();
     });
 
     test('the CSV lists the notes without a file', async () => {
-      renderWithProviders(<Debtors />, { user: VIEWER });
+      renderWithProviders(<BillsReceivable />, { user: VIEWER });
       const user = userEvent.setup();
       await screen.findByText('700/RM/26-27');
       await user.click(screen.getByRole('button', { name: /Download CSV/ }));
       await waitFor(() => expect(downloadCsv).toHaveBeenCalled());
-      const [, columns, rows] = downloadCsv.mock.calls[0];
+      const [name, columns, rows] = downloadCsv.mock.calls[0];
+      expect(name).toBe('rams-bills-receivable.csv');
       const col = columns.find(([h]) => h === 'CN without a file');
       expect(rows.map((r) => col[1](r))).toEqual(['CN/1501', '']);
     });
   });
 
   test('clicking a CN amount opens each credit note’s details', async () => {
-    renderWithProviders(<Debtors />, { user: VIEWER });
+    renderWithProviders(<BillsReceivable />, { user: VIEWER });
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Credit notes on 607/RM/26-27' }));
     const dialog = screen.getByRole('dialog', { name: 'Credit notes — 607/RM/26-27' });

@@ -1,8 +1,8 @@
-// The words, colours and icons the Ledgers page uses for what RAMS found, in
+// The words, colours and icons the Party Statements page uses for what RAMS found, in
 // one place so the badges, the statement's cells, the legend and the Help say
 // the same thing. One colour, one meaning: CHECK holds them, and a test fails
 // if a colour is used for two. Every row is Tally's -- nothing is typed on
-// Ledgers -- so what RAMS can find is two readings that disagree.
+// Party Statements -- so what RAMS can find is two readings that disagree.
 import { EqualNot } from 'lucide-react';
 import { formatDay, formatRupees } from './formatters';
 

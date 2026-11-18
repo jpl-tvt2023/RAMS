@@ -9,11 +9,11 @@ A running order for showing the client what RAMS does today, on production (http
 - [ ] **Auto-fill is Off or Preview.** In the demo, never click *Approve*, *Approve all*, *Write now*, *Write Tally's number* or *Automatic*: they write into **production ROMS**.
 - [ ] Sign in as an Admin. To show roles, have a Viewer user ready in a private browser window.
 - [ ] Pick your examples in advance:
-  - a Zepto party with debit/credit notes in Ledgers;
+  - a Zepto party with debit/credit notes in Party Statements;
   - a PO under *Needs review*;
-  - a marketplace with overdue invoices in Debtors;
+  - a marketplace with overdue invoices in Bills Receivable;
   - one real marketplace DN number from the portal (to type in flow 8).
-- [ ] Under **Tally Reports** only **Debtors** and **Ledgers** are released. The other report screens are held and don't show in the menu, so don't promise them as done. **Purchase Reports** shows greyed as *Coming soon*.
+- [ ] Under **Tally Reports** only **Bills Receivable** and **Party Statements** are released. The other report screens are held and don't show in the menu, so don't promise them as done. **Purchase Reports** shows greyed as *Coming soon*.
 
 ## Running order
 
@@ -24,9 +24,9 @@ A running order for showing the client what RAMS does today, on production (http
 | 3 | Party ledgers: which ledger is which marketplace | 4 | partly |
 | 4 | Match review: every PO against its Tally invoice | 8 | yes |
 | 5 | Auto-fill: Tally's numbers into ROMS, safely | 5 | yes |
-| 6 | Debtors: what each marketplace owes | 6 | — |
+| 6 | Bills Receivable: what each invoice still owes | 6 | — |
 | 7 | Credit terms | 3 | — |
-| 8 | Ledgers: the bill-to-bill statement | 10 | — |
+| 8 | Party Statements: the bill-to-bill statement | 10 | — |
 | 9 | Users, roles and permissions, audit log | 5 | — |
 | 10 | Help & FAQ | 2 | — |
 
@@ -89,10 +89,10 @@ A running order for showing the client what RAMS does today, on production (http
   - "Every write shows in ROMS's history as *Tally Sync*. One click on Off stops it."
 - **Don't:** approve or write anything.
 
-### 6. Debtors: what each marketplace owes
+### 6. Bills Receivable: what each invoice still owes
 - **Show:** every invoice, what settled it, and what is still owed or overdue, straight from Tally.
 - **Steps:**
-  1. **Tally Reports → Debtors.** It opens on MH. Switch to **All companies** for the consolidated view. A Zepto, Minutes or Now invoice is orange while a DN or CN against it has no file: click its CN amount to show which, and *Add it on Ledgers*.
+  1. **Tally Reports → Bills Receivable.** It opens on MH. Switch to **All companies** for the consolidated view. A Zepto, Minutes or Now invoice is orange while a DN or CN against it has no file: click its CN amount to show which, and *Add it on Party Statements*.
   2. Click a marketplace tab, then the statuses **Open** and **Overdue**. The line above the table adds up invoiced, credit notes, outstanding and overdue.
   3. In the **CN** column, click an amount. The pop-up lists each credit note, with its ROMS RTV row and its narration.
   4. Choose the status **No PO**: invoices not linked to any ROMS PO.
@@ -107,10 +107,10 @@ A running order for showing the client what RAMS does today, on production (http
   2. Click the pencil on Zepto and type a different number. The box says, for example, *"Of Zepto's 140 invoices still owed, 23 would become overdue"*.
   3. Click **Cancel**, unless the client wants the change. Every save is audited.
 
-### 8. Ledgers: the bill-to-bill statement (Minutes, Now, Zepto)
+### 8. Party Statements: the bill-to-bill statement (Minutes, Now, Zepto)
 - **Show:** one row per party: **Opening | Invoice | DN | CN | TDS | Journal/Adj | Receipt | Closing**. Every row is Tally's: nothing is typed in RAMS. Each row carries its document, and a row without one is orange.
 - **Steps:**
-  1. **Tally Reports → Ledgers.** It opens on MH, All (Minutes, Now, Zepto), All states, All parties, this month, with the statement already there. **Needs attention (N)** above it opens the parties with a problem.
+  1. **Tally Reports → Party Statements.** It opens on MH, All (Minutes, Now, Zepto), All states, All parties, this month, with the statement already there. **Needs attention (N)** above it opens the parties with a problem.
   2. Narrow it: Marketplace **Zepto** (states and parties go back to All). The list scrolls in its box; click a party and its detail opens right under it.
 
      Use **From** to start at 8 Jun to show more history.
@@ -119,7 +119,7 @@ A running order for showing the client what RAMS does today, on production (http
      - Invoices add to the balance; DN, CN, TDS and receipts take it down.
      - The closing equals Tally's balance.
      - The total row is at the bottom.
-  4. Pick **Blinkit** to show *"coming soon"*. Only marketplaces that pay bill to bill are on Ledgers for now.
+  4. Pick **Blinkit** to show *"coming soon"*. Only marketplaces that pay bill to bill are on Party Statements for now.
   5. Click a party. The detail shows:
      - both states (Tally's and the GSTIN's);
      - every Tally voucher with its narration, files and running balance. A credit note naming a marketplace DN (FKIDN…) is in the DN column, with the DN number under its own.
@@ -130,7 +130,7 @@ A running order for showing the client what RAMS does today, on production (http
      - orange means no file yet.
   8. After the demo, remove the test file (the bin in its files window), unless it was a real one.
 - **Say:**
-  - "Nothing is typed twice any more: Ledgers is Tally's own entries. We checked every Minutes, Now and Zepto party: RAMS holds all 559 of Tally's entries. Your team attaches each row's document; RAMS flags a DN booked twice and a row without its document."
+  - "Nothing is typed twice any more: Party Statements shows only Tally's own entries. We checked every Minutes, Now and Zepto party: RAMS holds all 559 of Tally's entries. Your team attaches each row's document; RAMS flags a DN booked twice and a row without its document."
 
 ### 9. Users, roles and permissions, audit log
 - **Show:** who can do what, and that every change is recorded.
@@ -154,7 +154,7 @@ A running order for showing the client what RAMS does today, on production (http
 | How fresh is it? | Every hour in office hours, plus a full check after hours. Admins can change the schedule. |
 | Why is something yellow? | It has no narration in Tally, and the narration check says it needs one. |
 | What does *State differs* mean? | The ledger's state in Tally isn't the state of its GSTIN. The accountant corrects the address in Tally. |
-| Why is Blinkit "coming soon" on Ledgers? | Ledgers covers the marketplaces that pay bill to bill (Minutes, Now, Zepto). The others pay on account, and their statement comes next. |
+| Why is Blinkit "coming soon" on Party Statements? | Party Statements covers the marketplaces that pay bill to bill (Minutes, Now, Zepto). The others pay on account, and their statement comes next. |
 | Why does a Zepto party show invoices but no receipts? | Zepto pays into head-office ledgers. Map those on Party ledgers. |
 | Can RAMS write a wrong number into ROMS? | ROMS accepts a write only when its current value is the one RAMS expects. Anything else goes to a person. Each field starts in Preview. |
-| Where are Invoices, Notes, Receivables, Exceptions? | Built, and released one at a time after each review. Debtors is first. |
+| Where are Invoices, Notes, Receivables, Exceptions? | Built, and released one at a time after each review. Bills Receivable is first. |

@@ -31,15 +31,20 @@ For the day itself, `go-live-cheatsheet.md` has the same steps as commands and c
 5. **Vercel region (done):** both projects are set to Mumbai (bom1).
    - RAMS production runs there since the M7 deploy (PR #9, 2026-10-06).
    - ROMS production moves there on its next production deploy.
-6. **Ledgers openings (settled):** Connector 0.6.0 reads every ledger's balance from Tally at the end of each sync (migration 017 holds them), and Ledgers starts each party from it. The ₹10,000 placeholder is used only when a sync couldn't read the balances, for example while the office PC still runs Connector 0.5.0.
-7. **Ledger states and narrations (Connector 0.7.0, migration 018):** 0.7.0 reads each ledger's latest dated address and GST registration (older Connectors took the oldest, and sometimes a GST rate block's "Any"), and keeps narrations up to 2,000 characters. RAMS stores the corrected state and GSTIN on the first end-of-day run after 0.7.0 starts; an older Connector can't undo them. Migration 018 adds the Ledgers marketplaces list (Minutes, Now, Zepto), the booking window, and the narration check.
+6. **Party Statements openings (settled):** Connector 0.6.0 reads every ledger's balance from Tally at the end of each sync (migration 017 holds them), and Party Statements starts each party from it. The ₹10,000 placeholder is used only when a sync couldn't read the balances, for example while the office PC still runs Connector 0.5.0.
+7. **Ledger states and narrations (Connector 0.7.0, migration 018):** 0.7.0 reads each ledger's latest dated address and GST registration (older Connectors took the oldest, and sometimes a GST rate block's "Any"), and keeps narrations up to 2,000 characters. RAMS stores the corrected state and GSTIN on the first end-of-day run after 0.7.0 starts; an older Connector can't undo them. Migration 018 adds the Party Statements marketplaces list (Minutes, Now, Zepto), the booking window, and the narration check.
+8. **The rename (migration 020, 2026-11-18): run it together with the deploy.** Debtors became *Bills Receivable* and Ledgers became *Party Statements*.
+   - **What 020 does:** it renames the page's tables (`statement_settings`, `statement_marketplaces`, `statement_openings`, `voucher_files`) and the permission keys (`statements.view/files/settings`), keeping every role's ticks. It drops the empty typed-notes table.
+   - **The timing:** the site in use breaks the moment 020 runs, and the new code breaks until it runs. So for each pair (the test database with the test site, then production with the PR merge), run `npm run migrate` and deploy back to back, and check the pages straight after.
+   - **The guard:** 020 refuses, changing nothing, if a typed DN/CN or a file on one is still in the database.
+   - **Old addresses:** the old page addresses (`/reports/debtors`, `/ledgers`) forward to `/reports/bills-receivable` and `/reports/party-statements`. The data addresses moved to `/api/reports/bills-receivable` and `/api/statements`.
 
 ## 1. The production database for RAMS (you, then maintainer)
 
 1. **You:** create the Turso database `royalmart-rams` in the `royalmart` org, region `aws-ap-south-1` (Mumbai), and make a token for it.
 2. **Maintainer:**
    1. In `backend/.env`, set `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` to it. **Check the URL twice:** `npm run migrate` writes to whatever it points at.
-   2. `npm run migrate`, which applies 001–018.
+   2. `npm run migrate`, which applies 001–020.
    3. `RAMS_ADMIN_USERNAME=… RAMS_ADMIN_PASSWORD='…' npm run bootstrap-admin`. It creates the first Admin, who changes the password at first sign-in.
    4. `npm run agent-token -- --name "Office PC" --rotate`. It prints the Connector token **once**; hand it to you privately. `--rotate` retires every other token first, such as one copied over with a test database.
 3. **You:** in Vercel (RAMS project → Environment Variables, **Production**):
@@ -73,8 +78,8 @@ Until step 2 is done, ROMS production answers RAMS with "The integration is not 
       - It installs the Connector in `C:\RAMS\Connector` with the task **RAMS Connector** (it starts when you sign in, in a hidden window, and restarts if it stops), loads Tally into RAMS (a few minutes for MH; Tally stays usable), and starts it.
    4. When every line is ticked, RAMS's Dashboard **Tally sync** card says *Connector online* within a minute.
 4. **In RAMS:**
-   - Click the **star** on MH, so Tally Reports → Debtors and Ledgers open on it. A fresh database has no default company until this is done, and the report opens on all companies instead.
-   - Open **Ledgers** on a Zepto party: its opening should say *From Tally*, not *Placeholder*.
+   - Click the **star** on MH, so Tally Reports → Bills Receivable and Party Statements open on it. A fresh database has no default company until this is done, and the report opens on all companies instead.
+   - Open **Party Statements** on a Zepto party: its opening should say *From Tally*, not *Placeholder*.
    - Matching → Party ledgers should show no "State differs" on *Flipkart India Private Limited - Bengalore* (it reads Karnataka now).
    - `C:\RAMS\Connector\rams-connector.cmd status` on the office PC shows the version: it must be **0.7.1**.
 5. **Stop the dev PC's Connector** if it points at the production site, so two Connectors don't sync the same books. One that feeds the test site can keep running.
@@ -97,9 +102,9 @@ Each step is a setting on **Matching → Auto-fill**, not a deploy. It can be pu
 ## 5. After go-live
 
 - **Daily:** Matching → Match review → *Needs review*, and Matching → Auto-fill → *Needs a person* and *Refused by ROMS*.
-- **Daily:** **Tally Reports → Ledgers** → *Needs attention*: parties with a DN booked twice, rows without a file, or a state that differs.
+- **Daily:** **Tally Reports → Party Statements** → *Needs attention*: parties with a DN booked twice, rows without a file, or a state that differs.
 - **Weekly:** Matching → Party ledgers → *Not set*. Map any new ledger, including head-office ledgers that marketplaces pay into.
-- **Weekly:** Tally Reports → **Debtors**, status *Overdue*: chase what is past its credit days. Status *No PO*: invoices to link to a ROMS PO.
+- **Weekly:** Tally Reports → **Bills Receivable**, status *Overdue*: chase what is past its credit days. Status *No PO*: invoices to link to a ROMS PO.
 - **If something looks old:** the Dashboard's **Tally sync** card says whether the Connector is online, Tally is answering, and when each company last synced.
 - These checks gain the other report screens (Exceptions, Receivables, Sync health) as each one is delivered.
 - **To stop all writing into ROMS at once:** set both auto-fill fields to Off. Or remove `INTEGRATION_TOKEN` from ROMS and redeploy.

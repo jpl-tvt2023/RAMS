@@ -2,24 +2,24 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import { getLedgerSettings, updateLedgerSettings } from '../../api/ledgers.api';
-import { paiseFrom } from '../../utils/ledgerText';
+import { getStatementSettings, updateStatementSettings } from '../../api/statements.api';
+import { paiseFrom } from '../../utils/statementText';
 import { formatDateTime, formatDay } from '../../utils/formatters';
 
 const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand tabular-nums';
 const rupeesText = (p) => (p / 100).toFixed(2);
 
-// Ledger settings, for whoever holds ledgers.settings: which marketplaces
-// Ledgers covers, and the placeholder opening. (Every row is Tally's, so
+// Statement settings, for whoever holds statements.settings: which marketplaces
+// Party Statements covers, and the placeholder opening. (Every row is Tally's, so
 // nothing about typed notes is left to set.)
-export default function LedgerSettings({ syncFrom, onClose, onSaved }) {
+export default function StatementSettings({ syncFrom, onClose, onSaved }) {
   const [s, setS] = useState(null);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const set = (patch) => setForm((x) => ({ ...x, ...patch }));
 
   useEffect(() => {
-    getLedgerSettings()
+    getStatementSettings()
       .then((d) => {
         setS(d);
         setForm({ marketplaces: d.marketplaces, opening: rupeesText(d.default_opening_paise) });
@@ -33,7 +33,7 @@ export default function LedgerSettings({ syncFrom, onClose, onSaved }) {
     if (opening == null) { toast.error('Type the placeholder opening in rupees, for example 10000'); return; }
     setSaving(true);
     try {
-      await updateLedgerSettings({ marketplaces: form.marketplaces, default_opening_paise: opening });
+      await updateStatementSettings({ marketplaces: form.marketplaces, default_opening_paise: opening });
       toast.success('Settings saved');
       onSaved();
     } catch (err) {
@@ -44,11 +44,11 @@ export default function LedgerSettings({ syncFrom, onClose, onSaved }) {
   const toggle = (v) => set({ marketplaces: form.marketplaces.includes(v) ? form.marketplaces.filter((x) => x !== v) : [...form.marketplaces, v] });
 
   return (
-    <Modal isOpen onClose={onClose} title="Ledger settings">
+    <Modal isOpen onClose={onClose} title="Statement settings">
       {!form ? <p className="text-sm text-gray-400 py-6 text-center">Loading…</p> : (
         <form onSubmit={save} className="space-y-4">
           <fieldset>
-            <legend className="text-sm font-medium text-gray-700">Marketplaces on Ledgers (pay bill to bill)</legend>
+            <legend className="text-sm font-medium text-gray-700">Marketplaces on Party Statements (pay bill to bill)</legend>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
               {s.known_marketplaces.map((v) => (
                 <label key={v} className="flex items-center gap-2 text-sm">
@@ -57,7 +57,7 @@ export default function LedgerSettings({ syncFrom, onClose, onSaved }) {
                 </label>
               ))}
             </div>
-            <span className="text-xs text-gray-500">The others show “coming soon” on Ledgers.</span>
+            <span className="text-xs text-gray-500">The others show “coming soon” on Party Statements.</span>
           </fieldset>
           <label className="block text-sm">
             <span className="font-medium text-gray-700">Placeholder opening (₹)</span>

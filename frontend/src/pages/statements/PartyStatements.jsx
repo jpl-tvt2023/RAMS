@@ -6,28 +6,29 @@ import HelpLink from '../../components/shared/HelpLink';
 import Button from '../../components/ui/Button';
 import MultiSelect from '../../components/ui/MultiSelect';
 import { ReportTable, selectCls, td } from '../../components/reports/ReportFrame';
-import StatementTable, { StateLine } from '../../components/ledgers/StatementTable';
-import PartyDetail from '../../components/ledgers/PartyDetail';
-import LedgerSettings from '../../components/ledgers/LedgerSettings';
+import StatementTable, { StateLine } from '../../components/statements/StatementTable';
+import PartyDetail from '../../components/statements/PartyDetail';
+import StatementSettings from '../../components/statements/StatementSettings';
 import FilesDialog from '../../components/files/FilesDialog';
-import { getLedgerParties, getLedgerStatement, getLedgerParty } from '../../api/ledgers.api';
+import { getStatementParties, getStatement, getStatementParty } from '../../api/statements.api';
 import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
 import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
 import { formatDay } from '../../utils/formatters';
-import { FILTERS_KEY, DEFAULTS } from '../../utils/ledgerLinks';
+import { FILTERS_KEY, DEFAULTS } from '../../utils/statementLinks';
 
-// Ledgers: the bill-to-bill statement. It opens on the default company (the
+// Party Statements (the page at /reports/party-statements, once called Ledgers): the bill-to-bill
+// statement. It opens on the default company (the
 // star on Admin -> Tally companies), every bill-to-bill marketplace, all states
 // and all parties, this month; narrow it with the filters. One row per party, every figure Tally's; a row opens the party's Tally
 // vouchers. Nothing is typed here: a credit note whose narration names a
 // marketplace DN is in the DN column. Any row can carry files (the invoice,
 // the DN's PDF, a photo, the email), and a row without one is highlighted.
 // Nothing is written to Tally. What is chosen (FILTERS_KEY, DEFAULTS) is in
-// utils/ledgerLinks.js.
-const statementOrNothing = (p) => (p.company_id && p.vendor && p.states && p.parties ? getLedgerStatement(p) : Promise.resolve(null));
-const partyOrNothing = (p) => (p.ledger_guid ? getLedgerParty(p) : Promise.resolve(null));
+// utils/statementLinks.js.
+const statementOrNothing = (p) => (p.company_id && p.vendor && p.states && p.parties ? getStatement(p) : Promise.resolve(null));
+const partyOrNothing = (p) => (p.ledger_guid ? getStatementParty(p) : Promise.resolve(null));
 const keyOf = (p) => `${p.company_id}:${p.guid}`;
 const COUNT_WORDS = { booked_twice: 'DN booked twice', no_file: 'without a file' };
 // The statement and Needs attention scroll inside their box past about eight
@@ -66,7 +67,7 @@ function Attention({ rows, total, onOpen }) {
   );
 }
 
-export default function Ledgers() {
+export default function PartyStatements() {
   const { can } = useAuth();
   const [pick, setPick] = useSessionState(FILTERS_KEY, DEFAULTS);
   const [filesOf, setFilesOf] = useState(null); // { voucherGuid }
@@ -74,7 +75,7 @@ export default function Ledgers() {
   const [attentionOpen, setAttentionOpen] = useState(false);
   const detailRef = useRef(null);
   const scrollPending = useRef(false);
-  const parties = useKeyedLoad(getLedgerParties, {});
+  const parties = useKeyedLoad(getStatementParties, {});
   const p = parties.last;
   const today = p?.today || '';
   const from = pick.from || p?.month_start || '';
@@ -109,7 +110,7 @@ export default function Ledgers() {
     company_id: openCompany, ledger_guid: openGuid, from: pick.from, to: pick.to,
   } : {});
   const day = detail.data;
-  const canFiles = can(PERM.LEDGERS_FILES);
+  const canFiles = can(PERM.STATEMENTS_FILES);
 
   // The row whose files are open, from the party as last loaded.
   const filesRow = day && filesOf ? day.vouchers.find((v) => v.guid === filesOf.voucherGuid) : null;
@@ -169,8 +170,8 @@ export default function Ledgers() {
     <AppShell>
       <div className="mb-4 max-w-4xl">
         <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold text-brand">Ledgers</h1>
-          <HelpLink section="ledgers" />
+          <h1 className="text-2xl font-bold text-brand">Party Statements</h1>
+          <HelpLink section="party-statements" />
         </div>
         <p className="text-gray-500 text-sm mt-1">
           The bill-to-bill statement per party, all from Tally: opening, invoices, debit and credit notes, TDS, journals, receipts and closing. Nothing is typed here. Attach each row’s document (PDF, photo or email); a row without one is orange. RAMS never writes to Tally.
@@ -222,8 +223,8 @@ export default function Ledgers() {
 
       {soon && (
         <div role="status" className="text-sm text-gray-700 bg-white rounded-xl border border-gray-200 px-4 py-6 text-center mb-4">
-          <p className="font-semibold">Ledgers for {soon.vendor} is coming soon.</p>
-          <p className="mt-1">For now Ledgers covers the marketplaces that pay bill to bill: {billToBill.map((m) => m.vendor).join(', ')}.</p>
+          <p className="font-semibold">Party Statements for {soon.vendor} is coming soon.</p>
+          <p className="mt-1">For now Party Statements covers the marketplaces that pay bill to bill: {billToBill.map((m) => m.vendor).join(', ')}.</p>
         </div>
       )}
 
@@ -260,9 +261,9 @@ export default function Ledgers() {
         </>
       )}
 
-      {can(PERM.LEDGERS_SETTINGS) && (
+      {can(PERM.STATEMENTS_SETTINGS) && (
         <div className="flex justify-end mt-4">
-          <Button size="sm" variant="ghost" onClick={() => setSettingsOpen(true)}><Settings2 size={14} /> Ledger settings</Button>
+          <Button size="sm" variant="ghost" onClick={() => setSettingsOpen(true)}><Settings2 size={14} /> Statement settings</Button>
         </div>
       )}
 
@@ -278,7 +279,7 @@ export default function Ledgers() {
           onChanged={reload}
         />
       )}
-      {settingsOpen && <LedgerSettings syncFrom={p?.sync_from} onClose={() => setSettingsOpen(false)} onSaved={() => { setSettingsOpen(false); reload(); }} />}
+      {settingsOpen && <StatementSettings syncFrom={p?.sync_from} onClose={() => setSettingsOpen(false)} onSaved={() => { setSettingsOpen(false); reload(); }} />}
     </AppShell>
   );
 }
