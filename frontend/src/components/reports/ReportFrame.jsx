@@ -46,18 +46,20 @@ export default function ReportFrame({
   );
 }
 
-// A table with a header row, loading rows and an empty line.
+// A table with a header row, loading rows and an empty line. With maxHeight (a
+// Tailwind max-h class) it scrolls inside its box, the header staying put; a
+// foot that should stay put too gives its <tfoot> `sticky bottom-0`.
 export function ReportTable({
-  head, loading, empty, children, foot,
+  head, loading, empty, children, foot, maxHeight,
 }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className={maxHeight ? `overflow-auto ${maxHeight}` : 'overflow-x-auto'}>
         <table className="w-full text-sm">
-          <thead>
+          <thead className={maxHeight ? 'sticky top-0 z-10' : undefined}>
             <tr className="bg-gray-50 border-b border-gray-200">
               {head.map((h) => (
-                <th key={typeof h === 'string' ? h : h.label} className={`px-3 py-3 font-semibold text-gray-600 whitespace-nowrap ${h.right ? 'text-right' : 'text-left'}`}>
+                <th key={typeof h === 'string' ? h : h.label} className={`px-3 py-3 font-semibold text-gray-600 whitespace-nowrap bg-gray-50 ${maxHeight ? 'shadow-[inset_0_-1px_0_var(--color-gray-200)]' : ''} ${h.right ? 'text-right' : 'text-left'}`}>
                   {typeof h === 'string' ? h : h.label}
                 </th>
               ))}

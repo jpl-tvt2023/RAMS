@@ -23,10 +23,12 @@ export const NO_NARRATION = {
 // marketplace's DN, our CN, the payment or TDS advice): the whole row gets a
 // warm orange fill, with these words in its Files cell. Like the narration
 // highlight it is a fill, never a status badge, and nothing else on the screen
-// is orange.
+// is orange. On Debtors it marks an invoice (of a party on Ledgers) with a DN
+// or CN against it that has no file, and that note in the CN popup.
 export const NO_FILE = {
   label: 'No file',
   help: 'No PDF, photo or email on this row yet. Add its document: the invoice, the marketplace’s DN, our CN, or the payment or TDS advice.',
+  invoiceHelp: 'A DN or CN against this invoice has no file yet. Open its credit notes to see which, and add it on Ledgers.',
   className: 'bg-orange-200 text-orange-900',
   row: 'bg-orange-100',
 };

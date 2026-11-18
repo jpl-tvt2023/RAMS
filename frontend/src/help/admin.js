@@ -106,7 +106,7 @@ export const tallyCompanies = {
     {
       title: 'Choose the company the reports open on',
       steps: [
-        'The company marked Default for reports is the one Reports → Debtors opens on (MH to begin with).',
+        'The company marked Default for reports is the one Tally Reports → Debtors and Ledgers open on (MH to begin with).',
         'To change it, click the star on another company’s row. Only a company whose sync is on can be the default.',
         'Everyone sees the new default the next time they open the report in a new tab. The change is recorded in the Audit Log.',
       ],

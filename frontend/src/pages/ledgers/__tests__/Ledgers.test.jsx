@@ -30,7 +30,7 @@ const PARTIES = {
   today: '2026-11-07',
   sync_from: '2026-06-08',
   month_start: '2026-11-01',
-  companies: [{ id: 1, code: 'HR', name: 'Roymax HR' }, { id: 2, code: 'MH', name: 'Roymax MH' }],
+  companies: [{ id: 1, code: 'HR', name: 'Roymax HR', is_default: false }, { id: 2, code: 'MH', name: 'Roymax MH', is_default: true }],
   marketplaces: [
     { vendor: 'Minutes', parties: 1, bill_to_bill: true },
     { vendor: 'Zepto', parties: 2, bill_to_bill: true },
@@ -102,16 +102,21 @@ async function chooseCompany(user, code) {
   await user.selectOptions(screen.getByLabelText('Company'), code);
 }
 
-// Company → marketplace → all states → one party.
+// MH (already chosen) → Zepto, which resets states and parties to All → just
+// the Pune party.
 async function chooseZeptoPune(user) {
   await chooseCompany(user, 'MH');
   await user.selectOptions(screen.getByLabelText('Marketplace'), 'Zepto');
-  await user.click(screen.getByRole('button', { name: 'State' }));
-  await user.click(screen.getByRole('checkbox', { name: 'All states' }));
-  await user.click(screen.getByRole('button', { name: 'Done' }));
   await user.click(screen.getByRole('button', { name: 'Party' }));
+  await user.click(screen.getByRole('checkbox', { name: 'All parties' }));
   await user.click(screen.getByRole('checkbox', { name: /PUNE/ }));
   await user.click(screen.getByRole('button', { name: 'Done' }));
+}
+
+// The "Needs attention (N)" button opens the list in place.
+async function openAttentionList(user, total) {
+  await user.click(await screen.findByRole('button', { name: `Needs attention (${total})` }));
+  return screen.getByRole('region', { name: 'Needs attention' });
 }
 
 describe('Ledgers', () => {
@@ -123,16 +128,91 @@ describe('Ledgers', () => {
     ledgers.getLedgerParty.mockResolvedValue(DAY);
   });
 
-  test('nothing is chosen at first, each filter waits for the one before, and Needs attention shows meanwhile', async () => {
+  test('it opens on the starred company, every bill-to-bill marketplace, all states and parties, this month', async () => {
     renderWithProviders(<Ledgers />, { user: VIEWER });
-    const attention = (await screen.findByText(Z2.name)).closest('tr');
-    expect(within(attention).getByText('1 DN booked twice')).toBeInTheDocument();
-    expect(within(attention).getByText(/State differs: Tally says Maharashtra/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Company')).toHaveValue('');
-    expect(screen.getByLabelText('Marketplace')).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'State' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Party' })).toBeDisabled();
-    expect(ledgers.getLedgerStatement).not.toHaveBeenCalled();
+    await waitFor(() => expect(ledgers.getLedgerStatement).toHaveBeenCalledWith({
+      company_id: '2', vendor: 'all', states: 'all', parties: 'all',
+    }));
+    expect(screen.getByLabelText('Company')).toHaveValue('2');
+    expect(within(screen.getByLabelText('Company')).queryByRole('option', { name: 'Choose a company' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Marketplace')).toHaveValue('all');
+    expect(screen.getByRole('button', { name: 'State' })).toHaveTextContent('All states');
+    expect(screen.getByRole('button', { name: 'Party' })).toHaveTextContent('All parties');
+    expect(screen.getByLabelText('From')).toHaveValue('2026-11-01');
+    expect(screen.getByLabelText('To')).toHaveValue('2026-11-07');
+    expect(await screen.findByRole('button', { name: Z1.name })).toBeInTheDocument();
+  });
+
+  test('with no starred company it opens on All companies', async () => {
+    ledgers.getLedgerParties.mockResolvedValue({ ...PARTIES, companies: PARTIES.companies.map((c) => ({ ...c, is_default: false })) });
+    renderWithProviders(<Ledgers />, { user: VIEWER });
+    await waitFor(() => expect(ledgers.getLedgerStatement).toHaveBeenCalledWith({
+      company_id: 'all', vendor: 'all', states: 'all', parties: 'all',
+    }));
+    expect(screen.getByLabelText('Company')).toHaveValue('all');
+  });
+
+  test('a new company or marketplace resets the filters after it to All', async () => {
+    renderWithProviders(<Ledgers />, { user: VIEWER });
+    const user = userEvent.setup();
+    await chooseZeptoPune(user);
+    expect(screen.getByRole('button', { name: 'Party' })).toHaveTextContent(Z1.name);
+    await user.selectOptions(screen.getByLabelText('Marketplace'), 'Minutes');
+    expect(screen.getByRole('button', { name: 'Party' })).toHaveTextContent('All parties');
+    await user.selectOptions(screen.getByLabelText('Company'), 'All companies');
+    expect(screen.getByLabelText('Marketplace')).toHaveValue('all');
+    expect(screen.getByRole('button', { name: 'State' })).toHaveTextContent('All states');
+    await waitFor(() => expect(ledgers.getLedgerStatement).toHaveBeenLastCalledWith({
+      company_id: 'all', vendor: 'all', states: 'all', parties: 'all',
+    }));
+  });
+
+  test('with no party ticked it asks for one', async () => {
+    renderWithProviders(<Ledgers />, { user: VIEWER });
+    const user = userEvent.setup();
+    await screen.findByRole('button', { name: Z1.name });
+    await user.click(screen.getByRole('button', { name: 'Party' }));
+    await user.click(screen.getByRole('checkbox', { name: 'All parties' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.getByText('Choose at least one state and one party.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: Z1.name })).not.toBeInTheDocument();
+  });
+
+  test('Needs attention is a button that opens and closes the list', async () => {
+    renderWithProviders(<Ledgers />, { user: VIEWER });
+    const user = userEvent.setup();
+    const button = await screen.findByRole('button', { name: 'Needs attention (1)' });
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('region', { name: 'Needs attention' })).not.toBeInTheDocument();
+    const list = await openAttentionList(user, 1);
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    const row = within(list).getByRole('button', { name: Z2.name }).closest('tr');
+    expect(within(row).getByText('1 DN booked twice')).toBeInTheDocument();
+    expect(within(row).getByText(/State differs: Tally says Maharashtra/)).toBeInTheDocument();
+    await user.click(button);
+    expect(screen.queryByRole('region', { name: 'Needs attention' })).not.toBeInTheDocument();
+  });
+
+  test('nothing needing attention, no button', async () => {
+    ledgers.getLedgerParties.mockResolvedValue({ ...PARTIES, attention: [], attention_total: 0 });
+    renderWithProviders(<Ledgers />, { user: VIEWER });
+    await screen.findByRole('button', { name: Z1.name });
+    expect(screen.queryByRole('button', { name: /Needs attention/ })).not.toBeInTheDocument();
+  });
+
+  test('a party clicked in the statement is brought into view once its detail loads', async () => {
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+    ledgers.getLedgerStatement.mockResolvedValue({
+      ...STATEMENT, rows: [STATEMENT.rows[0], { ...STATEMENT.rows[0], party: Z2 }],
+    });
+    renderWithProviders(<Ledgers />, { user: VIEWER });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: Z2.name }));
+    await waitFor(() => expect(ledgers.getLedgerParty).toHaveBeenCalledWith({ company_id: '2', ledger_guid: 'Z2' }));
+    await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
+    await waitFor(() => expect(scrolled).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' }));
+    delete Element.prototype.scrollIntoView;
   });
 
   test('a marketplace that doesn’t pay bill to bill is coming soon', async () => {
@@ -194,10 +274,12 @@ describe('Ledgers', () => {
     expect(within(detail).queryByRole('button', { name: /^(Change|Remove) / })).not.toBeInTheDocument();
   });
 
-  test('Needs attention opens the party, from its oldest problem', async () => {
+  test('Needs attention opens the party, from its oldest problem, and closes', async () => {
     renderWithProviders(<Ledgers />, { user: VIEWER });
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: Z2.name }));
+    const list = await openAttentionList(user, 1);
+    await user.click(within(list).getByRole('button', { name: Z2.name }));
+    expect(screen.queryByRole('region', { name: 'Needs attention' })).not.toBeInTheDocument();
     await waitFor(() => expect(ledgers.getLedgerStatement).toHaveBeenCalledWith({
       company_id: '2', vendor: 'Zepto', states: 'all', parties: ['2:Z2'], from: '2026-09-03',
     }));
@@ -234,7 +316,7 @@ describe('Ledgers', () => {
 
   test('a Viewer has no settings button', async () => {
     renderWithProviders(<Ledgers />, { user: VIEWER });
-    await screen.findByText(Z2.name);
+    await screen.findByRole('button', { name: Z1.name });
     expect(screen.queryByRole('button', { name: /Ledger settings/ })).not.toBeInTheDocument();
   });
 });
@@ -310,7 +392,8 @@ describe('Ledgers files', () => {
   test('Needs attention counts the rows without a file, and opens just those', async () => {
     renderWithProviders(<Ledgers />, { user: VIEWER });
     const user = userEvent.setup();
-    const row = (await screen.findByRole('button', { name: Z1.name })).closest('tr');
+    const list = await openAttentionList(user, 2);
+    const row = within(list).getByRole('button', { name: Z1.name }).closest('tr');
     expect(within(row).getByText('2 without a file')).toBeInTheDocument();
     await user.click(within(row).getByRole('button', { name: Z1.name }));
     const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });

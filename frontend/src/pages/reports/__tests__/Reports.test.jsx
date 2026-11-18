@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Routes, Route } from 'react-router-dom';
 import Debtors from '../Debtors';
 import Invoices from '../Invoices';
 import Receivables from '../Receivables';
@@ -10,6 +11,8 @@ import { renderWithProviders, ACCOUNTANT, VIEWER } from '../../../test/renderWit
 import toast from 'react-hot-toast';
 import * as reports from '../../../api/reports.api';
 import * as sync from '../../../api/sync.api';
+import { downloadCsv } from '../../../utils/csv';
+import { NO_FILE } from '../../../utils/highlights';
 
 vi.mock('../../../api/reports.api', () => ({
   getDebtors: vi.fn(), getInvoices: vi.fn(), getNotes: vi.fn(), getTransfers: vi.fn(), getReceivables: vi.fn(), getExceptions: vi.fn(),
@@ -19,6 +22,7 @@ vi.mock('../../../api/sync.api', () => ({ getSyncStatus: vi.fn(), getSyncRuns: v
 vi.mock('../../../api/audit.api', () => ({ getEntityHistory: vi.fn().mockResolvedValue([]) }));
 vi.mock('../../../api/files.api', () => ({ uploadFile: vi.fn(), fetchFile: vi.fn(), deleteFile: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('../../../utils/csv', async (importOriginal) => ({ ...(await importOriginal()), downloadCsv: vi.fn() }));
 
 const COMPANIES = [{ id: 2, code: 'MH', name: 'Roymax MH' }];
 const INVOICE = {
@@ -132,6 +136,116 @@ describe('Debtors', () => {
     expect(within(dialog).getByRole('button', { name: 'View invoice 607.pdf' })).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: /Choose files/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: /^Remove / })).not.toBeInTheDocument();
+  });
+
+  describe('a DN or CN without a file', () => {
+    const PDF = {
+      id: 7, name: 'CN 1502.pdf', kind: 'pdf', size: 90000, uploaded_by_name: 'Asha', uploaded_at: '2026-11-02 09:00:00',
+    };
+    // A Zepto invoice (its party is on Ledgers) with one CN filed and one not,
+    // and a Blinkit invoice (not on Ledgers) whose CN has no file either.
+    const ZEPTO = {
+      ...DEBTOR,
+      guid: 'g700', number: '700/RM/26-27', party: 'ZEPTO PRIVATE LIMITED ( PUNE ) - Dark Store', vendor: 'Zepto', files: [],
+      ledger: { guid: 'Z1', vendor: 'Zepto' },
+      credit_notes: [
+        { ...DEBTOR.credit_notes[0], files: [] },
+        {
+          guid: 'cn2', number: 'CN/1502', date: '2026-07-25', voucher_type: 'Credit Note', amount_paise: 10000, rtv_no: null, files: [PDF],
+        },
+      ],
+      notes_without_file: 1,
+    };
+    const BLINKIT = {
+      ...DEBTOR, files: [], ledger: null, credit_notes: [{ ...DEBTOR.credit_notes[0], files: [] }], notes_without_file: 0,
+    };
+    const page = (rows) => ({
+      rows, total: rows.length, page: 1, page_size: 50, companies: COMPANIES, company_id: 2, tabs: [], all: rows.length, unknown: 0, sync_from: '2026-06-08',
+      totals: { invoices: rows.length, total_paise: 0, credit_notes_paise: 0, outstanding_paise: 0, overdue_paise: 0 },
+    });
+    const rowOf = (number) => screen.getByText(number).closest('tr');
+
+    beforeEach(() => { reports.getDebtors.mockResolvedValue(page([ZEPTO, BLINKIT])); });
+
+    test('the invoice is orange and says how many; one not on Ledgers never is', async () => {
+      renderWithProviders(<Debtors />, { user: VIEWER });
+      await screen.findByText('700/RM/26-27');
+      expect(rowOf('700/RM/26-27')).toHaveClass(NO_FILE.row);
+      expect(within(rowOf('700/RM/26-27')).getByText('1 without a file')).toBeInTheDocument();
+      expect(rowOf('607/RM/26-27')).not.toHaveClass(NO_FILE.row);
+      expect(within(rowOf('607/RM/26-27')).queryByText(/without a file/)).not.toBeInTheDocument();
+      expect(screen.getByRole('note', { name: 'What the colours mean' })).toHaveTextContent('No file');
+    });
+
+    test('no orange row, no legend', async () => {
+      reports.getDebtors.mockResolvedValue(page([BLINKIT]));
+      renderWithProviders(<Debtors />, { user: VIEWER });
+      await screen.findByText('607/RM/26-27');
+      expect(screen.queryByRole('note', { name: 'What the colours mean' })).not.toBeInTheDocument();
+    });
+
+    test('the CN popup says which note has no file, and opens the files of one that has', async () => {
+      renderWithProviders(<Debtors />, { user: VIEWER });
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Credit notes on 700/RM/26-27' }));
+      const dialog = screen.getByRole('dialog', { name: 'Credit notes — 700/RM/26-27' });
+      const bare = within(dialog).getByText('CN/1501').closest('tr');
+      expect(bare).toHaveClass(NO_FILE.row);
+      expect(within(bare).getByText('No file')).toBeInTheDocument();
+      expect(within(bare).getByRole('button', { name: 'Add it on Ledgers' })).toBeInTheDocument();
+      const filed = within(dialog).getByText('CN/1502').closest('tr');
+      expect(filed).not.toHaveClass(NO_FILE.row);
+      await user.click(within(filed).getByRole('button', { name: 'Files on Credit Note CN/1502' }));
+      const files = screen.getByRole('dialog', { name: 'Files — Credit Note CN/1502' });
+      expect(within(files).getByText('CN 1502.pdf')).toBeInTheDocument();
+      expect(within(files).queryByRole('button', { name: /Choose files/ })).not.toBeInTheDocument();
+    });
+
+    test('a Blinkit note without a file is not flagged in the popup', async () => {
+      renderWithProviders(<Debtors />, { user: VIEWER });
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Credit notes on 607/RM/26-27' }));
+      const dialog = screen.getByRole('dialog', { name: 'Credit notes — 607/RM/26-27' });
+      expect(within(dialog).getByText('CN/1501').closest('tr')).not.toHaveClass(NO_FILE.row);
+      expect(within(dialog).queryByText('No file')).not.toBeInTheDocument();
+    });
+
+    test('“Add it on Ledgers” opens that party there, from the note’s date, showing the rows without a file', async () => {
+      renderWithProviders(
+        <Routes>
+          <Route path="/reports/debtors" element={<Debtors />} />
+          <Route path="/ledgers" element={<p>Ledgers page</p>} />
+        </Routes>,
+        { user: VIEWER, route: '/reports/debtors' },
+      );
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Credit notes on 700/RM/26-27' }));
+      await user.click(screen.getByRole('button', { name: 'Add it on Ledgers' }));
+      expect(screen.getByText('Ledgers page')).toBeInTheDocument();
+      expect(JSON.parse(sessionStorage.getItem('rams:ledgers.filters.v2:v1'))).toMatchObject({
+        company: '2', vendor: 'Zepto', states: 'all', parties: ['2:Z1'], from: '2026-07-20', to: '', open: '2:Z1', nofile: true,
+      });
+    });
+
+    test('without “See Ledgers” the note still says No file, with no link', async () => {
+      renderWithProviders(<Debtors />, { user: { ...VIEWER, permissions: VIEWER.permissions.filter((k) => k !== 'ledgers.view') } });
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Credit notes on 700/RM/26-27' }));
+      const dialog = screen.getByRole('dialog', { name: 'Credit notes — 700/RM/26-27' });
+      expect(within(dialog).getByText('No file')).toBeInTheDocument();
+      expect(within(dialog).queryByRole('button', { name: 'Add it on Ledgers' })).not.toBeInTheDocument();
+    });
+
+    test('the CSV lists the notes without a file', async () => {
+      renderWithProviders(<Debtors />, { user: VIEWER });
+      const user = userEvent.setup();
+      await screen.findByText('700/RM/26-27');
+      await user.click(screen.getByRole('button', { name: /Download CSV/ }));
+      await waitFor(() => expect(downloadCsv).toHaveBeenCalled());
+      const [, columns, rows] = downloadCsv.mock.calls[0];
+      const col = columns.find(([h]) => h === 'CN without a file');
+      expect(rows.map((r) => col[1](r))).toEqual(['CN/1501', '']);
+    });
   });
 
   test('clicking a CN amount opens each credit note’s details', async () => {

@@ -13,7 +13,7 @@ A running order for showing the client what RAMS does today, on production (http
   - a PO under *Needs review*;
   - a marketplace with overdue invoices in Debtors;
   - one real marketplace DN number from the portal (to type in flow 8).
-- [ ] Only **Debtors** is released under Reports. The other report screens are held and don't show in the menu, so don't promise them as done.
+- [ ] Under **Tally Reports** only **Debtors** and **Ledgers** are released. The other report screens are held and don't show in the menu, so don't promise them as done. **Purchase Reports** shows greyed as *Coming soon*.
 
 ## Running order
 
@@ -92,7 +92,7 @@ A running order for showing the client what RAMS does today, on production (http
 ### 6. Debtors: what each marketplace owes
 - **Show:** every invoice, what settled it, and what is still owed or overdue, straight from Tally.
 - **Steps:**
-  1. **Reports → Debtors.** It opens on MH. Switch to **All companies** for the consolidated view.
+  1. **Tally Reports → Debtors.** It opens on MH. Switch to **All companies** for the consolidated view. A Zepto, Minutes or Now invoice is orange while a DN or CN against it has no file: click its CN amount to show which, and *Add it on Ledgers*.
   2. Click a marketplace tab, then the statuses **Open** and **Overdue**. The line above the table adds up invoiced, credit notes, outstanding and overdue.
   3. In the **CN** column, click an amount. The pop-up lists each credit note, with its ROMS RTV row and its narration.
   4. Choose the status **No PO**: invoices not linked to any ROMS PO.
@@ -110,14 +110,10 @@ A running order for showing the client what RAMS does today, on production (http
 ### 8. Ledgers: the bill-to-bill statement (Minutes, Now, Zepto)
 - **Show:** one row per party: **Opening | Invoice | DN | CN | TDS | Journal/Adj | Receipt | Closing**. Every row is Tally's: nothing is typed in RAMS. Each row carries its document, and a row without one is orange.
 - **Steps:**
-  1. Click **Ledgers** in the top bar. Before anything is chosen, **Needs attention** lists the parties with a problem.
-  2. Choose:
-     - Company **MH**;
-     - Marketplace **Zepto**;
-     - State **All states** → Done;
-     - Party **All parties** → Done.
+  1. **Tally Reports → Ledgers.** It opens on MH, All (Minutes, Now, Zepto), All states, All parties, this month, with the statement already there. **Needs attention (N)** above it opens the parties with a problem.
+  2. Narrow it: Marketplace **Zepto** (states and parties go back to All). The list scrolls in its box; click a party and its detail opens right under it.
 
-     The dates default to this month. Use **From** to start at 8 Jun to show more history.
+     Use **From** to start at 8 Jun to show more history.
   3. Read a row:
      - The opening says *From Tally*.
      - Invoices add to the balance; DN, CN, TDS and receipts take it down.

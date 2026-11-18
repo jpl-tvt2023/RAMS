@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Settings, Users, ScrollText, Building2, Link2, ListChecks, SlidersHorizontal, BookUser, ShieldCheck, LifeBuoy, PenLine,
-  FileText, Receipt, ArrowLeftRight, Wallet, AlertTriangle, Activity, BarChart3, IndianRupee, BookOpen, CalendarClock, HardDrive,
+  FileText, Receipt, ArrowLeftRight, Wallet, AlertTriangle, Activity, BarChart3, IndianRupee, BookOpen, CalendarClock, HardDrive, ShoppingCart,
 } from 'lucide-react';
 import { isReleased } from './releases';
 
@@ -54,11 +54,13 @@ export const PERM = {
  * group with no child the user may see disappears. `permission` (a key, or a
  * list where any one is enough) follows Admin -> Roles & permissions; `roles`
  * is fixed. Each screen comes with a Help section (src/help). A screen still
- * held (utils/releases.js) is left out, and a group left empty with it.
+ * held (utils/releases.js) is left out, and a group left empty with it. A
+ * COMING-SOON leaf { label, icon, comingSoon: true, roles } has no path: the
+ * top bar shows it greyed with "Coming soon", and it can't be clicked.
  */
 const withoutHeld = (entries) => entries
   .map((e) => (e.children ? { ...e, children: e.children.filter((c) => isReleased(c.path)) } : e))
-  .filter((e) => (e.children ? e.children.length > 0 : isReleased(e.path)));
+  .filter((e) => (e.children ? e.children.length > 0 : e.comingSoon || isReleased(e.path)));
 
 export const NAV = withoutHeld([
   {
@@ -102,11 +104,14 @@ export const NAV = withoutHeld([
     ],
   },
   {
-    label: 'Reports',
+    label: 'Tally Reports',
     icon: BarChart3,
     children: [
       {
         label: 'Debtors', path: '/reports/debtors', icon: IndianRupee, description: 'What each invoice still owes, by marketplace', permission: PERM.REPORTS_VIEW,
+      },
+      {
+        label: 'Ledgers', path: '/ledgers', icon: BookOpen, description: 'Bill-to-bill statement per party, from Tally', permission: PERM.LEDGERS_VIEW,
       },
       {
         label: 'Invoices', path: '/reports/invoices', icon: FileText, description: 'Every Tally sales invoice, what settled it and what is owed', permission: PERM.REPORTS_VIEW,
@@ -129,11 +134,10 @@ export const NAV = withoutHeld([
     ],
   },
   {
-    label: 'Ledgers',
-    path: '/ledgers',
-    icon: BookOpen,
-    description: 'Bill-to-bill statement per party, checked against Tally',
-    permission: PERM.LEDGERS_VIEW,
+    label: 'Purchase Reports',
+    icon: ShoppingCart,
+    comingSoon: true,
+    roles: ALL_ROLES,
   },
   {
     label: 'Admin',

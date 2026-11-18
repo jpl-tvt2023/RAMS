@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Paperclip } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import FilesDialog from '../../components/files/FilesDialog';
+import Legend from '../../components/shared/Legend';
 import Pagination, { loadPersistedPageSize, persistPageSize } from '../../components/ui/Pagination';
 import ReportFrame, {
   ReportTable, selectCls, td, num,
@@ -14,13 +15,19 @@ import { useSessionState } from '../../hooks/useSessionState';
 import { formatDay, formatRupees } from '../../utils/formatters';
 import { downloadCsv, rupeesForCsv } from '../../utils/csv';
 import Narration from '../../components/shared/Narration';
-import { narrationForCsv } from '../../utils/highlights';
+import { narrationForCsv, NO_FILE } from '../../utils/highlights';
+import { useAuth } from '../../context/AuthContext';
+import { PERM } from '../../utils/roles';
+import { openLedgersAt } from '../../utils/ledgerLinks';
 
-// Reports -> Debtors: each Tally sales invoice with its internal (ROMS) and
-// vendor PO numbers, total, credit notes and what is still owed, a tab per
+// Tally Reports -> Debtors: each Tally sales invoice with its internal (ROMS)
+// and vendor PO numbers, total, credit notes and what is still owed, a tab per
 // marketplace. It opens on the company set as the default on Admin -> Tally
 // companies ('default' until the person picks one). Stock transfers are left
-// out. An invoice's files (added on Ledgers) can be viewed and downloaded.
+// out. The files on an invoice and on its credit notes (added on Ledgers) can
+// be viewed and downloaded. An invoice of a party on Ledgers is orange while a
+// DN or CN against it has no file; the CN popup says which, and links to
+// Ledgers to add it.
 const STATUSES = [['', 'All'], ['open', 'Open'], ['overdue', 'Overdue'], ['settled', 'Settled'], ['no_po', 'No PO']];
 const STATUS_LABEL = {
   open: 'Open', overdue: 'Overdue', settled: 'Settled', not_billwise: 'Not bill-wise',
@@ -41,7 +48,37 @@ function Outstanding({ r }) {
   );
 }
 
-function CreditNotes({ invoice, onClose }) {
+// A credit note's files in the popup: how many (they open read-only), or, for
+// a party on Ledgers, an orange "No file" and a link to add it there.
+function NoteFiles({
+  note, invoice, canLedgers, onFiles, onLedgers,
+}) {
+  const files = note.files || [];
+  if (files.length) {
+    return (
+      <button type="button" aria-label={`Files on ${note.voucher_type} ${note.number}`} onClick={() => onFiles(note)} className="inline-flex items-center gap-1 text-brand hover:underline whitespace-nowrap">
+        <Paperclip size={14} aria-hidden="true" />
+        {files.length} {files.length === 1 ? 'file' : 'files'}
+      </button>
+    );
+  }
+  if (!invoice.ledger) return <span className="text-gray-400">—</span>;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span title={NO_FILE.help} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap ${NO_FILE.className}`}>
+        <Paperclip size={12} aria-hidden="true" />
+        {NO_FILE.label}
+      </span>
+      {canLedgers && (
+        <button type="button" onClick={() => onLedgers(note)} className="text-xs font-medium text-brand hover:underline whitespace-nowrap">Add it on Ledgers</button>
+      )}
+    </span>
+  );
+}
+
+function CreditNotes({
+  invoice, onClose, canLedgers, onFiles, onLedgers,
+}) {
   const cns = invoice?.credit_notes || [];
   return (
     <Modal isOpen={!!invoice} onClose={onClose} title={`Credit notes — ${invoice?.number}`} size="lg">
@@ -50,20 +87,23 @@ function CreditNotes({ invoice, onClose }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              {['CN No', 'Date', 'Type', 'Narration', 'Amount', 'RTV No'].map((h) => (
+              {['CN No', 'Date', 'Type', 'Narration', 'Amount', 'RTV No', 'Files'].map((h) => (
                 <th key={h} className={`px-3 py-2 font-semibold text-gray-600 whitespace-nowrap ${h === 'Amount' ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {cns.map((c) => (
-              <tr key={c.guid || c.number} className="border-b border-gray-100">
+              <tr key={c.guid || c.number} className={`border-b border-gray-100 ${invoice.ledger && !(c.files || []).length ? NO_FILE.row : ''}`}>
                 <td className={`${td} font-medium`}>{c.number}</td>
                 <td className={`${td} whitespace-nowrap`}>{formatDay(c.date)}</td>
                 <td className={td}>{c.voucher_type}</td>
                 <td className={td}><Narration text={c.narration} missing={c.narration_missing} /></td>
                 <td className={num}>{formatRupees(c.amount_paise)}</td>
                 <td className={td}>{c.rtv_no || <span className="text-gray-400">—</span>}</td>
+                <td className={td}>
+                  <NoteFiles note={c} invoice={invoice} canLedgers={canLedgers} onFiles={onFiles} onLedgers={onLedgers} />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -72,7 +112,7 @@ function CreditNotes({ invoice, onClose }) {
               <tr className="bg-gray-50 font-semibold">
                 <td className={td} colSpan={4}>Total</td>
                 <td className={num}>{formatRupees(invoice.credit_notes_paise)}</td>
-                <td />
+                <td colSpan={2} />
               </tr>
             </tfoot>
           )}
@@ -81,22 +121,45 @@ function CreditNotes({ invoice, onClose }) {
       <p className="text-xs text-gray-500 mt-3">
         Each amount is what that credit note was set against this invoice in Tally. One credit note can be split across several invoices.
         The RTV No is the ROMS return row it was linked to, when there is one.
+        {invoice?.ledger && ' Each note’s document (the marketplace’s DN, or our CN) is added on Ledgers; until it is, the note and this invoice are orange.'}
       </p>
     </Modal>
   );
 }
 
 export default function Debtors() {
+  const { can } = useAuth();
+  const navigate = useNavigate();
   const [filters, setFilters] = useSessionState('reports.debtors', DEFAULTS);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(() => loadPersistedPageSize('debtors', 50));
   const [cnsOf, setCnsOf] = useState(null);
-  const [filesOf, setFilesOf] = useState(null);
+  const [filesOf, setFilesOf] = useState(null); // { title, subtitle, files }
   const { data, last, loading } = useKeyedLoad(getDebtors, { ...filters, page, page_size: pageSize });
   const set = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
   const view = data || { rows: [], total: last?.total || 0 };
   const shown = data || last;
   const companyId = filters.company_id === 'default' ? String(last?.company_id ?? '') : filters.company_id;
+  const canLedgers = can(PERM.LEDGERS_VIEW);
+
+  const invoiceFiles = (r) => setFilesOf({
+    title: `Invoice ${r.number}`, subtitle: `${r.party} · ${r.company} · ${formatDay(r.date)}. Files are added on Ledgers.`, files: r.files,
+  });
+  const noteFiles = (c) => {
+    const inv = cnsOf;
+    setCnsOf(null);
+    setFilesOf({
+      title: `${c.voucher_type} ${c.number}`, subtitle: `${inv.party} · ${inv.company} · ${formatDay(c.date)}. Files are added on Ledgers.`, files: c.files,
+    });
+  };
+  // Ledgers, on the invoice's party from the note's date, showing just the
+  // rows without a file.
+  const addOnLedgers = (c) => {
+    openLedgersAt({
+      companyId: cnsOf.company_id, vendor: cnsOf.ledger.vendor, guid: cnsOf.ledger.guid, date: c.date, syncFrom: shown?.sync_from, nofile: true,
+    });
+    navigate('/ledgers');
+  };
 
   const tabs = [
     ['', 'All', shown?.all],
@@ -112,6 +175,7 @@ export default function Debtors() {
         ['Marketplace', (r) => r.vendor || ''], ['Internal PO no', (r) => r.pos.join(' ')], ['Vendor PO no', (r) => r.vendor_pos.join(' ')],
         ['Amount', (r) => rupeesForCsv(r.total_paise)], ['CN', (r) => rupeesForCsv(r.credit_notes_paise)], ['CN numbers', (r) => r.credit_notes.map((c) => c.number).join(' ')],
         ['Outstanding', (r) => rupeesForCsv(r.outstanding_paise)], ['Status', (r) => STATUS_LABEL[r.status] || r.status],
+        ['CN without a file', (r) => (r.ledger ? r.credit_notes.filter((c) => !(c.files || []).length).map((c) => c.number).join(' ') : '')],
       ], all.rows);
     } catch { toast.error('The download failed'); }
   };
@@ -155,7 +219,7 @@ export default function Debtors() {
         empty={!loading && view.rows.length === 0 && <p className="text-center text-gray-400 py-8">No invoice matches these filters.</p>}
       >
         {view.rows.map((r) => (
-          <tr key={r.guid} className="border-b border-gray-100 align-top">
+          <tr key={r.guid} className={`border-b border-gray-100 align-top ${r.notes_without_file > 0 ? NO_FILE.row : ''}`}>
             <td className={`${td} whitespace-nowrap`}>
               <span className="font-medium">{r.number}</span>
               <p className="text-xs text-gray-400">{r.company} · {formatDay(r.date)}</p>
@@ -176,11 +240,17 @@ export default function Debtors() {
                   <span className="block text-xs text-gray-500 whitespace-normal">{r.credit_notes.map((c) => c.number).join(', ')}</span>
                 </button>
               ) : <span className="text-gray-400">—</span>}
+              {r.notes_without_file > 0 && (
+                <span title={NO_FILE.invoiceHelp} className={`mt-0.5 ml-auto flex w-fit items-center gap-1 px-1.5 rounded text-xs font-medium whitespace-nowrap ${NO_FILE.className}`}>
+                  <Paperclip size={11} aria-hidden="true" />
+                  {r.notes_without_file} without a file
+                </span>
+              )}
             </td>
             <td className={`${num} font-medium`}><Outstanding r={r} /></td>
             <td className={td}>
               {r.files?.length > 0 ? (
-                <button type="button" onClick={() => setFilesOf(r)} aria-label={`Files on ${r.number}`} className="inline-flex items-center gap-1 text-brand hover:underline whitespace-nowrap">
+                <button type="button" onClick={() => invoiceFiles(r)} aria-label={`Files on ${r.number}`} className="inline-flex items-center gap-1 text-brand hover:underline whitespace-nowrap">
                   <Paperclip size={14} aria-hidden="true" />
                   {r.files.length} {r.files.length === 1 ? 'file' : 'files'}
                 </button>
@@ -189,13 +259,14 @@ export default function Debtors() {
           </tr>
         ))}
       </ReportTable>
+      {view.rows.some((r) => r.notes_without_file > 0) && <Legend items={[]} withNoFile className="mt-2" />}
       <Pagination page={page} pageSize={pageSize} total={view.total} onPageChange={setPage}
         onPageSizeChange={(s) => { setPageSize(s); persistPageSize('debtors', s); setPage(1); }} />
-      <CreditNotes invoice={cnsOf} onClose={() => setCnsOf(null)} />
+      <CreditNotes invoice={cnsOf} onClose={() => setCnsOf(null)} canLedgers={canLedgers} onFiles={noteFiles} onLedgers={addOnLedgers} />
       {filesOf && (
         <FilesDialog
-          title={`Invoice ${filesOf.number}`}
-          subtitle={`${filesOf.party} · ${filesOf.company} · ${formatDay(filesOf.date)}. Files are added on Ledgers.`}
+          title={filesOf.title}
+          subtitle={filesOf.subtitle}
           files={filesOf.files}
           onClose={() => setFilesOf(null)}
         />

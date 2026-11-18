@@ -5,6 +5,8 @@ const {
 } = require('../books/book');
 const { narrationLookup } = require('../services/narration');
 const { filesFor } = require('../services/files');
+const { SYNC_FROM } = require('../config/env');
+const { loadSettings: loadLedgerSettings, loadParties } = require('../ledgers/ledger');
 
 // Reports: Debtors, Invoices, Credit & debit notes, Stock transfers,
 // Receivables and Exceptions, worked out at read time from the Tally copy
@@ -48,6 +50,13 @@ const sum = (list, k) => list.reduce((a, r) => a + (Number(r[k]) || 0), 0);
 // each invoice with its internal (ROMS) and vendor PO numbers, total, credit
 // notes and what is still owed, a tab per marketplace. vendor '-' = no
 // marketplace known. Stock transfers are left out.
+//
+// Files: each invoice and each credit note against it carries the files added
+// on Ledgers. An invoice of a party on Ledgers (a bill-to-bill marketplace,
+// the only place files are added) counts its credit notes -- ours and the
+// marketplace's DNs, which Tally books as credit notes -- that have no file
+// (notes_without_file); Debtors highlights it until each has one. `ledger`
+// says where on Ledgers to add them.
 async function debtors(req, res, next) {
   try {
     const q = req.query;
@@ -95,30 +104,42 @@ async function debtors(req, res, next) {
                                      AND d.voucher_guid IN (${guids.map(() => '?').join(',')})`, guids);
       for (const l of links) rtvOf.set(`${Number(l.company_id)}|${l.voucher_guid}`, l.rtv_no);
     }
-    // The files attached to each invoice on Ledgers.
-    const found = await filesFor(db, { vouchers: page.rows.map((i) => [i.company_id, i.guid]) });
-    page.rows = page.rows.map((i) => ({
-      company_id: i.company_id,
-      company: i.company,
-      guid: i.guid,
-      number: i.number,
-      date: i.date,
-      ...narrationOf(i.company_id, i.guid),
-      party: i.party,
-      vendor: i.vendor,
-      pos: i.pos,
-      vendor_pos: i.vendor_pos,
-      total_paise: i.total_paise,
-      credit_notes_paise: i.credit_notes_paise,
-      credit_notes: cnsOf(i).map((s) => ({
-        guid: s.guid, number: s.number, date: s.date, voucher_type: s.voucher_type, amount_paise: s.amount_paise, rtv_no: rtvOf.get(`${i.company_id}|${s.guid}`) || null, ...narrationOf(i.company_id, s.guid),
-      })),
-      outstanding_paise: i.outstanding_paise,
-      status: i.status,
-      due_date: i.due_date,
-      overdue_days: i.overdue_days,
-      files: found.voucher(i.company_id, i.guid),
-    }));
+    // The files on each invoice and each of its credit notes, and which
+    // parties are on Ledgers.
+    const [found, onLedgers] = await Promise.all([
+      filesFor(db, { vouchers: page.rows.flatMap((i) => [[i.company_id, i.guid], ...cnsOf(i).map((c) => [i.company_id, c.guid])]) }),
+      loadLedgerSettings(db).then((settings) => loadParties(db, settings)),
+    ]);
+    const ledgerOf = new Map(onLedgers.filter((x) => x.bill_to_bill).map((x) => [`${x.company_id}|${String(x.name).toLowerCase()}`, x]));
+    page.sync_from = SYNC_FROM;
+    page.rows = page.rows.map((i) => {
+      const ledger = ledgerOf.get(`${i.company_id}|${String(i.party || '').toLowerCase()}`) || null;
+      const notes = cnsOf(i).map((s) => ({
+        guid: s.guid, number: s.number, date: s.date, voucher_type: s.voucher_type, amount_paise: s.amount_paise, rtv_no: rtvOf.get(`${i.company_id}|${s.guid}`) || null, ...narrationOf(i.company_id, s.guid), files: found.voucher(i.company_id, s.guid),
+      }));
+      return {
+        company_id: i.company_id,
+        company: i.company,
+        guid: i.guid,
+        number: i.number,
+        date: i.date,
+        ...narrationOf(i.company_id, i.guid),
+        party: i.party,
+        vendor: i.vendor,
+        pos: i.pos,
+        vendor_pos: i.vendor_pos,
+        total_paise: i.total_paise,
+        credit_notes_paise: i.credit_notes_paise,
+        credit_notes: notes,
+        outstanding_paise: i.outstanding_paise,
+        status: i.status,
+        due_date: i.due_date,
+        overdue_days: i.overdue_days,
+        files: found.voucher(i.company_id, i.guid),
+        ledger: ledger && { guid: ledger.guid, vendor: ledger.vendor },
+        notes_without_file: ledger ? notes.filter((c) => !c.files.length).length : 0,
+      };
+    });
     res.json(page);
   } catch (err) { sendError(res, next, err); }
 }

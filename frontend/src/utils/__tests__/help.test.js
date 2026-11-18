@@ -8,8 +8,9 @@ import { NAV } from '../roles';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 // The user guide is kept with the screens: every page in the top bar has its
-// section, and every page's Help link points at one that exists.
-const leaves = NAV.flatMap((n) => (n.children ? n.children : [n]));
+// section, and every page's Help link points at one that exists. A
+// coming-soon entry is no page yet.
+const leaves = NAV.flatMap((n) => (n.children ? n.children : [n])).filter((n) => !n.comingSoon);
 
 function sourceFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {

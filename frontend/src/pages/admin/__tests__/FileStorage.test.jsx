@@ -75,7 +75,7 @@ describe('File storage', () => {
     );
     await userEvent.setup().click(await screen.findByRole('button', { name: 'Open DN scan.jpg on Ledgers' }));
     expect(screen.getByText('Ledgers page')).toBeInTheDocument();
-    expect(JSON.parse(sessionStorage.getItem('rams:ledgers.filters:v1'))).toMatchObject({
+    expect(JSON.parse(sessionStorage.getItem('rams:ledgers.filters.v2:v1'))).toMatchObject({
       company: '2', vendor: 'Zepto', states: 'all', parties: ['2:Z1'], from: '2026-06-08', to: '', open: '2:Z1', nofile: false,
     });
   });
