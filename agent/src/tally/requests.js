@@ -19,7 +19,7 @@
 //               light sync.
 //   list        GUID, AlterID and date only: the end-of-day deletion check.
 //   balances    Collection export of every ledger's closing balance as at a
-//               date, which the Ledgers page starts each party's balance from.
+//               date, which Party Statements starts each party's balance from.
 //   sysinfo     A tiny report of Tally's licence mode, for the heartbeat.
 const { parseXml, findAll, txt } = require('./parse');
 

@@ -207,9 +207,9 @@ describeIf('sync: mock Tally -> RAMS', () => {
     expect(mock.requests.length).toBe(before);
   });
 
-  // What the Ledgers page starts a MH party from (backend ledgers/ledger.js).
+  // What Party Statements starts a MH party from (backend statements/statement.js).
   const startOf = async (ledger) => {
-    const { startingBalanceOf } = require(path.join(BACKEND, 'src', 'ledgers', 'ledger'));
+    const { startingBalanceOf } = require(path.join(BACKEND, 'src', 'statements', 'statement'));
     const mh = books.company('MH');
     return startingBalanceOf(rams.db, {
       companyId: await companyId('MH'), ledgerGuid: `ledger-${mh.ledgers.indexOf(ledger)}`, ledgerName: ledger.name,
@@ -233,7 +233,7 @@ describeIf('sync: mock Tally -> RAMS', () => {
     expect(await startOf(zepto)).toMatchObject({ source: 'tally', as_of: '2027-03-31', paise: Math.round(-before1Apr * 100) });
   });
 
-  test('Tally refusing the balances is logged, not a failed sync, and Ledgers falls back until a sync brings them', async () => {
+  test('Tally refusing the balances is logged, not a failed sync, and Party Statements falls back until a sync brings them', async () => {
     const zepto = books.company('MH').ledgers.find((l) => l.opening);
     const logs = [];
     books.dataset.failWhen = (d) => /ledger balances/i.test(d.id);
