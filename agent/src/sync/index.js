@@ -12,7 +12,7 @@
 //   resync    the same from the start, after a restore or a rename
 //
 // Every kind ends with Tally's closing balance of each ledger as at the end of
-// the window, which the Ledgers page starts each party's balance from. Not
+// the window, which Party Statements starts each party's balance from. Not
 // getting them is logged, never a failed sync.
 //
 // RAMS moves the watermarks only when the run finishes ok, to the counters

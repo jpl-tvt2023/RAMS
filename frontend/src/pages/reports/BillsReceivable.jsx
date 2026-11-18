@@ -9,7 +9,7 @@ import Pagination, { loadPersistedPageSize, persistPageSize } from '../../compon
 import ReportFrame, {
   ReportTable, selectCls, td, num,
 } from '../../components/reports/ReportFrame';
-import { getDebtors } from '../../api/reports.api';
+import { getBillsReceivable } from '../../api/reports.api';
 import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
 import { formatDay, formatRupees } from '../../utils/formatters';
@@ -18,16 +18,17 @@ import Narration from '../../components/shared/Narration';
 import { narrationForCsv, NO_FILE } from '../../utils/highlights';
 import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
-import { openLedgersAt } from '../../utils/ledgerLinks';
+import { openStatementsAt } from '../../utils/statementLinks';
 
-// Tally Reports -> Debtors: each Tally sales invoice with its internal (ROMS)
+// Tally Reports -> Bills Receivable (the page at /reports/bills-receivable, once called Debtors):
+// each Tally sales invoice with its internal (ROMS)
 // and vendor PO numbers, total, credit notes and what is still owed, a tab per
 // marketplace. It opens on the company set as the default on Admin -> Tally
 // companies ('default' until the person picks one). Stock transfers are left
-// out. The files on an invoice and on its credit notes (added on Ledgers) can
-// be viewed and downloaded. An invoice of a party on Ledgers is orange while a
+// out. The files on an invoice and on its credit notes (added on Party Statements) can
+// be viewed and downloaded. An invoice of a party on Party Statements is orange while a
 // DN or CN against it has no file; the CN popup says which, and links to
-// Ledgers to add it.
+// Party Statements to add it.
 const STATUSES = [['', 'All'], ['open', 'Open'], ['overdue', 'Overdue'], ['settled', 'Settled'], ['no_po', 'No PO']];
 const STATUS_LABEL = {
   open: 'Open', overdue: 'Overdue', settled: 'Settled', not_billwise: 'Not bill-wise',
@@ -49,9 +50,9 @@ function Outstanding({ r }) {
 }
 
 // A credit note's files in the popup: how many (they open read-only), or, for
-// a party on Ledgers, an orange "No file" and a link to add it there.
+// a party on Party Statements, an orange "No file" and a link to add it there.
 function NoteFiles({
-  note, invoice, canLedgers, onFiles, onLedgers,
+  note, invoice, canStatements, onFiles, onStatements,
 }) {
   const files = note.files || [];
   if (files.length) {
@@ -69,15 +70,15 @@ function NoteFiles({
         <Paperclip size={12} aria-hidden="true" />
         {NO_FILE.label}
       </span>
-      {canLedgers && (
-        <button type="button" onClick={() => onLedgers(note)} className="text-xs font-medium text-brand hover:underline whitespace-nowrap">Add it on Ledgers</button>
+      {canStatements && (
+        <button type="button" onClick={() => onStatements(note)} className="text-xs font-medium text-brand hover:underline whitespace-nowrap">Add it on Party Statements</button>
       )}
     </span>
   );
 }
 
 function CreditNotes({
-  invoice, onClose, canLedgers, onFiles, onLedgers,
+  invoice, onClose, canStatements, onFiles, onStatements,
 }) {
   const cns = invoice?.credit_notes || [];
   return (
@@ -102,7 +103,7 @@ function CreditNotes({
                 <td className={num}>{formatRupees(c.amount_paise)}</td>
                 <td className={td}>{c.rtv_no || <span className="text-gray-400">—</span>}</td>
                 <td className={td}>
-                  <NoteFiles note={c} invoice={invoice} canLedgers={canLedgers} onFiles={onFiles} onLedgers={onLedgers} />
+                  <NoteFiles note={c} invoice={invoice} canStatements={canStatements} onFiles={onFiles} onStatements={onStatements} />
                 </td>
               </tr>
             ))}
@@ -121,44 +122,44 @@ function CreditNotes({
       <p className="text-xs text-gray-500 mt-3">
         Each amount is what that credit note was set against this invoice in Tally. One credit note can be split across several invoices.
         The RTV No is the ROMS return row it was linked to, when there is one.
-        {invoice?.ledger && ' Each note’s document (the marketplace’s DN, or our CN) is added on Ledgers; until it is, the note and this invoice are orange.'}
+        {invoice?.ledger && ' Each note’s document (the marketplace’s DN, or our CN) is added on Party Statements; until it is, the note and this invoice are orange.'}
       </p>
     </Modal>
   );
 }
 
-export default function Debtors() {
+export default function BillsReceivable() {
   const { can } = useAuth();
   const navigate = useNavigate();
-  const [filters, setFilters] = useSessionState('reports.debtors', DEFAULTS);
+  const [filters, setFilters] = useSessionState('reports.billsReceivable', DEFAULTS);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(() => loadPersistedPageSize('debtors', 50));
+  const [pageSize, setPageSize] = useState(() => loadPersistedPageSize('billsReceivable', 50));
   const [cnsOf, setCnsOf] = useState(null);
   const [filesOf, setFilesOf] = useState(null); // { title, subtitle, files }
-  const { data, last, loading } = useKeyedLoad(getDebtors, { ...filters, page, page_size: pageSize });
+  const { data, last, loading } = useKeyedLoad(getBillsReceivable, { ...filters, page, page_size: pageSize });
   const set = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
   const view = data || { rows: [], total: last?.total || 0 };
   const shown = data || last;
   const companyId = filters.company_id === 'default' ? String(last?.company_id ?? '') : filters.company_id;
-  const canLedgers = can(PERM.LEDGERS_VIEW);
+  const canStatements = can(PERM.STATEMENTS_VIEW);
 
   const invoiceFiles = (r) => setFilesOf({
-    title: `Invoice ${r.number}`, subtitle: `${r.party} · ${r.company} · ${formatDay(r.date)}. Files are added on Ledgers.`, files: r.files,
+    title: `Invoice ${r.number}`, subtitle: `${r.party} · ${r.company} · ${formatDay(r.date)}. Files are added on Party Statements.`, files: r.files,
   });
   const noteFiles = (c) => {
     const inv = cnsOf;
     setCnsOf(null);
     setFilesOf({
-      title: `${c.voucher_type} ${c.number}`, subtitle: `${inv.party} · ${inv.company} · ${formatDay(c.date)}. Files are added on Ledgers.`, files: c.files,
+      title: `${c.voucher_type} ${c.number}`, subtitle: `${inv.party} · ${inv.company} · ${formatDay(c.date)}. Files are added on Party Statements.`, files: c.files,
     });
   };
-  // Ledgers, on the invoice's party from the note's date, showing just the
+  // Party Statements, on the invoice's party from the note's date, showing just the
   // rows without a file.
-  const addOnLedgers = (c) => {
-    openLedgersAt({
+  const addOnStatements = (c) => {
+    openStatementsAt({
       companyId: cnsOf.company_id, vendor: cnsOf.ledger.vendor, guid: cnsOf.ledger.guid, date: c.date, syncFrom: shown?.sync_from, nofile: true,
     });
-    navigate('/ledgers');
+    navigate('/reports/party-statements');
   };
 
   const tabs = [
@@ -169,8 +170,8 @@ export default function Debtors() {
 
   const csv = async () => {
     try {
-      const all = await getDebtors({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page_size: 10000 });
-      downloadCsv('rams-debtors.csv', [
+      const all = await getBillsReceivable({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page_size: 10000 });
+      downloadCsv('rams-bills-receivable.csv', [
         ['Company', (r) => r.company], ['Invoice', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForCsv], ['Party', (r) => r.party],
         ['Marketplace', (r) => r.vendor || ''], ['Internal PO no', (r) => r.pos.join(' ')], ['Vendor PO no', (r) => r.vendor_pos.join(' ')],
         ['Amount', (r) => rupeesForCsv(r.total_paise)], ['CN', (r) => rupeesForCsv(r.credit_notes_paise)], ['CN numbers', (r) => r.credit_notes.map((c) => c.number).join(' ')],
@@ -182,8 +183,8 @@ export default function Debtors() {
 
   return (
     <ReportFrame
-      title="Debtors"
-      help="debtors"
+      title="Bills Receivable"
+      help="bills-receivable"
       intro="Each Tally sales invoice, by marketplace: its internal and vendor PO numbers, the amount, credit notes against it and what is still owed. Figures are worked out from Tally each time you open the page."
       companies={last?.companies || []}
       companyId={companyId}
@@ -261,8 +262,8 @@ export default function Debtors() {
       </ReportTable>
       {view.rows.some((r) => r.notes_without_file > 0) && <Legend items={[]} withNoFile className="mt-2" />}
       <Pagination page={page} pageSize={pageSize} total={view.total} onPageChange={setPage}
-        onPageSizeChange={(s) => { setPageSize(s); persistPageSize('debtors', s); setPage(1); }} />
-      <CreditNotes invoice={cnsOf} onClose={() => setCnsOf(null)} canLedgers={canLedgers} onFiles={noteFiles} onLedgers={addOnLedgers} />
+        onPageSizeChange={(s) => { setPageSize(s); persistPageSize('billsReceivable', s); setPage(1); }} />
+      <CreditNotes invoice={cnsOf} onClose={() => setCnsOf(null)} canStatements={canStatements} onFiles={noteFiles} onStatements={addOnStatements} />
       {filesOf && (
         <FilesDialog
           title={filesOf.title}

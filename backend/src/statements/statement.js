@@ -1,8 +1,8 @@
-// Ledgers: the bill-to-bill statement of a party over a date range, worked out
+// Party Statements: the bill-to-bill statement of a party over a date range, worked out
 // at read time from the Tally copy alone. Nothing derivable is stored, and
 // nothing is typed in RAMS: debit and credit notes typed here were dropped on
 // 2026-11-17, once a check showed RAMS holds every Tally entry on the
-// bill-to-bill parties (ledger_entries stays, empty).
+// bill-to-bill parties (the typed-notes table was dropped by migration 020).
 //
 // Balances are what the party owes (a debit balance is positive). Tally keeps
 // amounts the other way round (negative is a debit), so a voucher's effect on
@@ -13,8 +13,8 @@
 //                     closing balance (read by the Connector at the end of each
 //                     sync, as at the end of the sync window) less every
 //                     mirrored voucher up to it, else a figure loaded by a
-//                     script (ledger_openings), else the placeholder in
-//                     ledger_settings (10,000 rupees)
+//                     script (statement_openings), else the placeholder in
+//                     statement_settings (10,000 rupees)
 //   opening on From   starting balance + every voucher dated before From
 //   the columns       each voucher dated From-To, by what it is (columnOf, and
 //                     notesOf for the credit notes)
@@ -49,12 +49,12 @@ const chunks = (list, size = CHUNK) => {
   return out;
 };
 
-// Which marketplaces Ledgers covers and the placeholder opening. (The other
-// ledger_settings columns served the typed notes and are no longer read.)
+// Which marketplaces Party Statements covers and the placeholder opening. (The other
+// statement_settings columns served the typed notes and are no longer read.)
 async function loadSettings(client) {
   const [{ rows: [s] }, { rows: m }] = await Promise.all([
-    client.execute('SELECT s.*, u.name AS updated_by_name FROM ledger_settings s LEFT JOIN users u ON u.id = s.updated_by WHERE s.id = 1'),
-    client.execute('SELECT vendor FROM ledger_marketplaces ORDER BY vendor'),
+    client.execute('SELECT s.*, u.name AS updated_by_name FROM statement_settings s LEFT JOIN users u ON u.id = s.updated_by WHERE s.id = 1'),
+    client.execute('SELECT vendor FROM statement_marketplaces ORDER BY vendor'),
   ]);
   return {
     default_opening_paise: n(s.default_opening_paise),
@@ -115,7 +115,7 @@ const vendorOf = (r) => (r.kind === 'vendor' ? r.vendor : (r.kind == null ? r.su
 /**
  * Every party ledger mapped (or suggested) to a marketplace, in companies
  * whose sync is on, with both readings of its state. bill_to_bill says whether
- * Ledgers covers its marketplace.
+ * Party Statements covers its marketplace.
  */
 async function loadParties(client, settings) {
   const rows = await rowsOf(client, `
@@ -166,7 +166,7 @@ async function loadCompany(client, companyId, parties) {
   for (const part of chunks(parties.map((p) => p.name))) {
     vrows.push(...await rowsOf(client, `
       SELECT v.id, v.guid, v.date, v.voucher_type, v.base_type, v.number, v.reference, v.narration, l.ledger, SUM(l.amount_paise) AS amount,
-             EXISTS (SELECT 1 FROM ledger_files f WHERE f.company_id = v.company_id AND f.voucher_guid = v.guid) AS has_file
+             EXISTS (SELECT 1 FROM voucher_files f WHERE f.company_id = v.company_id AND f.voucher_guid = v.guid) AS has_file
         FROM tally_vch_ledger_lines l JOIN tally_vouchers v ON v.id = l.voucher_id
        WHERE v.company_id = ? AND l.ledger COLLATE NOCASE IN (${marks(part.length)})
          AND v.deleted_at IS NULL AND v.is_cancelled = 0 AND v.is_optional = 0 AND v.date >= ?
@@ -210,7 +210,7 @@ async function loadCompany(client, companyId, parties) {
       rowsOf(client, `SELECT ledger_guid, closing_paise, as_of, pulled_at FROM tally_ledger_balances
                        WHERE company_id = ? AND ledger_guid IN (${marks(part.length)})
                          AND run_id = (SELECT MAX(id) FROM tally_sync_runs WHERE company_id = ? AND status = 'ok')`, [companyId, ...part, companyId]),
-      rowsOf(client, `SELECT ledger_guid, amount_paise, loaded_at FROM ledger_openings WHERE company_id = ? AND ledger_guid IN (${marks(part.length)})`, [companyId, ...part]),
+      rowsOf(client, `SELECT ledger_guid, amount_paise, loaded_at FROM statement_openings WHERE company_id = ? AND ledger_guid IN (${marks(part.length)})`, [companyId, ...part]),
     ]);
     for (const b of balances) balanceOf.set(b.ledger_guid, b);
     for (const o of openings) openingOf.set(o.ledger_guid, o);
@@ -310,7 +310,7 @@ const byCompany = (parties) => {
 };
 
 /**
- * GET /api/ledgers/statement: one row per party over From-To, and the totals.
+ * GET /api/statements/statement: one row per party over From-To, and the totals.
  * `parties` come from loadParties, already filtered.
  */
 async function statementOf(client, {
@@ -343,7 +343,7 @@ async function statementOf(client, {
   };
 }
 
-// GET /api/ledgers/party: one party over From-To -- the statement row and
+// GET /api/statements/party: one party over From-To -- the statement row and
 // Tally's vouchers with a running balance.
 async function partyDetailOf(client, {
   party, from, to, today = todayIst(),

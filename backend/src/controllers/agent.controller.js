@@ -598,7 +598,7 @@ async function reconcile(req, res, next) {
 // POST /api/agent/runs/:id/balances { asOf, ledgers: [{guid, closing}] }
 // Every ledger's closing balance in Tally as at asOf (the end of the sync
 // window), in rupees, Tally's way round (negative is a debit). The list is
-// COMPLETE, so it replaces the company's last one. The Ledgers page uses it
+// COMPLETE, so it replaces the company's last one. Party Statements uses it
 // only while it comes from the company's latest run that ended ok.
 async function balances(req, res, next) {
   try {

@@ -65,7 +65,7 @@ app.use('/api/settings',   require('./src/routes/settings.routes'));
 app.use('/api/matching',   require('./src/routes/matching.routes'));
 app.use('/api/autofill',   require('./src/routes/autofill.routes'));
 app.use('/api/reports',    require('./src/routes/reports.routes'));
-app.use('/api/ledgers',    require('./src/routes/ledgers.routes'));
+app.use('/api/statements', require('./src/routes/statements.routes'));
 app.use('/api/files',      require('./src/routes/files.routes'));
 app.use('/api/agent',      require('./src/routes/agent.routes'));
 

@@ -104,7 +104,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (oldDefault !== undefined) { // the Debtors default-company test moved it
+  if (oldDefault !== undefined) { // the Bills Receivable default-company test moved it
     await db.execute('UPDATE tally_companies SET is_default = 0');
     if (oldDefault) await db.execute({ sql: 'UPDATE tally_companies SET is_default = 1 WHERE id = ?', args: [oldDefault] });
   }
@@ -115,9 +115,9 @@ afterAll(async () => {
   await db.execute("UPDATE report_settings SET default_credit_days = 30, exception_days = 15 WHERE id = 1");
 });
 
-describe('Debtors', () => {
+describe('Bills Receivable', () => {
   test('each invoice with its internal and vendor PO numbers, total, credit notes and what is still owed', async () => {
-    const res = await get(viewer.token, `/debtors?${q}&page_size=100`);
+    const res = await get(viewer.token, `/bills-receivable?${q}&page_size=100`);
     expect(res.status).toBe(200);
     const by = Object.fromEntries(res.body.rows.map((r) => [r.number, r]));
     expect(by['901/RP/26-27']).toMatchObject({
@@ -130,23 +130,23 @@ describe('Debtors', () => {
   });
 
   test('a tab per marketplace, counted before the marketplace filter', async () => {
-    const res = await get(viewer.token, `/debtors?${q}&vendor=Blinkit&status=no_po`);
+    const res = await get(viewer.token, `/bills-receivable?${q}&vendor=Blinkit&status=no_po`);
     expect(res.body.tabs).toContainEqual({ vendor: 'Blinkit', count: 2 });
     expect(res.body).toMatchObject({ all: 2, unknown: 0 });
     expect(res.body.rows.map((r) => r.number).sort()).toEqual(['902/RP/26-27', '903/RP/26-27']);
-    expect((await get(viewer.token, `/debtors?${q}&vendor=-`)).body.rows).toEqual([]);
+    expect((await get(viewer.token, `/bills-receivable?${q}&vendor=-`)).body.rows).toEqual([]);
   });
 
   test('search by internal or vendor PO number; an unknown status is refused', async () => {
-    expect((await get(viewer.token, `/debtors?${q}&q=RPPO-1`)).body.rows.map((r) => r.number)).toEqual(['901/RP/26-27']);
-    expect((await get(viewer.token, `/debtors?${q}&q=RP1`)).body.rows.map((r) => r.number)).toEqual(['901/RP/26-27']);
-    expect((await get(viewer.token, `/debtors?${q}&status=paid`)).status).toBe(400);
+    expect((await get(viewer.token, `/bills-receivable?${q}&q=RPPO-1`)).body.rows.map((r) => r.number)).toEqual(['901/RP/26-27']);
+    expect((await get(viewer.token, `/bills-receivable?${q}&q=RP1`)).body.rows.map((r) => r.number)).toEqual(['901/RP/26-27']);
+    expect((await get(viewer.token, `/bills-receivable?${q}&status=paid`)).status).toBe(400);
   });
 
-  test('an invoice of a party on Ledgers counts its credit notes without a file; others never do', async () => {
+  test('an invoice of a party on Party Statements counts its credit notes without a file; others never do', async () => {
     const at = (body, number) => body.rows.find((r) => r.number === number);
-    // The Blinkit ledger is not on Ledgers (not bill to bill): nothing counted.
-    let { body } = await get(viewer.token, `/debtors?${q}&page_size=100`);
+    // The Blinkit ledger is not on Party Statements (not bill to bill): nothing counted.
+    let { body } = await get(viewer.token, `/bills-receivable?${q}&page_size=100`);
     expect(at(body, '901/RP/26-27')).toMatchObject({ ledger: null, notes_without_file: 0, credit_notes: [expect.objectContaining({ number: '1501', files: [] })] });
     expect(body.sync_from).toBeTruthy();
 
@@ -155,7 +155,7 @@ describe('Debtors', () => {
     await db.execute({ sql: "INSERT OR REPLACE INTO party_ledgers (company_id, ledger_guid, kind, vendor, source) VALUES (?, 'RPL1', 'vendor', 'Zepto', 'person')", args: [company.id] });
     let fileId;
     try {
-      ({ body } = await get(viewer.token, `/debtors?${q}&page_size=100`));
+      ({ body } = await get(viewer.token, `/bills-receivable?${q}&page_size=100`));
       expect(at(body, '901/RP/26-27')).toMatchObject({ ledger: { guid: 'RPL1', vendor: 'Zepto' }, notes_without_file: 1 });
       expect(at(body, '902/RP/26-27')).toMatchObject({ ledger: { guid: 'RPL1', vendor: 'Zepto' }, notes_without_file: 0, credit_notes: [] });
 
@@ -164,7 +164,7 @@ describe('Debtors', () => {
         .set('Content-Type', 'application/octet-stream').send(Buffer.from('%PDF-1.4\n1 0 obj << >> endobj\n%%EOF\n'));
       expect(up.status).toBe(201);
       fileId = up.body.id;
-      ({ body } = await get(viewer.token, `/debtors?${q}&page_size=100`));
+      ({ body } = await get(viewer.token, `/bills-receivable?${q}&page_size=100`));
       const inv = at(body, '901/RP/26-27');
       expect(inv.notes_without_file).toBe(0);
       expect(inv.credit_notes[0].files).toEqual([expect.objectContaining({ name: 'CN 1501.pdf' })]);
@@ -185,11 +185,11 @@ describe('Debtors', () => {
     const { rows: [was] } = await db.execute('SELECT id FROM tally_companies WHERE is_default = 1');
     oldDefault = was ? Number(was.id) : null;
     expect((await bearer(request(app).patch(`/api/companies/${company.id}`), admin.token).send({ is_default: true })).status).toBe(200);
-    const res = await get(viewer.token, '/debtors?company_id=default');
+    const res = await get(viewer.token, '/bills-receivable?company_id=default');
     expect(res.body.company_id).toBe(company.id);
     expect(res.body.companies.find((c) => c.id === company.id).is_default).toBe(true);
     expect(res.body.rows.every((r) => r.company_id === company.id)).toBe(true);
-    expect((await get(viewer.token, '/debtors?company_id=')).body.company_id).toBeNull();
+    expect((await get(viewer.token, '/bills-receivable?company_id=')).body.company_id).toBeNull();
   });
 });
 
@@ -294,7 +294,7 @@ describe('settings, permissions and Sync now', () => {
 describe('narrations and the credit terms preview', () => {
   test('each invoice and its credit notes carry their narration, and a missing one is flagged', async () => {
     await db.execute({ sql: "UPDATE tally_vouchers SET narration = NULL WHERE company_id = ? AND guid = 'rp-902'", args: [company.id] });
-    const { body } = await get(viewer.token, `/debtors?${q}&page_size=100`);
+    const { body } = await get(viewer.token, `/bills-receivable?${q}&page_size=100`);
     const byNumber = Object.fromEntries(body.rows.map((r) => [r.number, r]));
     expect(byNumber['901/RP/26-27']).toMatchObject({ narration: 'PO P4588464', narration_missing: false });
     expect(byNumber['901/RP/26-27'].credit_notes[0]).toMatchObject({ narration: 'PO P4588464', narration_missing: false });

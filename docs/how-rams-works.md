@@ -8,7 +8,7 @@
 
 Royal Mart keeps its **accounts in Tally** and its **marketplace orders in ROMS** (the Royal Mart portal). Until now, the two never spoke to each other. Someone had to read an invoice number in Tally and type it into ROMS, and nobody could easily see which order had been invoiced, paid or credited.
 
-**RAMS is the bridge between them.** It reads the books from Tally, matches each ROMS order to the Tally invoice that billed it, and each return to the credit note that settled it. With your permission, it then writes Tally's invoice and credit-note numbers into ROMS. Report screens, such as what every marketplace owes, follow one at a time. On **Ledgers**, each bill-to-bill party's statement comes straight from Tally, and your team attaches each row's document.
+**RAMS is the bridge between them.** It reads the books from Tally, matches each ROMS order to the Tally invoice that billed it, and each return to the credit note that settled it. With your permission, it then writes Tally's invoice and credit-note numbers into ROMS. Report screens, such as what every marketplace owes, follow one at a time. On **Party Statements**, each bill-to-bill party's statement comes straight from Tally, and your team attaches each row's document.
 
 ```
    TALLY                      RAMS                         ROMS
@@ -33,7 +33,7 @@ Royal Mart keeps its **accounts in Tally** and its **marketplace orders in ROMS*
 
 ## 3. What RAMS will never do
 
-- **It never changes Tally.** Every request it makes to Tally is "export" (read). There is no way for it to write. What your team enters on *Ledgers* stays in RAMS.
+- **It never changes Tally.** Every request it makes to Tally is "export" (read). There is no way for it to write. What your team enters on *Party Statements* stays in RAMS.
 - **It never deletes anything in ROMS.**
 - **It writes only four fields in ROMS:**
   - the **Bill No** and **Bill Date** of an order
@@ -78,9 +78,9 @@ RAMS keeps a copy of the books of **MH, HR and WB** from **8 June 2026** (when R
 | In Tally | Why RAMS needs it |
 |---|---|
 | Ledger name, alias and group (for example *Sundry Debtors*, *Sales Accounts*, *Duties & Taxes*) | To know which ledgers are customers, which are sales and which are GST |
-| Ledger GSTIN and state (the latest dated entry) | To tell which marketplace a party ledger belongs to and which ledgers are Roymax's own registrations, and to filter *Ledgers* by state |
+| Ledger GSTIN and state (the latest dated entry) | To tell which marketplace a party ledger belongs to and which ledgers are Roymax's own registrations, and to filter *Party Statements* by state |
 | Bill-wise on/off | To know whether Tally tracks a party's invoices one by one |
-| Each ledger's closing balance | To start each party's balance on *Ledgers* from Tally's own figure |
+| Each ledger's closing balance | To start each party's balance on *Party Statements* from Tally's own figure |
 
 ### Stock items and voucher types
 
@@ -186,9 +186,11 @@ Checked on the real books (MH, HR, WB) and the ROMS test copy, October 2026:
 
 The report screens (what has been invoiced, what has been paid, and what is still owed) are delivered **one at a time**. We go through each one with you, adjust it to what you need, and only then switch it on in RAMS.
 
-In the top bar they are under **Tally Reports**: *Debtors* and *Ledgers* (section 11). **Purchase Reports** is there too, greyed and marked *Coming soon*: it can't be clicked yet.
+In the top bar they are under **Tally Reports**: *Bills Receivable* and *Party Statements* (section 11). **Purchase Reports** is there too, greyed and marked *Coming soon*: it can't be clicked yet.
 
-**Debtors** is the first one (*Tally Reports → Debtors*). It lists every sales invoice since 8 June, with a tab for each marketplace (All, Amazon, Blinkit and so on). For each invoice it shows:
+**New names (18 November):** *Debtors* is now **Bills Receivable**, Tally's own name for the bill-wise list of what is owed. *Ledgers* is now **Party Statements**, since it shows each party's statement from opening to closing. They are the same pages with the same permissions. Their addresses moved to */reports/bills-receivable* and */reports/party-statements*, and the old ones still lead there.
+
+**Bills Receivable** is the first one (*Tally Reports → Bills Receivable*). It lists every sales invoice since 8 June, with a tab for each marketplace (All, Amazon, Blinkit and so on). For each invoice it shows:
 
 | Column | What it is |
 |---|---|
@@ -199,9 +201,9 @@ In the top bar they are under **Tally Reports**: *Debtors* and *Ledgers* (sectio
 | Amount | The invoice total |
 | CN | The credit notes set against it in Tally (ours, and the marketplace's DNs, which Tally books as credit notes). Click the amount to see each one: its number, date, amount, the ROMS return (RTV) it belongs to, and its files |
 | Outstanding | What is still owed after receipts, credit notes, TDS and adjustments, and how many days it is overdue |
-| Files | The invoice's files (PDF, photo or email), added on *Ledgers*. Click to view or download them |
+| Files | The invoice's files (PDF, photo or email), added on *Party Statements*. Click to view or download them |
 
-**An invoice is orange while a DN or CN against it has no file**, with "1 without a file" (or more) under its CN amount. In the credit-note window the note without a file is orange too, with a link, *Add it on Ledgers*, that opens that party on Ledgers showing just its rows without a file. Once each DN and CN against the invoice has its file, the orange goes. Only Minutes, Now and Zepto invoices can turn orange: files are added on Ledgers, which covers those three. A credit note set against two invoices needs its file only once.
+**An invoice is orange while a DN or CN against it has no file**, with "1 without a file" (or more) under its CN amount. In the credit-note window the note without a file is orange too, with a link, *Add it on Party Statements*, that opens that party on Party Statements showing just its rows without a file. Once each DN and CN against the invoice has its file, the orange goes. Only Minutes, Now and Zepto invoices can turn orange: files are added on Party Statements, which covers those three. A credit note set against two invoices needs its file only once.
 
 It opens on **MH**, with all marketplaces and all statuses. You can switch to another company or to all companies together, and filter by Open, Overdue, Settled or No PO. You can search by invoice, party or either PO number, and download it for Excel.
 
@@ -209,9 +211,9 @@ Until the rest arrive, RAMS keeps working in the background: it copies the books
 
 **Something to start on in Tally now:** several marketplaces pay into a *head-office* ledger "On Account", not against the warehouse-ledger invoices. In Tally's bill-wise view, those invoices therefore look unpaid. Setting those receipts against their invoices in Tally will make the figures exact when the reports arrive.
 
-## 11. Ledgers: the bill-to-bill statement
+## 11. Party Statements: the bill-to-bill statement
 
-**Ledgers** is under *Tally Reports → Ledgers*. It shows the statement of each party of the marketplaces that **pay bill to bill**: **Minutes, Now and Zepto** to begin with. Blinkit and Scootsy say *coming soon*, while their format is worked out.
+**Party Statements** is under *Tally Reports → Party Statements*. It shows the statement of each party of the marketplaces that **pay bill to bill**: **Minutes, Now and Zepto** to begin with. Blinkit and Scootsy say *coming soon*, while their format is worked out.
 
 1. It opens on **MH**, **all** three marketplaces, **all** states and **all** parties, from the 1st of this month to today, with the statement already shown.
 2. Narrow it by **company** (or all), **marketplace**, **states** and **parties**, and change the **dates** for another range. A new company or marketplace sets the filters after it back to *All*.
@@ -255,13 +257,13 @@ Every row of a party can carry its proof: the invoice, the marketplace's DN, our
 - **A row without a file is orange**, across the whole row, until a file is added: every row from 8 June. *Needs attention* counts them for every party, and *Without a file* shows just those rows.
 - **Viewing:** a PDF or a photo opens inside RAMS, and any file can be downloaded. PDFs and emails come back **exactly as they were added**. Emails are not opened in RAMS: they open in Outlook or your mail app, with their attachments.
 - **Small on purpose:** photos are made smaller before they are sent (at most 2,000 pixels across; a 1.6 MB photo became 146 KB in our test, still easy to read). PDFs and emails are compressed without losing anything, and a file attached to several rows is kept once. One file for every DN, CN and invoice comes to about 1 GB a year. *Admin → File storage* shows the space used and saved, and the biggest files.
-- An invoice's files, and those of the DN and CN against it, also show on *Debtors*, where an invoice whose DN or CN has no file is orange (section 10).
+- An invoice's files, and those of the DN and CN against it, also show on *Bills Receivable*, where an invoice whose DN or CN has no file is orange (section 10).
 - Adding and removing a file is in the Audit Log.
 
 **Later, once the NAS is bought:** a shared folder that RAMS checks every few minutes, attaching each file named by its DN, CN or invoice number to the right row by itself.
 
 ### Narrations, everywhere
-Every Tally record RAMS shows (on Ledgers, Debtors, Match review and Auto-fill, and on the report screens still to come) now shows its **narration**. A record without one is **highlighted in yellow**, so the accountants can add it in Tally. Today almost no invoice or receipt has a narration (362 of 362 invoices on Minutes, Now and Zepto), so a lot will be highlighted at first. Which voucher types need a narration, and from which date, is a setting on *Admin → Tally companies* (*Narration check*).
+Every Tally record RAMS shows (on Party Statements, Bills Receivable, Match review and Auto-fill, and on the report screens still to come) now shows its **narration**. A record without one is **highlighted in yellow**, so the accountants can add it in Tally. Today almost no invoice or receipt has a narration (362 of 362 invoices on Minutes, Now and Zepto), so a lot will be highlighted at first. Which voucher types need a narration, and from which date, is a setting on *Admin → Tally companies* (*Narration check*).
 
 ### States: Tally's and the GSTIN's
 Each party has two states: the one on its ledger in Tally, and the one its GSTIN belongs to (the first two digits). Where they disagree, RAMS shows **State differs** so the ledger can be corrected in Tally. The *State* filter lists a party under both, so it is never hidden. On the 4 October copy, 15 ledgers in MH disagree: all say Maharashtra in Tally. RAMS used to read the oldest address of a ledger rather than the latest; the new Connector (0.7.0) reads the latest.
@@ -278,11 +280,11 @@ There are four roles. **Admin and Owner can always do everything**, and they dec
 | | Accountant (starting setup) | Viewer (starting setup) |
 |---|---|---|
 | See matching and auto-fill | ✓ | ✓ |
-| See Debtors (Tally Reports) | ✓ | ✓ |
-| See Ledgers | ✓ | ✓ |
-| Add and remove files on Ledgers | ✓ | – |
-| View and download files (on Ledgers and Debtors) | ✓ | ✓ |
-| Change the ledger settings (marketplaces, placeholder opening) | – (Admin/Owner) | – |
+| See Bills Receivable (Tally Reports) | ✓ | ✓ |
+| See Party Statements | ✓ | ✓ |
+| Add and remove files on Party Statements | ✓ | – |
+| View and download files (on Party Statements and Bills Receivable) | ✓ | ✓ |
+| Change the statement settings (marketplaces, placeholder opening) | – (Admin/Owner) | – |
 | Change the credit days (*Admin → Credit terms*) | ✓ | – |
 | Change the narration check | – (Admin/Owner) | – |
 | Run matching, confirm or reject links, map ledgers, change matching rules | ✓ | – |
@@ -300,7 +302,7 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 - **Each vendor's handling:** match it, treat it as a stock transfer, or ignore it
 - **Which party ledger belongs to which marketplace**
 - **Auto-fill:** each field's mode, whether to rewrite short forms, and which Bill Date to keep
-- **Ledgers:** which marketplaces it covers and the placeholder opening
+- **Party Statements:** which marketplaces it covers and the placeholder opening
 - **Credit terms:** each marketplace's credit days and the default, on *Admin → Credit terms*, with a preview of what a change does before it is saved
 - **The narration check:** which voucher types need a narration, and from which date
 - **What Accountants and Viewers may do**
@@ -313,7 +315,7 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 - **Sessions** expire, and a password reset or role change signs that person out.
 - **The Connector and ROMS** each use a private key. The key can be withdrawn at any time, which stops the connection.
 - **The data** is held in a database in **Mumbai**. The website is set to run in Mumbai too, which also makes it faster.
-- **Files** on Ledgers are kept in that same database, never on a public link: only people signed in to RAMS who can see Ledgers or Debtors can open them. RAMS checks each file is really a PDF, photo or email before keeping it.
+- **Files** on Party Statements are kept in that same database, never on a public link: only people signed in to RAMS who can see Party Statements or Bills Receivable can open them. RAMS checks each file is really a PDF, photo or email before keeping it.
 - **Every change** in RAMS is in the Audit Log; every change in ROMS is in ROMS's history.
 
 ## 15. Progress and next steps
@@ -326,11 +328,11 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 | 3–4 | The Connector and the copy of Tally's books | Done, live on the test setup |
 | 5 | Matching, with review screens and rules | Done, live on the test setup |
 | 6 | Auto-fill into ROMS | Done, being tried on the test setup |
-| 7 | The report screens | Delivered one at a time, each after you have reviewed it. Debtors is out; the rest follow |
-| – | Ledgers: the bill-to-bill statement for Minutes, Now and Zepto; narrations and states everywhere; Credit terms | Done, live on the test setup, with Connector 0.7.0 |
-| – | Files on Ledgers: PDFs, photos and emails on each row, viewed in RAMS and shown on Debtors; *File storage* | Built and tested; both databases updated for it (17 Nov) |
-| – | Ledgers from Tally only: debit and credit notes no longer typed in RAMS (559 of 559 entries checked against Tally first); every row without its document is orange | Built and tested; goes on the test setup after your review |
-| – | *Tally Reports* menu (Debtors, Ledgers) and *Purchase Reports* coming soon; Ledgers opens on every party, with *Needs attention* as a button and a scrolling list; Debtors shows an invoice orange while a DN or CN against it has no file | Built and tested; goes on the test setup after your review |
+| 7 | The report screens | Delivered one at a time, each after you have reviewed it. Bills Receivable is out; the rest follow |
+| – | Party Statements: the bill-to-bill statement for Minutes, Now and Zepto; narrations and states everywhere; Credit terms | Done, live on the test setup, with Connector 0.7.0 |
+| – | Files on Party Statements: PDFs, photos and emails on each row, viewed in RAMS and shown on Bills Receivable; *File storage* | Built and tested; both databases updated for it (17 Nov) |
+| – | Party Statements from Tally only: debit and credit notes no longer typed in RAMS (559 of 559 entries checked against Tally first); every row without its document is orange | Built and tested; goes on the test setup after your review |
+| – | *Tally Reports* menu (Debtors and Ledgers renamed *Bills Receivable* and *Party Statements*) and *Purchase Reports* coming soon; Party Statements opens on every party, with *Needs attention* as a button and a scrolling list; Bills Receivable shows an invoice orange while a DN or CN against it has no file | Built and tested; goes on the test setup after your review |
 | Later | A NAS folder RAMS checks every few minutes, attaching files by their DN, CN or invoice number | Designed; waits for the NAS |
 | 8 | Go-live: production database, Connector installed on the office PC, the trial weeks | Prepared (see *go-live.md*); needs the office PC and your go-ahead |
 

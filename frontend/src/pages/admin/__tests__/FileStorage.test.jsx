@@ -59,23 +59,23 @@ describe('File storage', () => {
     expect(screen.getByText('10 kept, as some are on more than one row')).toBeInTheDocument();
     const scan = screen.getByText('DN scan.jpg').closest('tr');
     expect(scan).toHaveTextContent('MH · Credit Note 951 · ZEPTO (PUNE) · 20 May 2026');
-    // An email downloads rather than opens; a party with no marketplace can't open on Ledgers.
+    // An email downloads rather than opens; a party with no marketplace can't open on Party Statements.
     const mail = screen.getByText('mail.eml').closest('tr');
     expect(within(mail).getByRole('button', { name: 'View mail.eml' })).toHaveTextContent('Download');
-    expect(within(mail).queryByRole('button', { name: /on Ledgers/ })).not.toBeInTheDocument();
+    expect(within(mail).queryByRole('button', { name: /on Party Statements/ })).not.toBeInTheDocument();
   });
 
-  test('Open on Ledgers goes to the party, from the file’s date (or RAMS’s start)', async () => {
+  test('Open on Party Statements goes to the party, from the file’s date (or RAMS’s start)', async () => {
     renderWithProviders(
       <Routes>
         <Route path="/admin/files" element={<FileStorage />} />
-        <Route path="/ledgers" element={<p>Ledgers page</p>} />
+        <Route path="/reports/party-statements" element={<p>Party Statements page</p>} />
       </Routes>,
       { user: ADMIN, route: '/admin/files' },
     );
-    await userEvent.setup().click(await screen.findByRole('button', { name: 'Open DN scan.jpg on Ledgers' }));
-    expect(screen.getByText('Ledgers page')).toBeInTheDocument();
-    expect(JSON.parse(sessionStorage.getItem('rams:ledgers.filters.v2:v1'))).toMatchObject({
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Open DN scan.jpg on Party Statements' }));
+    expect(screen.getByText('Party Statements page')).toBeInTheDocument();
+    expect(JSON.parse(sessionStorage.getItem('rams:statements.filters:v1'))).toMatchObject({
       company: '2', vendor: 'Zepto', states: 'all', parties: ['2:Z1'], from: '2026-06-08', to: '', open: '2:Z1', nofile: false,
     });
   });

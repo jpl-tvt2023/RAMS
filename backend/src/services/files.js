@@ -1,7 +1,6 @@
-// Files on Ledgers rows (migration 019): PDFs, photos and emails attached to a
+// Files on Party Statements rows (migrations 019 and 020): PDFs, photos and emails attached to a
 // Tally voucher in a party's section -- an invoice, a DN or CN, a receipt, a
-// TDS or other journal. Debtors shows an invoice's files too. (Notes typed in
-// RAMS were dropped on 2026-11-17, so ledger_files.entry_id stays empty.)
+// TDS or other journal. Bills Receivable shows an invoice's files too.
 //
 // Kept small three ways:
 //   - the browser shrinks photos before they are sent (frontend utils/files.js)
@@ -138,7 +137,7 @@ async function storeBlob(tx, { bytes, gzip = false }, name) {
  */
 async function readFile(client, id) {
   const [f] = await rowsOf(client, `SELECT f.id, f.file_name, f.kind, f.blob_id, b.mime, b.size, b.stored_size, b.encoding
-                                      FROM ledger_files f JOIN file_blobs b ON b.id = f.blob_id WHERE f.id = ?`, [Number(id) || 0]);
+                                      FROM voucher_files f JOIN file_blobs b ON b.id = f.blob_id WHERE f.id = ?`, [Number(id) || 0]);
   if (!f) return null;
   const pieces = [];
   const count = Math.ceil(Number(f.stored_size) / CHUNK_BYTES);
@@ -161,7 +160,7 @@ const fileOut = (r) => ({
   uploaded_at: r.uploaded_at,
 });
 const SELECT_FILES = `SELECT f.id, f.company_id, f.voucher_guid, f.file_name, f.kind, f.uploaded_at, b.size, u.name AS uploaded_by_name
-                        FROM ledger_files f JOIN file_blobs b ON b.id = f.blob_id LEFT JOIN users u ON u.id = f.uploaded_by`;
+                        FROM voucher_files f JOIN file_blobs b ON b.id = f.blob_id LEFT JOIN users u ON u.id = f.uploaded_by`;
 
 /**
  * The files on many Tally vouchers at once, given as [companyId, guid] pairs.
@@ -184,7 +183,7 @@ async function filesFor(client, { vouchers = [] }) {
 
 // Deletes a blob no row uses any more. Returns whether it did.
 async function freeBlob(tx, blobId) {
-  const [{ n }] = await rowsOf(tx, 'SELECT COUNT(*) AS n FROM ledger_files WHERE blob_id = ?', [blobId]);
+  const [{ n }] = await rowsOf(tx, 'SELECT COUNT(*) AS n FROM voucher_files WHERE blob_id = ?', [blobId]);
   if (Number(n)) return false;
   await tx.execute({ sql: 'DELETE FROM file_chunks WHERE blob_id = ?', args: [blobId] });
   await tx.execute({ sql: 'DELETE FROM file_blobs WHERE id = ?', args: [blobId] });
@@ -194,9 +193,9 @@ async function freeBlob(tx, blobId) {
 // Takes one file off its row (and frees its blob if nothing else uses it).
 // Returns the removed row, or null if it was already gone.
 async function unlink(tx, fileId) {
-  const [f] = await rowsOf(tx, 'SELECT * FROM ledger_files WHERE id = ?', [Number(fileId) || 0]);
+  const [f] = await rowsOf(tx, 'SELECT * FROM voucher_files WHERE id = ?', [Number(fileId) || 0]);
   if (!f) return null;
-  await tx.execute({ sql: 'DELETE FROM ledger_files WHERE id = ?', args: [f.id] });
+  await tx.execute({ sql: 'DELETE FROM voucher_files WHERE id = ?', args: [f.id] });
   await freeBlob(tx, Number(f.blob_id));
   return f;
 }
@@ -211,21 +210,21 @@ async function unlink(tx, fileId) {
 async function usage(client) {
   const [[t], [b], picked, stored, biggest] = await Promise.all([
     rowsOf(client, `SELECT COUNT(*) AS files, COALESCE(SUM(COALESCE(f.original_size, b.size)), 0) AS picked
-                      FROM ledger_files f JOIN file_blobs b ON b.id = f.blob_id`),
+                      FROM voucher_files f JOIN file_blobs b ON b.id = f.blob_id`),
     rowsOf(client, 'SELECT COUNT(*) AS blobs, COALESCE(SUM(size), 0) AS size, COALESCE(SUM(stored_size), 0) AS stored FROM file_blobs'),
     rowsOf(client, `SELECT f.kind, COUNT(*) AS files, COALESCE(SUM(COALESCE(f.original_size, b.size)), 0) AS picked
-                      FROM ledger_files f JOIN file_blobs b ON b.id = f.blob_id GROUP BY f.kind`),
+                      FROM voucher_files f JOIN file_blobs b ON b.id = f.blob_id GROUP BY f.kind`),
     rowsOf(client, `SELECT kind, COALESCE(SUM(stored_size), 0) AS stored
-                      FROM (SELECT DISTINCT f.kind, b.id, b.stored_size FROM ledger_files f JOIN file_blobs b ON b.id = f.blob_id)
+                      FROM (SELECT DISTINCT f.kind, b.id, b.stored_size FROM voucher_files f JOIN file_blobs b ON b.id = f.blob_id)
                      GROUP BY kind`),
     // Where each file is: the Tally voucher, its party, and the party's
-    // marketplace (as Ledgers decides it: the mapping, else the suggestion),
-    // so File storage can open it on Ledgers.
+    // marketplace (as Party Statements decides it: the mapping, else the suggestion),
+    // so File storage can open it on Party Statements.
     rowsOf(client, `SELECT f.id, f.file_name, f.kind, f.company_id, f.voucher_guid, f.uploaded_at,
                            b.size, b.stored_size, u.name AS uploaded_by_name, c.code AS company,
                            v.voucher_type, v.number AS voucher_number, v.date AS voucher_date, v.party AS voucher_party, vl.guid AS voucher_ledger,
                            CASE WHEN vp.kind = 'vendor' THEN vp.vendor WHEN vp.kind IS NULL THEN vp.suggested_vendor END AS voucher_vendor
-                      FROM ledger_files f JOIN file_blobs b ON b.id = f.blob_id
+                      FROM voucher_files f JOIN file_blobs b ON b.id = f.blob_id
                       LEFT JOIN users u ON u.id = f.uploaded_by
                       LEFT JOIN tally_companies c ON c.id = f.company_id
                       LEFT JOIN tally_vouchers v ON v.company_id = f.company_id AND v.guid = f.voucher_guid

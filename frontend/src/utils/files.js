@@ -1,4 +1,4 @@
-// Files on Ledgers rows, as the browser gets them ready before they are sent
+// Files on Party Statements rows, as the browser gets them ready before they are sent
 // (the server side is backend/src/services/files.js). A photo is shrunk to
 // at most 2000 px on its long side and saved as JPEG, which keeps a DN or an
 // invoice readable at a tenth of the size. A PDF or an email is compressed

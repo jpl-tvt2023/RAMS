@@ -33,8 +33,8 @@ RAMS production started as a copy of the test database (13 Oct). It still holds 
 | Deleted | Kept |
 |---|---|
 | Tally books: vouchers and their lines, balances, sync state and runs | Users, roles and permissions |
-| The copy of ROMS, every match and auto-fill result | Every setting: sync schedule, matching rules, credit terms, Ledgers and narration settings |
-| Ledgers' files, loaded openings and any old typed DN/CN | Party ledger maps (which ledger is which marketplace) |
+| The copy of ROMS, every match and auto-fill result | Every setting: sync schedule, matching rules, credit terms, Party Statements and narration settings |
+| Party Statements' files, loaded openings and any old typed DN/CN | Party ledger maps (which ledger is which marketplace) |
 | Every Connector token | Companies switched on (MH, HR, WB) and the default star |
 | Companies switched off (the dev PC's "Test Company") | Tally's ledger list. The first load refreshes it |
 | The audit log. One new row records the reset | Auto-fill is set to **Off** for both fields |
@@ -142,9 +142,9 @@ Do this at the PC where TallyPrime runs, signed in as the Windows user who uses 
 | Where in RAMS | What you should see |
 |---|---|
 | Dashboard → Tally sync card | **Connector online**, **Tally answering**, each company *Up to date* |
-| Tally Reports → Ledgers (opens on MH, all parties) → Zepto | Openings say **From Tally**, not *Placeholder*. The closing equals Tally's balance |
+| Tally Reports → Party Statements (opens on MH, all parties) → Zepto | Openings say **From Tally**, not *Placeholder*. The closing equals Tally's balance |
 | Matching → Party ledgers | No *State differs* on *Flipkart India Private Limited – Bengalore*. New ledgers wait under **Not set**: accept the suggestions |
-| Tally Reports → Debtors | Today's invoices from Tally, marked overdue by the credit terms |
+| Tally Reports → Bills Receivable | Today's invoices from Tally, marked overdue by the credit terms |
 | Matching → Match review | Rows in Linked / Needs review / Waiting for Tally, after **Match now** |
 | Admin → Audit Log | The `DATA_RESET` row, then your own changes |
 
@@ -176,7 +176,7 @@ On the office PC, `C:\RAMS\Connector\rams-connector.cmd status` lists every comp
 | Match review: *ROMS isn't connected* | `ROMS_API_URL` / `ROMS_INTEGRATION_TOKEN` missing in `rams` Production, or not redeployed | Step 4.5 |
 | *ROMS refused RAMS's integration token* | The two Vercel projects have different tokens | Make one token (4.3), set it in both, and redeploy both |
 | ROMS says *The integration is not configured* | `INTEGRATION_TOKEN` missing in ROMS Production, or not redeployed | Step 4.4 |
-| Ledgers opening says *Placeholder* | The first load hasn't finished, or Tally couldn't give balances | Wait for the next sync. Check the Tally sync card |
+| Party Statements opening says *Placeholder* | The first load hasn't finished, or Tally couldn't give balances | Wait for the next sync. Check the Tally sync card |
 | A party says *State differs* | Its state in Tally isn't the state of its GSTIN | The accountant corrects the ledger's address in Tally. It clears after the end-of-day sync |
 | A record is highlighted yellow | It has no narration in Tally | Add it in Tally, or narrow the rule: Admin → Tally companies → Narration check |
 | Anything is being written into ROMS that shouldn't be | — | Matching → Auto-fill: set both fields to **Off**. To be sure, remove `INTEGRATION_TOKEN` from ROMS and redeploy |

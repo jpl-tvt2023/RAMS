@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import AppShell from '../../components/layout/AppShell';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
-import { STATE_DIFFERS } from '../../utils/ledgerText';
+import { STATE_DIFFERS } from '../../utils/statementText';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Pagination, { loadPersistedPageSize, persistPageSize } from '../../components/ui/Pagination';
 import HelpLink from '../../components/shared/HelpLink';

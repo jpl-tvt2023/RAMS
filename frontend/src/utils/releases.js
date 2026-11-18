@@ -18,12 +18,12 @@ export const isReleased = (path) => !HELD.includes(path);
 // The screens each permission governs (keys from utils/roles.js PERM). Its row
 // on Roles & permissions shows once any of them is released.
 export const PERM_SCREENS = {
-  'reports.view': ['/reports/debtors', '/reports/invoices', '/reports/notes', '/reports/transfers', '/reports/receivables', '/reports/exceptions'],
+  'reports.view': ['/reports/bills-receivable', '/reports/invoices', '/reports/notes', '/reports/transfers', '/reports/receivables', '/reports/exceptions'],
   'reports.settings': ['/admin/credit-terms', '/reports/receivables'],
   'sync.run': ['/sync'],
-  'ledgers.view': ['/ledgers'],
-  'ledgers.files': ['/ledgers'],
-  'ledgers.settings': ['/ledgers'],
+  'statements.view': ['/reports/party-statements'],
+  'statements.files': ['/reports/party-statements'],
+  'statements.settings': ['/reports/party-statements'],
 };
 
 export const permissionReleased = (key) => !PERM_SCREENS[key] || PERM_SCREENS[key].some(isReleased);

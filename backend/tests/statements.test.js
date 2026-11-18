@@ -5,15 +5,15 @@ const { signIn, bearer } = require('./helpers/auth');
 const {
   newAgent, agentPost, tallyCompany, voucher, enabledCompanies, startRun,
 } = require('./helpers/agent');
-const { dnNumbersIn, columnOf, notesOf } = require('../src/ledgers/ledger');
+const { dnNumbersIn, columnOf, notesOf } = require('../src/statements/statement');
 
-// Ledgers end to end: a Zepto party's Tally vouchers pushed by a Connector,
+// Party Statements end to end: a Zepto party's Tally vouchers pushed by a Connector,
 // and the bill-to-bill statement RAMS works out from them alone -- nothing is
 // typed in RAMS. Every request names this suite's company, so other suites'
 // data never mixes in. Its August is your example row (opening 100, invoice
 // 10, DN 2, CN 3, TDS 0.1, journal 2, receipt 5, closing 101.9) in hundreds
 // of rupees.
-const api = (method, token, path) => bearer(request(app)[method](`/api/ledgers${path}`), token);
+const api = (method, token, path) => bearer(request(app)[method](`/api/statements${path}`), token);
 
 let admin; let accountant; let viewer; let agent; let company;
 
@@ -60,14 +60,14 @@ const LEDGERS = (z2State = 'Maharashtra') => [
 ];
 
 const pick = (p) => `company_id=${company.id}&vendor=Zepto&states=all&parties=${company.id}:${p}`;
-const statementOf = (token, query) => api('get', token, `/statement?${query}`);
+const statementOf = (token, query) => api('get', token, `?${query}`);
 const partyOf = (token, guid, from, to) => api('get', token, `/party?company_id=${company.id}&ledger_guid=${guid}&from=${from}&to=${to}`);
 const attentionOf = async (guid) => (await api('get', viewer.token, '/parties')).body.attention
   .find((a) => a.party.guid === guid && a.party.company_id === company.id);
 
 beforeAll(async () => {
   [admin, accountant, viewer] = await Promise.all([signIn('admin'), signIn('accountant'), signIn('viewer')]);
-  agent = await newAgent('Ledgers suite PC');
+  agent = await newAgent('Party Statements suite PC');
   [company] = await enabledCompanies(agent, admin, [tallyCompany({ state: 'Maharashtra' })]);
   const run = await startRun(agent, company.id, 'backfill');
   await agentPost(agent.token, `/runs/${run}/masters`, {
@@ -110,9 +110,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.execute('UPDATE ledger_settings SET default_opening_paise = 1000000 WHERE id = 1');
-  await db.execute('DELETE FROM ledger_marketplaces');
-  await db.execute("INSERT INTO ledger_marketplaces (vendor) VALUES ('Minutes'), ('Now'), ('Zepto')");
+  await db.execute('UPDATE statement_settings SET default_opening_paise = 1000000 WHERE id = 1');
+  await db.execute('DELETE FROM statement_marketplaces');
+  await db.execute("INSERT INTO statement_marketplaces (vendor) VALUES ('Minutes'), ('Now'), ('Zepto')");
   await db.execute("UPDATE narration_settings SET types = NULL, required_from = '2026-06-08' WHERE id = 1");
 });
 
@@ -282,7 +282,7 @@ describe('The narration check', () => {
 });
 
 describe('Settings', () => {
-  test('who may: anyone who sees Ledgers reads them, ledgers.settings changes them', async () => {
+  test('who may: anyone who sees Party Statements reads them, statements.settings changes them', async () => {
     expect((await api('get', viewer.token, '/settings')).status).toBe(200);
     expect((await api('put', accountant.token, '/settings').send({ default_opening_paise: 500000 })).status).toBe(403);
   });
@@ -308,7 +308,7 @@ describe('Settings', () => {
     expect(res.body.marketplaces).toEqual(['Blinkit', 'Minutes', 'Now', 'Zepto']);
     const parties = await api('get', viewer.token, '/parties');
     expect(parties.body.parties.some((p) => p.guid === 'LGB1' && p.company_id === company.id)).toBe(true);
-    const { rows: [log] } = await db.execute("SELECT changes FROM audit_logs WHERE action_type = 'LEDGER_SETTINGS_UPDATE' ORDER BY id DESC LIMIT 1");
+    const { rows: [log] } = await db.execute("SELECT changes FROM audit_logs WHERE action_type = 'STATEMENT_SETTINGS_UPDATE' ORDER BY id DESC LIMIT 1");
     expect(JSON.parse(log.changes)).toEqual([{ field: 'marketplaces', old: 'Minutes, Now, Zepto', new: 'Blinkit, Minutes, Now, Zepto' }]);
     await put({ default_opening_paise: 1000000, marketplaces: ['Minutes', 'Now', 'Zepto'] });
   });

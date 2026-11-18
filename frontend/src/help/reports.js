@@ -1,19 +1,19 @@
-// Help: the Tally Reports screens -- Debtors, Invoices, Credit & debit notes, Stock
+// Help: the Tally Reports screens -- Bills Receivable (/reports/bills-receivable), Invoices, Credit & debit notes, Stock
 // transfers, Receivables, Exceptions and Sync health.
 const SEE = 'Seeing it: "See the reports". Admin and Owner always can.';
 
-export const debtorsHelp = {
-  id: 'debtors',
-  path: '/reports/debtors',
+export const billsReceivableHelp = {
+  id: 'bills-receivable',
+  path: '/reports/bills-receivable',
   area: 'Tally Reports',
-  title: 'Debtors',
+  title: 'Bills Receivable',
   who: SEE,
   summary: 'Each Tally sales invoice since RAMS started (8 June 2026), by marketplace: its internal and vendor PO numbers, the amount, the credit notes against it and what is still owed. RAMS works the figures out from Tally each time the page opens, so they are as fresh as the last sync. Stock transfers are left out.',
   flows: [
     {
       title: 'See what a marketplace owes',
       steps: [
-        'Tally Reports → Debtors. It opens on the default company (MH to begin with). Choose another company, or All companies for the consolidated view.',
+        'Tally Reports → Bills Receivable. It opens on the default company (MH to begin with). Choose another company, or All companies for the consolidated view.',
         'Click a marketplace tab, for example Blinkit, or All for every marketplace. Each tab shows how many invoices it has.',
         'Choose a status: Open for invoices still owed, Overdue for those past their credit days, Settled for those paid in full.',
         'The line above the table adds up what the filters show: invoiced, credit notes, outstanding and overdue.',
@@ -32,9 +32,9 @@ export const debtorsHelp = {
       steps: [
         'An invoice of a Minutes, Now or Zepto party is orange while a DN or CN set against it in Tally has no file. Under the CN amount it says how many, for example “1 without a file”.',
         'Click the CN amount. The note without a file is orange and says “No file”.',
-        'Click “Add it on Ledgers”. Ledgers opens on that party, from the note’s date, showing just its rows without a file.',
+        'Click “Add it on Party Statements”. Party Statements opens on that party, from the note’s date, showing just its rows without a file.',
         'Click Add on the note’s row and attach its document: the marketplace’s DN, or our CN (PDF, photo or email).',
-        'Come back to Debtors: once every DN and CN against the invoice has a file, it is no longer orange.',
+        'Come back to Bills Receivable: once every DN and CN against the invoice has a file, it is no longer orange.',
       ],
     },
     {
@@ -57,14 +57,14 @@ export const debtorsHelp = {
       steps: [
         'In the Files column, click the count (for example “1 file”). A dash means the invoice has no file.',
         'Click View to see a PDF or a photo inside RAMS, or Download to save it.',
-        'Files are added on Ledgers, in the party’s “In Tally” list. Debtors only shows them.',
+        'Files are added on Party Statements, in the party’s “In Tally” list. Bills Receivable only shows them.',
       ],
     },
   ],
   faq: [
-    { q: 'Where do the files come from?', a: 'They are attached on Ledgers, to the invoice’s or the note’s row in the party’s “In Tally” list, by anyone with “Attach files”. Debtors shows the same files.' },
-    { q: 'Why is an invoice orange?', a: 'A DN or CN set against it in Tally has no file yet. Click its CN amount to see which, and add the file on Ledgers. Only Minutes, Now and Zepto invoices turn orange: those are the parties on Ledgers, where files are added.' },
-    { q: 'One credit note is against two invoices. Do I add its file twice?', a: 'No. Add it once, on the note’s row on Ledgers. Every invoice it is set against stops being orange.' },
+    { q: 'Where do the files come from?', a: 'They are attached on Party Statements, to the invoice’s or the note’s row in the party’s “In Tally” list, by anyone with “Attach files”. Bills Receivable shows the same files.' },
+    { q: 'Why is an invoice orange?', a: 'A DN or CN set against it in Tally has no file yet. Click its CN amount to see which, and add the file on Party Statements. Only Minutes, Now and Zepto invoices turn orange: those are the parties on Party Statements, where files are added.' },
+    { q: 'One credit note is against two invoices. Do I add its file twice?', a: 'No. Add it once, on the note’s row on Party Statements. Every invoice it is set against stops being orange.' },
     { q: 'Why is a narration highlighted in yellow?', a: 'Tally has no narration on that record, and the narration check (Admin → Tally companies) says it needs one. Ask the accountant to add it in Tally; it shows after the next sync.' },
     { q: 'Where are the credit days set?', a: 'On Admin → Credit terms, for anyone with “Change credit terms” (Accountants by default). A change shows what it would do before it is saved.' },
     { q: 'What is the difference between Internal PO no and Vendor PO no?', a: 'Internal PO no is ROMS’s own PO id (for example B002). Vendor PO no is the marketplace’s purchase order number, as typed in ROMS.' },

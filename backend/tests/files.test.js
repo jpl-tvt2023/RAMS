@@ -10,7 +10,7 @@ const {
 const { sniff, CHUNK_BYTES } = require('../src/services/files');
 const { cleanName, disposition } = require('../src/controllers/files.controller');
 
-// Files on Ledgers rows end to end: a Zepto party with a sales invoice and
+// Files on Party Statements rows end to end: a Zepto party with a sales invoice and
 // credit notes pushed by a Connector, and PDFs, photos and emails attached to
 // those Tally rows -- stored once, compressed where it helps, and downloaded
 // byte for byte. Every row is a Tally voucher: nothing is typed in RAMS.
@@ -29,8 +29,8 @@ const upload = (token, params, bytes) => bearer(request(app).post(`/api/files?${
   .set('Content-Type', 'application/octet-stream').send(bytes);
 const download = (token, id) => bearer(request(app).get(`/api/files/${id}`), token).buffer(true).parse(binary);
 const remove = (token, id) => bearer(request(app).delete(`/api/files/${id}`), token);
-const ledgers = (method, token, path) => bearer(request(app)[method](`/api/ledgers${path}`), token);
-const partyOf = (token) => ledgers('get', token, `/party?company_id=${company.id}&ledger_guid=${PARTY}&from=2026-08-01&to=2026-08-31`);
+const statements = (method, token, path) => bearer(request(app)[method](`/api/statements${path}`), token);
+const partyOf = (token) => statements('get', token, `/party?company_id=${company.id}&ledger_guid=${PARTY}&from=2026-08-01&to=2026-08-31`);
 const onVoucher = (guid) => ({ company_id: company.id, voucher_guid: guid });
 const blobsOf = async (hash) => (await db.execute({ sql: 'SELECT * FROM file_blobs WHERE sha256 = ?', args: [hash] })).rows;
 
@@ -178,15 +178,15 @@ describe('Who may', () => {
     expect((await remove(viewer.token, added.body.id)).status).toBe(403);
   });
 
-  test('seeing Debtors alone is enough to download', async () => {
+  test('seeing Bills Receivable alone is enough to download', async () => {
     const added = await upload(accountant.token, { ...onVoucher('fl-s1'), name: 'invoice.pdf' }, Buffer.concat([PDF, Buffer.from('% viewer')]));
-    await db.execute("DELETE FROM role_permissions WHERE role = 'Viewer' AND permission = 'ledgers.view'");
+    await db.execute("DELETE FROM role_permissions WHERE role = 'Viewer' AND permission = 'statements.view'");
     try {
       expect((await download(viewer.token, added.body.id)).status).toBe(200);
       await db.execute("DELETE FROM role_permissions WHERE role = 'Viewer' AND permission = 'reports.view'");
       expect((await download(viewer.token, added.body.id)).status).toBe(403);
     } finally {
-      await db.execute("INSERT OR IGNORE INTO role_permissions (role, permission) VALUES ('Viewer', 'ledgers.view'), ('Viewer', 'reports.view')");
+      await db.execute("INSERT OR IGNORE INTO role_permissions (role, permission) VALUES ('Viewer', 'statements.view'), ('Viewer', 'reports.view')");
     }
   });
 
@@ -203,7 +203,7 @@ describe('Stored once, freed when unused', () => {
     const b = await upload(accountant.token, { ...onVoucher('fl-cn1'), name: 'same dn.eml' }, mail);
     expect(b.body.stored_once).toBe(true);
     const [blob] = await blobsOf(sha(mail));
-    expect((await db.execute({ sql: 'SELECT COUNT(*) AS n FROM ledger_files WHERE blob_id = ?', args: [blob.id] })).rows[0].n).toBe(2);
+    expect((await db.execute({ sql: 'SELECT COUNT(*) AS n FROM voucher_files WHERE blob_id = ?', args: [blob.id] })).rows[0].n).toBe(2);
 
     expect((await remove(accountant.token, a.body.id)).body).toEqual({ id: a.body.id, removed: true });
     expect(await blobsOf(sha(mail))).toHaveLength(1);
@@ -250,7 +250,7 @@ describe('On the screens', () => {
   });
 
   test('the statement counts every Tally row without a file', async () => {
-    const { body } = await ledgers('get', viewer.token, `/statement?company_id=${company.id}&vendor=Zepto&states=all&parties=${company.id}:${PARTY}&from=2026-08-01&to=2026-08-31`);
+    const { body } = await statements('get', viewer.token, `?company_id=${company.id}&vendor=Zepto&states=all&parties=${company.id}:${PARTY}&from=2026-08-01&to=2026-08-31`);
     const detail = (await partyOf(viewer.token)).body;
     expect(body.rows[0].rows_without_file).toBe(bare(detail).length);
     expect(body.totals.rows_without_file).toBe(body.rows[0].rows_without_file);
@@ -258,14 +258,14 @@ describe('On the screens', () => {
 
   test('Needs attention counts them too, since the oldest', async () => {
     const detail = (await partyOf(viewer.token)).body;
-    const { body } = await ledgers('get', viewer.token, '/parties');
+    const { body } = await statements('get', viewer.token, '/parties');
     const mine = body.attention.find((a) => a.party.company_id === company.id && a.party.guid === PARTY);
     expect(mine.counts).toEqual({ booked_twice: 0, no_file: bare(detail).length });
     expect(mine.since).toBe(bare(detail).map((v) => v.date).sort()[0]);
   });
 
-  test('Debtors shows an invoice’s files', async () => {
-    const { body } = await bearer(request(app).get(`/api/reports/debtors?company_id=${company.id}&page_size=100`), viewer.token);
+  test('Bills Receivable shows an invoice’s files', async () => {
+    const { body } = await bearer(request(app).get(`/api/reports/bills-receivable?company_id=${company.id}&page_size=100`), viewer.token);
     const row = body.rows.find((r) => r.guid === 'fl-s1');
     expect(row.files.map((f) => f.name)).toContain('party invoice.pdf');
     expect(row.files[0]).toEqual({
@@ -281,7 +281,7 @@ describe('File storage', () => {
     await upload(accountant.token, { ...onVoucher('fl-cn9'), name: 'shrunk.jpg', original_size: 3000000 }, photo);
     const { status, body } = await bearer(request(app).get('/api/files/usage'), admin.token);
     expect(status).toBe(200);
-    const { rows: [t] } = await db.execute('SELECT COUNT(*) AS files FROM ledger_files');
+    const { rows: [t] } = await db.execute('SELECT COUNT(*) AS files FROM voucher_files');
     const { rows: [b] } = await db.execute('SELECT COUNT(*) AS blobs, SUM(stored_size) AS stored FROM file_blobs');
     expect(body).toMatchObject({
       files: Number(t.files), stored_files: Number(b.blobs), stored_bytes: Number(b.stored), max_upload_bytes: 4 * 1024 * 1024, sync_from: '2026-06-08',

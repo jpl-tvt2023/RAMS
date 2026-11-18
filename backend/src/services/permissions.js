@@ -49,23 +49,23 @@ const CATALOG = [
   },
   {
     key: 'reports.view', area: 'Reports', label: 'See the reports',
-    description: 'The report screens under Reports',
+    description: 'The report screens under Tally Reports, such as Bills Receivable',
   },
   {
     key: 'reports.settings', area: 'Reports', label: 'Change credit terms',
     description: 'Each marketplace\'s credit days, the default, and how long before something is an exception',
   },
   {
-    key: 'ledgers.view', area: 'Ledgers', label: 'See Ledgers',
+    key: 'statements.view', area: 'Party Statements', label: 'See Party Statements',
     description: 'The bill-to-bill statement per party, all from Tally: opening, invoices, debit and credit notes, TDS, journals, receipts and closing',
   },
   {
-    key: 'ledgers.files', area: 'Ledgers', label: 'Attach files',
-    description: 'Add and remove PDFs, photos and emails on a party\'s Tally rows. Anyone who sees Ledgers or Debtors can view and download them',
+    key: 'statements.files', area: 'Party Statements', label: 'Attach files',
+    description: 'Add and remove PDFs, photos and emails on a party\'s Tally rows. Anyone who sees Party Statements or Bills Receivable can view and download them',
   },
   {
-    key: 'ledgers.settings', area: 'Ledgers', label: 'Change ledger settings',
-    description: 'Which marketplaces Ledgers covers, and the placeholder opening',
+    key: 'statements.settings', area: 'Party Statements', label: 'Change statement settings',
+    description: 'Which marketplaces Party Statements covers, and the placeholder opening',
   },
   {
     key: 'sync.companies', area: 'Tally sync', label: 'Turn company sync on or off',

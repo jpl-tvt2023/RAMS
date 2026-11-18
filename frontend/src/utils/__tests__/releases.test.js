@@ -19,6 +19,15 @@ describe('screens held for later delivery', () => {
     }
   });
 
+  test('the addresses the renamed pages had before still lead to them', () => {
+    expect(appSource).toContain('<Route path="/reports/debtors" element={<Navigate to="/reports/bills-receivable" replace />} />');
+    expect(appSource).toContain('<Route path="/ledgers" element={<Navigate to="/reports/party-statements" replace />} />');
+    const leaves = NAV.flatMap((n) => (n.children ? n.children : [n])).map((n) => n.path);
+    expect(leaves).toEqual(expect.arrayContaining(['/reports/bills-receivable', '/reports/party-statements']));
+    expect(leaves).not.toContain('/reports/debtors');
+    expect(leaves).not.toContain('/ledgers');
+  });
+
   test('a held screen is not in the top bar, and no group is left empty', () => {
     for (const entry of NAV) {
       if (entry.children) {
@@ -29,8 +38,8 @@ describe('screens held for later delivery', () => {
       }
     }
     expect(NAV.map((n) => n.label)).toContain('Matching');
-    expect(NAV.find((n) => n.label === 'Tally Reports').children.map((c) => c.label)).toEqual(['Debtors', 'Ledgers']);
-    expect(NAV.find((n) => n.label === 'Ledgers')).toBeUndefined(); // no longer its own top-bar entry
+    expect(NAV.find((n) => n.label === 'Tally Reports').children.map((c) => c.label)).toEqual(['Bills Receivable', 'Party Statements']);
+    expect(NAV.find((n) => n.label === 'Party Statements')).toBeUndefined(); // only under Tally Reports
     expect(NAV.find((n) => n.label === 'Purchase Reports')).toMatchObject({ comingSoon: true });
     expect(NAV.find((n) => n.label === 'Purchase Reports').path).toBeUndefined();
   });

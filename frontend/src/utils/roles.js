@@ -39,9 +39,9 @@ export const PERM = {
   AUTOFILL_SETTINGS: 'autofill.settings',
   REPORTS_VIEW: 'reports.view',
   REPORTS_SETTINGS: 'reports.settings',
-  LEDGERS_VIEW: 'ledgers.view',
-  LEDGERS_FILES: 'ledgers.files',
-  LEDGERS_SETTINGS: 'ledgers.settings',
+  STATEMENTS_VIEW: 'statements.view',
+  STATEMENTS_FILES: 'statements.files',
+  STATEMENTS_SETTINGS: 'statements.settings',
   SYNC_COMPANIES: 'sync.companies',
   SYNC_SCHEDULE: 'sync.schedule',
   NARRATION_SETTINGS: 'narration.settings',
@@ -108,10 +108,10 @@ export const NAV = withoutHeld([
     icon: BarChart3,
     children: [
       {
-        label: 'Debtors', path: '/reports/debtors', icon: IndianRupee, description: 'What each invoice still owes, by marketplace', permission: PERM.REPORTS_VIEW,
+        label: 'Bills Receivable', path: '/reports/bills-receivable', icon: IndianRupee, description: 'Each invoice, what is still owed and how overdue', permission: PERM.REPORTS_VIEW,
       },
       {
-        label: 'Ledgers', path: '/ledgers', icon: BookOpen, description: 'Bill-to-bill statement per party, from Tally', permission: PERM.LEDGERS_VIEW,
+        label: 'Party Statements', path: '/reports/party-statements', icon: BookOpen, description: 'Each party’s statement from Tally, with its documents', permission: PERM.STATEMENTS_VIEW,
       },
       {
         label: 'Invoices', path: '/reports/invoices', icon: FileText, description: 'Every Tally sales invoice, what settled it and what is owed', permission: PERM.REPORTS_VIEW,
@@ -182,7 +182,7 @@ export const NAV = withoutHeld([
         label: 'File storage',
         path: '/admin/files',
         icon: HardDrive,
-        description: 'The space the files on Ledgers take, and the biggest ones',
+        description: 'The space the files on Party Statements take, and the biggest ones',
         roles: ADMIN_ONLY,
       },
     ],

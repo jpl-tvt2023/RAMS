@@ -6,9 +6,9 @@ const {
 const { narrationLookup } = require('../services/narration');
 const { filesFor } = require('../services/files');
 const { SYNC_FROM } = require('../config/env');
-const { loadSettings: loadLedgerSettings, loadParties } = require('../ledgers/ledger');
+const { loadSettings: loadStatementSettings, loadParties } = require('../statements/statement');
 
-// Reports: Debtors, Invoices, Credit & debit notes, Stock transfers,
+// Reports: Bills Receivable, Invoices, Credit & debit notes, Stock transfers,
 // Receivables and Exceptions, worked out at read time from the Tally copy
 // (src/books/book.js). Every list filters by company (or all companies,
 // consolidated) and pages. Seeing them is reports.view; credit terms and
@@ -44,20 +44,20 @@ const matches = (q, ...values) => {
 };
 const sum = (list, k) => list.reduce((a, r) => a + (Number(r[k]) || 0), 0);
 
-// ------------------------------------------------------------ debtors
+// ------------------------------------------------------------ bills receivable
 
-// GET /api/reports/debtors?company_id|default&vendor&status&q&page&page_size --
+// GET /api/reports/bills-receivable?company_id|default&vendor&status&q&page&page_size --
 // each invoice with its internal (ROMS) and vendor PO numbers, total, credit
 // notes and what is still owed, a tab per marketplace. vendor '-' = no
 // marketplace known. Stock transfers are left out.
 //
 // Files: each invoice and each credit note against it carries the files added
-// on Ledgers. An invoice of a party on Ledgers (a bill-to-bill marketplace,
+// on Party Statements. An invoice of a party on Party Statements (a bill-to-bill marketplace,
 // the only place files are added) counts its credit notes -- ours and the
 // marketplace's DNs, which Tally books as credit notes -- that have no file
-// (notes_without_file); Debtors highlights it until each has one. `ledger`
-// says where on Ledgers to add them.
-async function debtors(req, res, next) {
+// (notes_without_file); Bills Receivable highlights it until each has one. `ledger`
+// says where on Party Statements to add them.
+async function billsReceivable(req, res, next) {
   try {
     const q = req.query;
     if (q.status && !INVOICE_STATUSES.includes(q.status)) throw fail(400, 'Unknown status');
@@ -105,12 +105,12 @@ async function debtors(req, res, next) {
       for (const l of links) rtvOf.set(`${Number(l.company_id)}|${l.voucher_guid}`, l.rtv_no);
     }
     // The files on each invoice and each of its credit notes, and which
-    // parties are on Ledgers.
-    const [found, onLedgers] = await Promise.all([
+    // parties are on Party Statements.
+    const [found, onStatements] = await Promise.all([
       filesFor(db, { vouchers: page.rows.flatMap((i) => [[i.company_id, i.guid], ...cnsOf(i).map((c) => [i.company_id, c.guid])]) }),
-      loadLedgerSettings(db).then((settings) => loadParties(db, settings)),
+      loadStatementSettings(db).then((settings) => loadParties(db, settings)),
     ]);
-    const ledgerOf = new Map(onLedgers.filter((x) => x.bill_to_bill).map((x) => [`${x.company_id}|${String(x.name).toLowerCase()}`, x]));
+    const ledgerOf = new Map(onStatements.filter((x) => x.bill_to_bill).map((x) => [`${x.company_id}|${String(x.name).toLowerCase()}`, x]));
     page.sync_from = SYNC_FROM;
     page.rows = page.rows.map((i) => {
       const ledger = ledgerOf.get(`${i.company_id}|${String(i.party || '').toLowerCase()}`) || null;
@@ -505,5 +505,5 @@ async function previewTerms(req, res, next) {
 }
 
 module.exports = {
-  debtors, invoices, notes, transfers, receivables, exceptions, getSettings, updateSettings, updateTerms, previewTerms,
+  billsReceivable, invoices, notes, transfers, receivables, exceptions, getSettings, updateSettings, updateTerms, previewTerms,
 };

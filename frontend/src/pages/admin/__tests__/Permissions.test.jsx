@@ -47,7 +47,7 @@ describe('Roles & permissions', () => {
 
   test('a permission whose screens are all held is not shown', async () => {
     renderWithProviders(<Permissions />, { user: ADMIN });
-    expect(await screen.findByText('See the reports')).toBeInTheDocument(); // Debtors is released
+    expect(await screen.findByText('See the reports')).toBeInTheDocument(); // Bills Receivable is released
     expect(screen.getByText('Change credit terms')).toBeInTheDocument(); // Admin → Credit terms is released
     expect(screen.queryByText('Sync now')).not.toBeInTheDocument(); // Sync health is still held
   });

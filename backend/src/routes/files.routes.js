@@ -5,12 +5,12 @@ const { allowRoles, ADMIN_ROLES } = require('../middleware/rbac');
 const { MAX_UPLOAD_BYTES, TOO_BIG } = require('../services/files');
 const c = require('../controllers/files.controller');
 
-// Files on Ledgers rows. Adding and removing is ledgers.files; viewing and
-// downloading, ledgers.view or reports.view (Debtors shows an invoice's
+// Files on Party Statements rows. Adding and removing is statements.files; viewing and
+// downloading, statements.view or reports.view (Bills Receivable shows an invoice's
 // files); the storage figures, Admin and Owner.
 const router = express.Router();
-const attach = requirePermission('ledgers.files');
-const see = requireAnyPermission('ledgers.view', 'reports.view');
+const attach = requirePermission('statements.files');
+const see = requireAnyPermission('statements.view', 'reports.view');
 
 // The file is the request body, whatever type the browser says it is (the
 // server checks its first bytes). Only this route reads a body this large.

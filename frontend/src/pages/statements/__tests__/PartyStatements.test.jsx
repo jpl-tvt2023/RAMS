@@ -1,17 +1,17 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import Ledgers from '../Ledgers';
+import PartyStatements from '../PartyStatements';
 import { renderWithProviders, ADMIN, ACCOUNTANT, VIEWER } from '../../../test/renderWithProviders';
-import * as ledgers from '../../../api/ledgers.api';
+import * as statements from '../../../api/statements.api';
 import { NO_FILE } from '../../../utils/highlights';
 
-vi.mock('../../../api/ledgers.api', () => ({
-  getLedgerParties: vi.fn(),
-  getLedgerStatement: vi.fn(),
-  getLedgerParty: vi.fn(),
-  getLedgerSettings: vi.fn(),
-  updateLedgerSettings: vi.fn(),
+vi.mock('../../../api/statements.api', () => ({
+  getStatementParties: vi.fn(),
+  getStatement: vi.fn(),
+  getStatementParty: vi.fn(),
+  getStatementSettings: vi.fn(),
+  updateStatementSettings: vi.fn(),
 }));
 vi.mock('../../../api/files.api', () => ({ uploadFile: vi.fn(), fetchFile: vi.fn(), deleteFile: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
@@ -119,20 +119,21 @@ async function openAttentionList(user, total) {
   return screen.getByRole('region', { name: 'Needs attention' });
 }
 
-describe('Ledgers', () => {
+describe('Party Statements', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
-    ledgers.getLedgerParties.mockResolvedValue(PARTIES);
-    ledgers.getLedgerStatement.mockResolvedValue(STATEMENT);
-    ledgers.getLedgerParty.mockResolvedValue(DAY);
+    statements.getStatementParties.mockResolvedValue(PARTIES);
+    statements.getStatement.mockResolvedValue(STATEMENT);
+    statements.getStatementParty.mockResolvedValue(DAY);
   });
 
   test('it opens on the starred company, every bill-to-bill marketplace, all states and parties, this month', async () => {
-    renderWithProviders(<Ledgers />, { user: VIEWER });
-    await waitFor(() => expect(ledgers.getLedgerStatement).toHaveBeenCalledWith({
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
+    await waitFor(() => expect(statements.getStatement).toHaveBeenCalledWith({
       company_id: '2', vendor: 'all', states: 'all', parties: 'all',
     }));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Party Statements');
     expect(screen.getByLabelText('Company')).toHaveValue('2');
     expect(within(screen.getByLabelText('Company')).queryByRole('option', { name: 'Choose a company' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Marketplace')).toHaveValue('all');
@@ -144,16 +145,16 @@ describe('Ledgers', () => {
   });
 
   test('with no starred company it opens on All companies', async () => {
-    ledgers.getLedgerParties.mockResolvedValue({ ...PARTIES, companies: PARTIES.companies.map((c) => ({ ...c, is_default: false })) });
-    renderWithProviders(<Ledgers />, { user: VIEWER });
-    await waitFor(() => expect(ledgers.getLedgerStatement).toHaveBeenCalledWith({
+    statements.getStatementParties.mockResolvedValue({ ...PARTIES, companies: PARTIES.companies.map((c) => ({ ...c, is_default: false })) });
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
+    await waitFor(() => expect(statements.getStatement).toHaveBeenCalledWith({
       company_id: 'all', vendor: 'all', states: 'all', parties: 'all',
     }));
     expect(screen.getByLabelText('Company')).toHaveValue('all');
   });
 
   test('a new company or marketplace resets the filters after it to All', async () => {
-    renderWithProviders(<Ledgers />, { user: VIEWER });
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
     const user = userEvent.setup();
     await chooseZeptoPune(user);
     expect(screen.getByRole('button', { name: 'Party' })).toHaveTextContent(Z1.name);
@@ -162,13 +163,13 @@ describe('Ledgers', () => {
     await user.selectOptions(screen.getByLabelText('Company'), 'All companies');
     expect(screen.getByLabelText('Marketplace')).toHaveValue('all');
     expect(screen.getByRole('button', { name: 'State' })).toHaveTextContent('All states');
-    await waitFor(() => expect(ledgers.getLedgerStatement).toHaveBeenLastCalledWith({
+    await waitFor(() => expect(statements.getStatement).toHaveBeenLastCalledWith({
       company_id: 'all', vendor: 'all', states: 'all', parties: 'all',
     }));
   });
 
   test('with no party ticked it asks for one', async () => {
-    renderWithProviders(<Ledgers />, { user: VIEWER });
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
     const user = userEvent.setup();
     await screen.findByRole('button', { name: Z1.name });
     await user.click(screen.getByRole('button', { name: 'Party' }));
@@ -179,7 +180,7 @@ describe('Ledgers', () => {
   });
 
   test('Needs attention is a button that opens and closes the list', async () => {
-    renderWithProviders(<Ledgers />, { user: VIEWER });
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
     const user = userEvent.setup();
     const button = await screen.findByRole('button', { name: 'Needs attention (1)' });
     expect(button).toHaveAttribute('aria-expanded', 'false');
@@ -194,8 +195,8 @@ describe('Ledgers', () => {
   });
 
   test('nothing needing attention, no button', async () => {
-    ledgers.getLedgerParties.mockResolvedValue({ ...PARTIES, attention: [], attention_total: 0 });
-    renderWithProviders(<Ledgers />, { user: VIEWER });
+    statements.getStatementParties.mockResolvedValue({ ...PARTIES, attention: [], attention_total: 0 });
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
     await screen.findByRole('button', { name: Z1.name });
     expect(screen.queryByRole('button', { name: /Needs attention/ })).not.toBeInTheDocument();
   });
@@ -203,31 +204,31 @@ describe('Ledgers', () => {
   test('a party clicked in the statement is brought into view once its detail loads', async () => {
     const scrolled = vi.fn();
     Element.prototype.scrollIntoView = scrolled;
-    ledgers.getLedgerStatement.mockResolvedValue({
+    statements.getStatement.mockResolvedValue({
       ...STATEMENT, rows: [STATEMENT.rows[0], { ...STATEMENT.rows[0], party: Z2 }],
     });
-    renderWithProviders(<Ledgers />, { user: VIEWER });
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: Z2.name }));
-    await waitFor(() => expect(ledgers.getLedgerParty).toHaveBeenCalledWith({ company_id: '2', ledger_guid: 'Z2' }));
-    await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
+    await waitFor(() => expect(statements.getStatementParty).toHaveBeenCalledWith({ company_id: '2', ledger_guid: 'Z2' }));
+    await screen.findByRole('region', { name: `Statement of ${Z1.name}` });
     await waitFor(() => expect(scrolled).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' }));
     delete Element.prototype.scrollIntoView;
   });
 
   test('a marketplace that doesn’t pay bill to bill is coming soon', async () => {
-    renderWithProviders(<Ledgers />, { user: VIEWER });
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
     const user = userEvent.setup();
     await chooseCompany(user, 'MH');
     const vendor = screen.getByLabelText('Marketplace');
     expect(within(vendor).getByRole('option', { name: 'All (Minutes, Zepto)' })).toBeInTheDocument();
     await user.selectOptions(vendor, 'Blinkit');
-    expect(screen.getByRole('status')).toHaveTextContent('Ledgers for Blinkit is coming soon.');
+    expect(screen.getByRole('status')).toHaveTextContent('Party Statements for Blinkit is coming soon.');
     expect(screen.getByRole('button', { name: 'State' })).toBeDisabled();
   });
 
   test('states list both readings; the statement row is Tally’s, with what RAMS found in its cells', async () => {
-    renderWithProviders(<Ledgers />, { user: VIEWER });
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
     const user = userEvent.setup();
     await chooseCompany(user, 'MH');
     await user.selectOptions(screen.getByLabelText('Marketplace'), 'Zepto');
@@ -239,7 +240,7 @@ describe('Ledgers', () => {
     await user.click(screen.getByRole('button', { name: 'Done' }));
     await chooseZeptoPune(user);
 
-    await waitFor(() => expect(ledgers.getLedgerStatement).toHaveBeenCalledWith({
+    await waitFor(() => expect(statements.getStatement).toHaveBeenCalledWith({
       company_id: '2', vendor: 'Zepto', states: 'all', parties: ['2:Z1'],
     }));
     const row = (await screen.findByRole('button', { name: Z1.name })).closest('tr');
@@ -254,10 +255,10 @@ describe('Ledgers', () => {
   });
 
   test('one party opens by itself: every row is Tally’s, a DN read from its narration, a DN booked twice', async () => {
-    renderWithProviders(<Ledgers />, { user: ACCOUNTANT });
+    renderWithProviders(<PartyStatements />, { user: ACCOUNTANT });
     await chooseZeptoPune(userEvent.setup());
-    await waitFor(() => expect(ledgers.getLedgerParty).toHaveBeenCalledWith({ company_id: '2', ledger_guid: 'Z1' }));
-    const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
+    await waitFor(() => expect(statements.getStatementParty).toHaveBeenCalledWith({ company_id: '2', ledger_guid: 'Z1' }));
+    const detail = await screen.findByRole('region', { name: `Statement of ${Z1.name}` });
     expect(within(detail).getByRole('heading', { name: 'In Tally' })).toBeInTheDocument();
     expect(within(rowOf(detail, '901')).getByText('DN FKIDN51803946')).toBeInTheDocument();
     expect(within(rowOf(detail, '901')).getByText('DN')).toBeInTheDocument(); // the column
@@ -275,12 +276,12 @@ describe('Ledgers', () => {
   });
 
   test('Needs attention opens the party, from its oldest problem, and closes', async () => {
-    renderWithProviders(<Ledgers />, { user: VIEWER });
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
     const user = userEvent.setup();
     const list = await openAttentionList(user, 1);
     await user.click(within(list).getByRole('button', { name: Z2.name }));
     expect(screen.queryByRole('region', { name: 'Needs attention' })).not.toBeInTheDocument();
-    await waitFor(() => expect(ledgers.getLedgerStatement).toHaveBeenCalledWith({
+    await waitFor(() => expect(statements.getStatement).toHaveBeenCalledWith({
       company_id: '2', vendor: 'Zepto', states: 'all', parties: ['2:Z2'], from: '2026-09-03',
     }));
     expect(screen.getByLabelText('From')).toHaveValue('2026-09-03');
@@ -288,7 +289,7 @@ describe('Ledgers', () => {
   });
 
   test('a company with no bill-to-bill party says where to map them', async () => {
-    renderWithProviders(<Ledgers />, { user: ADMIN });
+    renderWithProviders(<PartyStatements />, { user: ADMIN });
     const user = userEvent.setup();
     await chooseCompany(user, 'HR');
     expect(screen.getByText(/No party ledger here is mapped/)).toBeInTheDocument();
@@ -296,32 +297,32 @@ describe('Ledgers', () => {
   });
 
   test('Admin opens the settings: the marketplaces and the placeholder opening, nothing about typed notes', async () => {
-    ledgers.getLedgerSettings.mockResolvedValue({
+    statements.getStatementSettings.mockResolvedValue({
       default_opening_paise: 1000000, marketplaces: ['Minutes', 'Now', 'Zepto'], known_marketplaces: ['Blinkit', 'Minutes', 'Now', 'Zepto'], updated_at: null, updated_by_name: null,
     });
-    ledgers.updateLedgerSettings.mockResolvedValue({});
-    renderWithProviders(<Ledgers />, { user: ADMIN });
+    statements.updateStatementSettings.mockResolvedValue({});
+    renderWithProviders(<PartyStatements />, { user: ADMIN });
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: /Ledger settings/ }));
-    const dialog = await screen.findByRole('dialog', { name: 'Ledger settings' });
+    await user.click(await screen.findByRole('button', { name: /Statement settings/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Statement settings' });
     expect(await within(dialog).findByLabelText('Placeholder opening')).toHaveValue('10000.00');
     expect(within(dialog).queryByLabelText('Days Tally may take')).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText('Amount tolerance')).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole('checkbox', { name: 'Blinkit' }));
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
-    expect(ledgers.updateLedgerSettings).toHaveBeenCalledWith({
+    expect(statements.updateStatementSettings).toHaveBeenCalledWith({
       marketplaces: ['Minutes', 'Now', 'Zepto', 'Blinkit'], default_opening_paise: 1000000,
     });
   });
 
   test('a Viewer has no settings button', async () => {
-    renderWithProviders(<Ledgers />, { user: VIEWER });
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
     await screen.findByRole('button', { name: Z1.name });
-    expect(screen.queryByRole('button', { name: /Ledger settings/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Statement settings/ })).not.toBeInTheDocument();
   });
 });
 
-describe('Ledgers files', () => {
+describe('Party Statements files', () => {
   const PDF = {
     id: 31, name: 'FKIDN51803946.pdf', kind: 'pdf', size: 120000, uploaded_by_name: 'Asha', uploaded_at: '2026-11-02 09:00:00',
   };
@@ -341,24 +342,24 @@ describe('Ledgers files', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
-    ledgers.getLedgerParties.mockResolvedValue({
+    statements.getStatementParties.mockResolvedValue({
       ...PARTIES,
       attention: [...PARTIES.attention, {
         party: Z1, counts: { booked_twice: 0, no_file: 2 }, since: '2026-10-02', state_differs: false,
       }],
       attention_total: 2,
     });
-    ledgers.getLedgerStatement.mockResolvedValue({ ...STATEMENT, rows: [{ ...STATEMENT.rows[0], rows_without_file: 2 }] });
-    ledgers.getLedgerParty.mockResolvedValue(withFiles);
+    statements.getStatement.mockResolvedValue({ ...STATEMENT, rows: [{ ...STATEMENT.rows[0], rows_without_file: 2 }] });
+    statements.getStatementParty.mockResolvedValue(withFiles);
   });
 
   test('any Tally row with no file is orange and says so; a row with its file is not', async () => {
-    renderWithProviders(<Ledgers />, { user: VIEWER });
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
     await chooseZeptoPune(userEvent.setup());
     const statementRow = (await screen.findByRole('button', { name: Z1.name })).closest('tr');
     expect(within(statementRow).getByText('2 without a file')).toBeInTheDocument();
 
-    const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
+    const detail = await screen.findByRole('region', { name: `Statement of ${Z1.name}` });
     for (const number of ['902', '908']) {
       const bare = rowOf(detail, number);
       expect(bare).toHaveClass(NO_FILE.row);
@@ -376,10 +377,10 @@ describe('Ledgers files', () => {
   });
 
   test('“Without a file” shows just those rows', async () => {
-    renderWithProviders(<Ledgers />, { user: VIEWER });
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
     const user = userEvent.setup();
     await chooseZeptoPune(user);
-    const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
+    const detail = await screen.findByRole('region', { name: `Statement of ${Z1.name}` });
     const toggle = within(detail).getByRole('button', { name: 'Without a file (2)' });
     await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
@@ -390,22 +391,22 @@ describe('Ledgers files', () => {
   });
 
   test('Needs attention counts the rows without a file, and opens just those', async () => {
-    renderWithProviders(<Ledgers />, { user: VIEWER });
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
     const user = userEvent.setup();
     const list = await openAttentionList(user, 2);
     const row = within(list).getByRole('button', { name: Z1.name }).closest('tr');
     expect(within(row).getByText('2 without a file')).toBeInTheDocument();
     await user.click(within(row).getByRole('button', { name: Z1.name }));
-    const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
+    const detail = await screen.findByRole('region', { name: `Statement of ${Z1.name}` });
     expect(within(detail).getByRole('button', { name: 'Without a file (2)' })).toHaveAttribute('aria-pressed', 'true');
-    expect(ledgers.getLedgerStatement).toHaveBeenCalledWith(expect.objectContaining({ parties: ['2:Z1'], from: '2026-10-02' }));
+    expect(statements.getStatement).toHaveBeenCalledWith(expect.objectContaining({ parties: ['2:Z1'], from: '2026-10-02' }));
   });
 
   test('an Accountant adds a file from the Files column', async () => {
-    renderWithProviders(<Ledgers />, { user: ACCOUNTANT });
+    renderWithProviders(<PartyStatements />, { user: ACCOUNTANT });
     const user = userEvent.setup();
     await chooseZeptoPune(user);
-    const detail = await screen.findByRole('region', { name: `Ledger of ${Z1.name}` });
+    const detail = await screen.findByRole('region', { name: `Statement of ${Z1.name}` });
     await user.click(within(detail).getByRole('button', { name: 'Add a file to Credit Note 902' }));
     const dialog = screen.getByRole('dialog', { name: 'Files — Credit Note 902' });
     expect(within(dialog).getByText('No file yet.')).toBeInTheDocument();

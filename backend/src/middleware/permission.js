@@ -16,7 +16,7 @@ const requirePermission = (key) => {
 };
 
 // Passes when the user holds any one of the keys -- for something reached from
-// two screens (a file seen on Ledgers or on Debtors).
+// two screens (a file seen on Party Statements or on Bills Receivable).
 const requireAnyPermission = (...keys) => {
   for (const key of keys) if (!KEYS.has(key)) throw new Error(`requireAnyPermission: unknown permission ${key}`);
   return async (req, res, next) => {

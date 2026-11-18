@@ -3,7 +3,7 @@ import { ReportTable, td, num } from '../reports/ReportFrame';
 import Legend from '../shared/Legend';
 import {
   COLUMNS, LEGEND, STATE_DIFFERS, cellFindings, balance, signed,
-} from '../../utils/ledgerText';
+} from '../../utils/statementText';
 import { NO_FILE } from '../../utils/highlights';
 
 // Written out whole, so Tailwind keeps them.

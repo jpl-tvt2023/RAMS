@@ -7,11 +7,11 @@ const { keyOf } = require('../utils/gstStates');
 const { filesFor } = require('../services/files');
 const {
   loadSettings, loadParties, statementOf, partyDetailOf, attentionOf, monthStart,
-} = require('../ledgers/ledger');
+} = require('../statements/statement');
 
-// Ledgers: the bill-to-bill statement per party, every row Tally's
-// (src/ledgers/ledger.js). Seeing it is ledgers.view, the settings are
-// ledgers.settings, and files on its rows are /api/files. Every change is
+// Party Statements: the bill-to-bill statement per party, every row Tally's
+// (src/statements/statement.js). Seeing it is statements.view, the settings are
+// statements.settings, and files on its rows are /api/files. Every change is
 // audited. Nothing here writes to Tally, and nothing is typed here.
 
 const MAX_PAISE = 100000000000; // 100 crore rupees
@@ -68,13 +68,13 @@ async function billToBillParty(companyId, ledgerGuid) {
   const settings = await loadSettings(db);
   const party = (await loadParties(db, settings)).find((p) => p.company_id === Number(companyId) && p.guid === String(ledgerGuid || ''));
   if (!party) throw fail(400, 'Choose a party ledger of a synced company');
-  if (!party.bill_to_bill) throw fail(400, `Ledgers for ${party.vendor} is coming soon. For now Ledgers covers ${settings.marketplaces.join(', ') || 'no marketplace'}`);
+  if (!party.bill_to_bill) throw fail(400, `Party Statements for ${party.vendor} is coming soon. For now Party Statements covers ${settings.marketplaces.join(', ') || 'no marketplace'}`);
   return party;
 }
 
 // ------------------------------------------------------------ parties
 
-// GET /api/ledgers/parties -- the companies, every marketplace (those Ledgers
+// GET /api/statements/parties -- the companies, every marketplace (those Party Statements
 // covers first, the rest "coming soon"), the bill-to-bill parties with both
 // readings of their state, and what needs attention.
 async function parties(req, res, next) {
@@ -104,7 +104,7 @@ async function parties(req, res, next) {
 
 // ------------------------------------------------------------ statement
 
-// GET /api/ledgers/statement?company_id&vendor&states&parties&from&to --
+// GET /api/statements?company_id&vendor&states&parties&from&to --
 // company_id 'all' or an id, vendor 'all' or a marketplace, states 'all' or a
 // comma list, parties 'all' or a comma list of companyId:guid. Each is
 // required: nothing is shown until everything is chosen.
@@ -119,7 +119,7 @@ async function statement(req, res, next) {
     if (!company || !vendor || !states || !picked) throw fail(400, 'Choose a company, a marketplace, states and parties');
     const { from, to } = rangeIn(q, today);
     const settings = await loadSettings(db);
-    if (vendor !== 'all' && !settings.marketplaces.includes(vendor)) throw fail(400, `Ledgers for ${vendor} is coming soon`);
+    if (vendor !== 'all' && !settings.marketplaces.includes(vendor)) throw fail(400, `Party Statements for ${vendor} is coming soon`);
     const stateKeys = states === 'all' ? null : new Set(states.map(keyOf));
     const partyKeys = picked === 'all' ? null : new Set(picked);
     const list = (await loadParties(db, settings)).filter((p) => p.bill_to_bill
@@ -133,7 +133,7 @@ async function statement(req, res, next) {
   } catch (err) { sendError(res, next, err); }
 }
 
-// GET /api/ledgers/party?company_id&ledger_guid&from&to -- one party's range,
+// GET /api/statements/party?company_id&ledger_guid&from&to -- one party's range,
 // with the files on each Tally voucher.
 async function party(req, res, next) {
   try {
@@ -153,7 +153,7 @@ async function party(req, res, next) {
 
 // ------------------------------------------------------------ settings
 
-// Which marketplaces Ledgers covers (marketplaces) and the placeholder opening.
+// Which marketplaces Party Statements covers (marketplaces) and the placeholder opening.
 const SETTING_RULES = {
   default_opening_paise: [-MAX_PAISE, MAX_PAISE, 'The placeholder opening is too large'],
 };
@@ -166,7 +166,7 @@ async function knownMarketplaces(settings) {
   return [...new Set([...rows.map((r) => r.vendor), ...settings.marketplaces])].filter(Boolean).sort((a, b) => a.localeCompare(b));
 }
 
-// GET /api/ledgers/settings
+// GET /api/statements/settings
 async function getSettings(req, res, next) {
   try {
     const settings = await loadSettings(db);
@@ -174,7 +174,7 @@ async function getSettings(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// PUT /api/ledgers/settings { default_opening_paise?, marketplaces? }
+// PUT /api/statements/settings { default_opening_paise?, marketplaces? }
 async function updateSettings(req, res, next) {
   try {
     const body = req.body || {};
@@ -198,15 +198,15 @@ async function updateSettings(req, res, next) {
     if (changes.length) {
       await inTx(async (tx) => {
         await tx.execute({
-          sql: "UPDATE ledger_settings SET default_opening_paise = ?, updated_at = datetime('now'), updated_by = ? WHERE id = 1",
+          sql: "UPDATE statement_settings SET default_opening_paise = ?, updated_at = datetime('now'), updated_by = ? WHERE id = 1",
           args: [merged.default_opening_paise, req.user.id],
         });
         const gone = current.marketplaces.filter((v) => !marketplaces.includes(v));
         const added = marketplaces.filter((v) => !current.marketplaces.includes(v));
-        for (const v of gone) await tx.execute({ sql: 'DELETE FROM ledger_marketplaces WHERE vendor = ?', args: [v] });
-        for (const v of added) await tx.execute({ sql: 'INSERT INTO ledger_marketplaces (vendor, added_by) VALUES (?, ?)', args: [v, req.user.id] });
+        for (const v of gone) await tx.execute({ sql: 'DELETE FROM statement_marketplaces WHERE vendor = ?', args: [v] });
+        for (const v of added) await tx.execute({ sql: 'INSERT INTO statement_marketplaces (vendor, added_by) VALUES (?, ?)', args: [v, req.user.id] });
         await logAction({
-          client: tx, userId: req.user.id, actionType: 'LEDGER_SETTINGS_UPDATE', description: 'Ledger settings changed', entityType: 'ledger_settings', entityId: 1, changes,
+          client: tx, userId: req.user.id, actionType: 'STATEMENT_SETTINGS_UPDATE', description: 'Statement settings changed', entityType: 'statement_settings', entityId: 1, changes,
         });
       });
     }

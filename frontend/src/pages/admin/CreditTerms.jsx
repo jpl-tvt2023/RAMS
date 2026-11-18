@@ -12,7 +12,7 @@ import {
 import { formatDay, formatDateTime, formatRupees } from '../../utils/formatters';
 
 // Admin -> Credit terms (reports.settings: Admin, Owner and Accountants to
-// start): how many days each marketplace has to pay an invoice. Debtors marks
+// start): how many days each marketplace has to pay an invoice. Bills Receivable marks
 // an invoice overdue once they have passed. Each change is previewed before it
 // is saved, and audited.
 const todayIst = () => new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
@@ -118,7 +118,7 @@ export default function CreditTerms() {
           <h1 className="text-2xl font-bold text-brand">Credit terms</h1>
           <HelpLink section="credit-terms" />
         </div>
-        <p className="text-gray-500 text-sm mt-1">How many days each marketplace has to pay an invoice. Debtors marks an invoice overdue once they have passed. Each change shows what it does before you save it, and is kept in the audit log.</p>
+        <p className="text-gray-500 text-sm mt-1">How many days each marketplace has to pay an invoice. Bills Receivable marks an invoice overdue once they have passed. Each change shows what it does before you save it, and is kept in the audit log.</p>
       </div>
 
       {!data ? <p className="text-sm text-gray-400">Loading…</p> : (

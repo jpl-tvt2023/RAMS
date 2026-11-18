@@ -106,7 +106,7 @@ export const tallyCompanies = {
     {
       title: 'Choose the company the reports open on',
       steps: [
-        'The company marked Default for reports is the one Tally Reports → Debtors and Ledgers open on (MH to begin with).',
+        'The company marked Default for reports is the one Tally Reports → Bills Receivable and Party Statements open on (MH to begin with).',
         'To change it, click the star on another company’s row. Only a company whose sync is on can be the default.',
         'Everyone sees the new default the next time they open the report in a new tab. The change is recorded in the Audit Log.',
       ],
@@ -126,7 +126,7 @@ export const creditTerms = {
   area: 'Admin',
   title: 'Credit terms',
   who: 'Anyone with "Change credit terms": Admin and Owner always, Accountants by default. An Admin or Owner can give it to, or take it from, other roles on Roles & permissions.',
-  summary: 'How many days each marketplace has to pay an invoice. Debtors marks an invoice overdue once its days have passed. A marketplace without its own days uses the default. Each change shows what it would do before you save it.',
+  summary: 'How many days each marketplace has to pay an invoice. Bills Receivable marks an invoice overdue once its days have passed. A marketplace without its own days uses the default. Each change shows what it would do before you save it.',
   flows: [
     {
       title: 'Change a marketplace’s credit days',
@@ -134,7 +134,7 @@ export const creditTerms = {
         'Admin → Credit terms.',
         'Click the pencil on the marketplace’s row.',
         'Type the days. The box under it says what changes today, for example “Of Zepto’s 140 invoices still owed, 23 would become overdue”.',
-        'Click Save. Debtors uses the new days at once, and the change is in the Audit Log.',
+        'Click Save. Bills Receivable uses the new days at once, and the change is in the Audit Log.',
       ],
     },
     {
@@ -160,7 +160,7 @@ export const creditTerms = {
     },
   ],
   faq: [
-    { q: 'What do the credit days decide?', a: 'When an invoice is overdue: its date plus the days. Debtors shows the due date and how many days overdue.' },
+    { q: 'What do the credit days decide?', a: 'When an invoice is overdue: its date plus the days. Bills Receivable shows the due date and how many days overdue.' },
     { q: 'What does “Default (30)” mean?', a: 'The marketplace has no days of its own, so it uses the default, 30 days to begin with.' },
     { q: 'Why aren’t Flipkart and Amazon listed?', a: 'They are set to stock transfer on Matching rules: sales between our own registrations, so nothing is owed and nothing is overdue.' },
     { q: 'Does the preview change anything?', a: 'No. Nothing is saved until you click Save.' },
@@ -173,7 +173,7 @@ export const fileStorage = {
   area: 'Admin',
   title: 'File storage',
   who: 'Admin and Owner only.',
-  summary: 'How much space the files attached on Ledgers take in RAMS’s database, how much RAMS saved, and the biggest files. Photos are made smaller before they are sent, PDFs and emails are compressed without losing anything, and a file attached to several rows is kept once.',
+  summary: 'How much space the files attached on Party Statements take in RAMS’s database, how much RAMS saved, and the biggest files. Photos are made smaller before they are sent, PDFs and emails are compressed without losing anything, and a file attached to several rows is kept once.',
   flows: [
     {
       title: 'See how much space files take',
@@ -188,13 +188,13 @@ export const fileStorage = {
       title: 'Find and look at the biggest files',
       steps: [
         'The list at the bottom shows the 20 biggest files, where each is attached, and who added it when.',
-        'Click View to see one inside RAMS (an email downloads instead), or Open on Ledgers to go to its party.',
+        'Click View to see one inside RAMS (an email downloads instead), or Open on Party Statements to go to its party.',
       ],
     },
     {
       title: 'Free space',
       steps: [
-        'Open the file’s party on Ledgers and remove the files nobody needs (the bin in the row’s files).',
+        'Open the file’s party on Party Statements and remove the files nobody needs (the bin in the row’s files).',
         'A file is deleted once no row uses it; the removal stays in the audit log.',
       ],
     },
