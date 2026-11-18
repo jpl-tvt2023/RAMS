@@ -73,7 +73,7 @@ Until step 2 is done, ROMS production answers RAMS with "The integration is not 
       - It installs the Connector in `C:\RAMS\Connector` with the task **RAMS Connector** (it starts when you sign in, in a hidden window, and restarts if it stops), loads Tally into RAMS (a few minutes for MH; Tally stays usable), and starts it.
    4. When every line is ticked, RAMS's Dashboard **Tally sync** card says *Connector online* within a minute.
 4. **In RAMS:**
-   - Click the **star** on MH, so Reports → Debtors opens on it. A fresh database has no default company until this is done, and the report opens on all companies instead.
+   - Click the **star** on MH, so Tally Reports → Debtors and Ledgers open on it. A fresh database has no default company until this is done, and the report opens on all companies instead.
    - Open **Ledgers** on a Zepto party: its opening should say *From Tally*, not *Placeholder*.
    - Matching → Party ledgers should show no "State differs" on *Flipkart India Private Limited - Bengalore* (it reads Karnataka now).
    - `C:\RAMS\Connector\rams-connector.cmd status` on the office PC shows the version: it must be **0.7.1**.
@@ -97,9 +97,9 @@ Each step is a setting on **Matching → Auto-fill**, not a deploy. It can be pu
 ## 5. After go-live
 
 - **Daily:** Matching → Match review → *Needs review*, and Matching → Auto-fill → *Needs a person* and *Refused by ROMS*.
-- **Daily:** **Ledgers** → *Needs attention*: the days where what was entered for a party differs from Tally.
+- **Daily:** **Tally Reports → Ledgers** → *Needs attention*: parties with a DN booked twice, rows without a file, or a state that differs.
 - **Weekly:** Matching → Party ledgers → *Not set*. Map any new ledger, including head-office ledgers that marketplaces pay into.
-- **Weekly:** Reports → **Debtors**, status *Overdue*: chase what is past its credit days. Status *No PO*: invoices to link to a ROMS PO.
+- **Weekly:** Tally Reports → **Debtors**, status *Overdue*: chase what is past its credit days. Status *No PO*: invoices to link to a ROMS PO.
 - **If something looks old:** the Dashboard's **Tally sync** card says whether the Connector is online, Tally is answering, and when each company last synced.
 - These checks gain the other report screens (Exceptions, Receivables, Sync health) as each one is delivered.
 - **To stop all writing into ROMS at once:** set both auto-fill fields to Off. Or remove `INTEGRATION_TOKEN` from ROMS and redeploy.

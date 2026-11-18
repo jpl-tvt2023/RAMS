@@ -142,9 +142,9 @@ Do this at the PC where TallyPrime runs, signed in as the Windows user who uses 
 | Where in RAMS | What you should see |
 |---|---|
 | Dashboard → Tally sync card | **Connector online**, **Tally answering**, each company *Up to date* |
-| Ledgers → MH → Zepto → All states → All parties | Openings say **From Tally**, not *Placeholder*. The closing equals Tally's balance |
+| Tally Reports → Ledgers (opens on MH, all parties) → Zepto | Openings say **From Tally**, not *Placeholder*. The closing equals Tally's balance |
 | Matching → Party ledgers | No *State differs* on *Flipkart India Private Limited – Bengalore*. New ledgers wait under **Not set**: accept the suggestions |
-| Reports → Debtors | Today's invoices from Tally, marked overdue by the credit terms |
+| Tally Reports → Debtors | Today's invoices from Tally, marked overdue by the credit terms |
 | Matching → Match review | Rows in Linked / Needs review / Waiting for Tally, after **Match now** |
 | Admin → Audit Log | The `DATA_RESET` row, then your own changes |
 

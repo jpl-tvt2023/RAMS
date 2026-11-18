@@ -7,7 +7,24 @@ import NavDropdown from './NavDropdown';
 import Wordmark from './Wordmark';
 
 // (Copied from ROMS: a horizontal top bar, no sidebar, built from NAV and
-// filtered by role or permission.)
+// filtered by role or permission.) A coming-soon entry is greyed, with a
+// "Coming soon" tag, and isn't a link.
+function ComingSoon({ entry, mobile = false }) {
+  return (
+    <span
+      aria-disabled="true"
+      title={`${entry.label}: coming soon`}
+      className={mobile
+        ? 'flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white/40 cursor-default'
+        : 'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap text-white/40 cursor-default'}
+    >
+      {entry.icon && <entry.icon size={16} className="shrink-0" />}
+      {entry.label}
+      <span className="px-1.5 py-px rounded-full bg-white/10 text-[10px] font-semibold uppercase tracking-wide text-white/60">Coming soon</span>
+    </span>
+  );
+}
+
 export default function Topbar() {
   const { user, logout, can } = useAuth();
   const navigate = useNavigate();
@@ -59,16 +76,17 @@ export default function Topbar() {
         <div className="shrink-0"><Wordmark /></div>
 
         <nav className="hidden lg:flex items-center gap-1 flex-1">
-          {visibleNav.map((entry) =>
-            entry.children ? (
+          {visibleNav.map((entry) => {
+            if (entry.comingSoon) return <ComingSoon key={entry.label} entry={entry} />;
+            return entry.children ? (
               <NavDropdown key={entry.label} label={entry.label} icon={entry.icon} items={entry.children} />
             ) : (
               <NavLink key={entry.path} to={entry.path} className={linkCls}>
                 {entry.icon && <entry.icon size={16} className="shrink-0" />}
                 {entry.label}
               </NavLink>
-            ),
-          )}
+            );
+          })}
         </nav>
 
         <div className="flex-1 lg:hidden" />
@@ -97,8 +115,9 @@ export default function Topbar() {
 
       {menuOpen && (
         <nav className="lg:hidden border-t border-white/10 bg-brand pb-2">
-          {visibleNav.map((entry) =>
-            entry.children ? (
+          {visibleNav.map((entry) => {
+            if (entry.comingSoon) return <ComingSoon key={entry.label} entry={entry} mobile />;
+            return entry.children ? (
               <div key={entry.label} className="pt-1">
                 <p className="px-4 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-white/40">{entry.label}</p>
                 {entry.children.map((child) => (
@@ -113,8 +132,8 @@ export default function Topbar() {
                 {entry.icon && <entry.icon size={16} className="shrink-0" />}
                 {entry.label}
               </NavLink>
-            ),
-          )}
+            );
+          })}
         </nav>
       )}
     </header>

@@ -1,11 +1,11 @@
-// Help: the Reports screens -- Debtors, Invoices, Credit & debit notes, Stock
+// Help: the Tally Reports screens -- Debtors, Invoices, Credit & debit notes, Stock
 // transfers, Receivables, Exceptions and Sync health.
 const SEE = 'Seeing it: "See the reports". Admin and Owner always can.';
 
 export const debtorsHelp = {
   id: 'debtors',
   path: '/reports/debtors',
-  area: 'Reports',
+  area: 'Tally Reports',
   title: 'Debtors',
   who: SEE,
   summary: 'Each Tally sales invoice since RAMS started (8 June 2026), by marketplace: its internal and vendor PO numbers, the amount, the credit notes against it and what is still owed. RAMS works the figures out from Tally each time the page opens, so they are as fresh as the last sync. Stock transfers are left out.',
@@ -13,7 +13,7 @@ export const debtorsHelp = {
     {
       title: 'See what a marketplace owes',
       steps: [
-        'Reports → Debtors. It opens on the default company (MH to begin with). Choose another company, or All companies for the consolidated view.',
+        'Tally Reports → Debtors. It opens on the default company (MH to begin with). Choose another company, or All companies for the consolidated view.',
         'Click a marketplace tab, for example Blinkit, or All for every marketplace. Each tab shows how many invoices it has.',
         'Choose a status: Open for invoices still owed, Overdue for those past their credit days, Settled for those paid in full.',
         'The line above the table adds up what the filters show: invoiced, credit notes, outstanding and overdue.',
@@ -24,6 +24,17 @@ export const debtorsHelp = {
       steps: [
         'In the CN column, click the amount. The CN numbers are under it.',
         'A window lists each credit note: its number, date, type, the amount set against this invoice and, when there is one, the ROMS RTV row it was linked to.',
+        'The Files column shows each note’s files. Click the count to view or download them.',
+      ],
+    },
+    {
+      title: 'Clear an orange invoice (a DN or CN without its file)',
+      steps: [
+        'An invoice of a Minutes, Now or Zepto party is orange while a DN or CN set against it in Tally has no file. Under the CN amount it says how many, for example “1 without a file”.',
+        'Click the CN amount. The note without a file is orange and says “No file”.',
+        'Click “Add it on Ledgers”. Ledgers opens on that party, from the note’s date, showing just its rows without a file.',
+        'Click Add on the note’s row and attach its document: the marketplace’s DN, or our CN (PDF, photo or email).',
+        'Come back to Debtors: once every DN and CN against the invoice has a file, it is no longer orange.',
       ],
     },
     {
@@ -51,7 +62,9 @@ export const debtorsHelp = {
     },
   ],
   faq: [
-    { q: 'Where do the files come from?', a: 'They are attached on Ledgers, to the invoice’s row in the party’s “In Tally” list, by anyone with “Attach files”. Debtors shows the same files.' },
+    { q: 'Where do the files come from?', a: 'They are attached on Ledgers, to the invoice’s or the note’s row in the party’s “In Tally” list, by anyone with “Attach files”. Debtors shows the same files.' },
+    { q: 'Why is an invoice orange?', a: 'A DN or CN set against it in Tally has no file yet. Click its CN amount to see which, and add the file on Ledgers. Only Minutes, Now and Zepto invoices turn orange: those are the parties on Ledgers, where files are added.' },
+    { q: 'One credit note is against two invoices. Do I add its file twice?', a: 'No. Add it once, on the note’s row on Ledgers. Every invoice it is set against stops being orange.' },
     { q: 'Why is a narration highlighted in yellow?', a: 'Tally has no narration on that record, and the narration check (Admin → Tally companies) says it needs one. Ask the accountant to add it in Tally; it shows after the next sync.' },
     { q: 'Where are the credit days set?', a: 'On Admin → Credit terms, for anyone with “Change credit terms” (Accountants by default). A change shows what it would do before it is saved.' },
     { q: 'What is the difference between Internal PO no and Vendor PO no?', a: 'Internal PO no is ROMS’s own PO id (for example B002). Vendor PO no is the marketplace’s purchase order number, as typed in ROMS.' },
@@ -67,7 +80,7 @@ export const debtorsHelp = {
 export const invoicesHelp = {
   id: 'invoices',
   path: '/reports/invoices',
-  area: 'Reports',
+  area: 'Tally Reports',
   title: 'Invoices',
   who: SEE,
   summary: 'Every Tally sales invoice since RAMS started (8 June 2026), with its marketplace and PO, what settled it and what is still owed. RAMS works the figures out from Tally each time the page opens, so they are as fresh as the last sync.',
@@ -75,7 +88,7 @@ export const invoicesHelp = {
     {
       title: 'Find what is owed',
       steps: [
-        'Reports → Invoices. Choose a company, or All companies for the consolidated view.',
+        'Tally Reports → Invoices. Choose a company, or All companies for the consolidated view.',
         'Click Overdue to see invoices past their credit days, or Open for everything still owed.',
         'Sort by Most outstanding or Most overdue to see the biggest first.',
         'Each row shows the total, what was received, credit notes plus TDS and adjustments, and what is still outstanding.',
@@ -105,7 +118,7 @@ export const invoicesHelp = {
 export const notesHelp = {
   id: 'credit-debit-notes',
   path: '/reports/notes',
-  area: 'Reports',
+  area: 'Tally Reports',
   title: 'Credit & debit notes',
   who: SEE,
   summary: 'Each Tally credit note and debit note, the invoice it settles (its Agst Ref in Tally), that invoice’s PO, and the RTV row RAMS linked it to, with whether its number is in ROMS yet.',
@@ -113,7 +126,7 @@ export const notesHelp = {
     {
       title: 'Check a return’s credit note',
       steps: [
-        'Reports → Credit & debit notes, Credit notes tab.',
+        'Tally Reports → Credit & debit notes, Credit notes tab.',
         'Search by the RTV No, the PO or the CN number.',
         'The row shows the invoice it settles and the RTV row; under it, whether auto-fill has put the CN No into ROMS.',
       ],
@@ -128,7 +141,7 @@ export const notesHelp = {
 export const transfersHelp = {
   id: 'stock-transfers',
   path: '/reports/transfers',
-  area: 'Reports',
+  area: 'Tally Reports',
   title: 'Stock transfers',
   who: SEE,
   summary: 'Sales from one Roymax registration to another, for example MH to HR. They move our own stock, so they stay out of receivables.',
@@ -149,7 +162,7 @@ export const transfersHelp = {
 export const receivablesHelp = {
   id: 'receivables',
   path: '/reports/receivables',
-  area: 'Reports',
+  area: 'Tally Reports',
   title: 'Receivables',
   who: `${SEE} Changing credit terms: "Change credit terms".`,
   summary: 'What each marketplace owes, per company: invoiced, received, credit notes, TDS and adjustments, outstanding, overdue, and how old it is (0–30, 31–60, 61–90, 90+ days since the invoice). Stock transfers are left out.',
@@ -157,7 +170,7 @@ export const receivablesHelp = {
     {
       title: 'Read it',
       steps: [
-        'Reports → Receivables. Choose a company, or All companies for the consolidated figures.',
+        'Tally Reports → Receivables. Choose a company, or All companies for the consolidated figures.',
         'Outstanding is what invoices still owe. Received on account is money a marketplace paid that Tally holds without setting it against an invoice.',
         'Net outstanding = Outstanding − Received on account: what the marketplace really still owes.',
         'Download CSV gives the same table for Excel.',
@@ -182,7 +195,7 @@ export const receivablesHelp = {
 export const exceptionsHelp = {
   id: 'exceptions',
   path: '/reports/exceptions',
-  area: 'Reports',
+  area: 'Tally Reports',
   title: 'Exceptions',
   who: SEE,
   summary: 'Everything that needs a person, by kind, each saying where it is fixed. Fixed items drop off by themselves after the next match.',
@@ -190,7 +203,7 @@ export const exceptionsHelp = {
     {
       title: 'Work through them',
       steps: [
-        'Reports → Exceptions. Each kind shows how many there are; click one to see them.',
+        'Tally Reports → Exceptions. Each kind shows how many there are; click one to see them.',
         'Follow the link to where it is fixed: Match review, Auto-fill or Invoices.',
         'The kinds: a Bill No or CN No in ROMS that Tally doesn’t have; a Tally invoice with no PO; ROMS and Tally disagreeing; more than one possible invoice or credit note; an RTV row with no credit note yet; and an auto-fill ROMS refused.',
       ],
@@ -204,7 +217,7 @@ export const exceptionsHelp = {
 export const syncHealthHelp = {
   id: 'sync-health',
   path: '/sync',
-  area: 'Reports',
+  area: 'Tally Reports',
   title: 'Sync health',
   who: 'Everyone sees it. Sync now: "Sync now". Admin and Owner always can.',
   summary: 'Whether the RAMS Connector on the office PC is checking in, whether Tally answers, where each company stands, and every sync run with its errors.',
@@ -212,7 +225,7 @@ export const syncHealthHelp = {
     {
       title: 'Bring a company up to date now',
       steps: [
-        'Reports → Sync health.',
+        'Tally Reports → Sync health.',
         'Click Sync now on the company, or Sync all now.',
         'The Connector picks it up at its next check-in (within a minute or two) and syncs the changes from Tally, even outside office hours. The run appears under Sync runs.',
       ],

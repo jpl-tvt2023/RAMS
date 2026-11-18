@@ -49,10 +49,11 @@ export function StateLine({ party }) {
 
 /**
  * The bill-to-bill statement: one row per party, every figure Tally's, so each
- * row adds up to Tally's closing. A row opens that party's detail.
+ * row adds up to Tally's closing. A row opens that party's detail. With
+ * maxHeight the rows scroll inside the box, the header and Total staying put.
  */
 export default function StatementTable({
-  data, loading, selected, onOpen, showCompany,
+  data, loading, selected, onOpen, showCompany, maxHeight,
 }) {
   const rows = data?.rows || [];
   const keyOf = (r) => `${r.party.company_id}:${r.party.guid}`;
@@ -63,10 +64,11 @@ export default function StatementTable({
       <ReportTable
         loading={loading}
         head={head}
+        maxHeight={maxHeight}
         empty={!loading && !rows.length && <p className="text-center text-gray-400 py-8 text-sm">No party matches these filters.</p>}
         foot={t && rows.length > 1 ? (
-          <tfoot>
-            <tr className="bg-gray-50 font-semibold border-t border-gray-200">
+          <tfoot className={maxHeight ? 'sticky bottom-0 z-10' : undefined}>
+            <tr className="bg-gray-50 font-semibold border-t border-gray-200 [&>td]:shadow-[inset_0_1px_0_var(--color-gray-200)]">
               <td className={td}>
                 Total
                 {t.placeholders > 0 && <p className="text-xs font-normal text-gray-500">{t.placeholders} opening{t.placeholders > 1 ? 's are placeholders' : ' is a placeholder'}, not from Tally</p>}

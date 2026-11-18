@@ -143,6 +143,44 @@ describe('Debtors', () => {
     expect((await get(viewer.token, `/debtors?${q}&status=paid`)).status).toBe(400);
   });
 
+  test('an invoice of a party on Ledgers counts its credit notes without a file; others never do', async () => {
+    const at = (body, number) => body.rows.find((r) => r.number === number);
+    // The Blinkit ledger is not on Ledgers (not bill to bill): nothing counted.
+    let { body } = await get(viewer.token, `/debtors?${q}&page_size=100`);
+    expect(at(body, '901/RP/26-27')).toMatchObject({ ledger: null, notes_without_file: 0, credit_notes: [expect.objectContaining({ number: '1501', files: [] })] });
+    expect(body.sync_from).toBeTruthy();
+
+    // Mapped to Zepto (bill to bill), its CN 1501 has no file: counted.
+    const { rows: [was] } = await db.execute({ sql: "SELECT * FROM party_ledgers WHERE company_id = ? AND ledger_guid = 'RPL1'", args: [company.id] });
+    await db.execute({ sql: "INSERT OR REPLACE INTO party_ledgers (company_id, ledger_guid, kind, vendor, source) VALUES (?, 'RPL1', 'vendor', 'Zepto', 'person')", args: [company.id] });
+    let fileId;
+    try {
+      ({ body } = await get(viewer.token, `/debtors?${q}&page_size=100`));
+      expect(at(body, '901/RP/26-27')).toMatchObject({ ledger: { guid: 'RPL1', vendor: 'Zepto' }, notes_without_file: 1 });
+      expect(at(body, '902/RP/26-27')).toMatchObject({ ledger: { guid: 'RPL1', vendor: 'Zepto' }, notes_without_file: 0, credit_notes: [] });
+
+      // A file on the CN clears it; the invoice's own files are separate.
+      const up = await bearer(request(app).post(`/api/files?${new URLSearchParams({ company_id: company.id, voucher_guid: 'rp-cn1', name: 'CN 1501.pdf' })}`), admin.token)
+        .set('Content-Type', 'application/octet-stream').send(Buffer.from('%PDF-1.4\n1 0 obj << >> endobj\n%%EOF\n'));
+      expect(up.status).toBe(201);
+      fileId = up.body.id;
+      ({ body } = await get(viewer.token, `/debtors?${q}&page_size=100`));
+      const inv = at(body, '901/RP/26-27');
+      expect(inv.notes_without_file).toBe(0);
+      expect(inv.credit_notes[0].files).toEqual([expect.objectContaining({ name: 'CN 1501.pdf' })]);
+      expect(inv.files).toEqual([]);
+    } finally {
+      if (fileId) await bearer(request(app).delete(`/api/files/${fileId}`), admin.token);
+      await db.execute({ sql: "DELETE FROM party_ledgers WHERE company_id = ? AND ledger_guid = 'RPL1'", args: [company.id] });
+      if (was) {
+        await db.execute({
+          sql: 'INSERT INTO party_ledgers (company_id, ledger_guid, kind, vendor, source, suggested_vendor, suggested_votes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          args: [company.id, 'RPL1', was.kind ?? null, was.vendor ?? null, was.source ?? null, was.suggested_vendor ?? null, was.suggested_votes ?? 0],
+        });
+      }
+    }
+  });
+
   test('company_id=default opens on the company set as the default on Tally companies', async () => {
     const { rows: [was] } = await db.execute('SELECT id FROM tally_companies WHERE is_default = 1');
     oldDefault = was ? Number(was.id) : null;

@@ -186,7 +186,9 @@ Checked on the real books (MH, HR, WB) and the ROMS test copy, October 2026:
 
 The report screens (what has been invoiced, what has been paid, and what is still owed) are delivered **one at a time**. We go through each one with you, adjust it to what you need, and only then switch it on in RAMS.
 
-**Debtors** is the first one (*Reports → Debtors*). It lists every sales invoice since 8 June, with a tab for each marketplace (All, Amazon, Blinkit and so on). For each invoice it shows:
+In the top bar they are under **Tally Reports**: *Debtors* and *Ledgers* (section 11). **Purchase Reports** is there too, greyed and marked *Coming soon*: it can't be clicked yet.
+
+**Debtors** is the first one (*Tally Reports → Debtors*). It lists every sales invoice since 8 June, with a tab for each marketplace (All, Amazon, Blinkit and so on). For each invoice it shows:
 
 | Column | What it is |
 |---|---|
@@ -195,9 +197,11 @@ The report screens (what has been invoiced, what has been paid, and what is stil
 | Internal PO no | ROMS's own PO id (for example B002) |
 | Vendor PO no | The marketplace's purchase order number |
 | Amount | The invoice total |
-| CN | The credit notes set against it in Tally. Click the amount to see each credit note: its number, date, amount and the ROMS return (RTV) it belongs to |
+| CN | The credit notes set against it in Tally (ours, and the marketplace's DNs, which Tally books as credit notes). Click the amount to see each one: its number, date, amount, the ROMS return (RTV) it belongs to, and its files |
 | Outstanding | What is still owed after receipts, credit notes, TDS and adjustments, and how many days it is overdue |
 | Files | The invoice's files (PDF, photo or email), added on *Ledgers*. Click to view or download them |
+
+**An invoice is orange while a DN or CN against it has no file**, with "1 without a file" (or more) under its CN amount. In the credit-note window the note without a file is orange too, with a link, *Add it on Ledgers*, that opens that party on Ledgers showing just its rows without a file. Once each DN and CN against the invoice has its file, the orange goes. Only Minutes, Now and Zepto invoices can turn orange: files are added on Ledgers, which covers those three. A credit note set against two invoices needs its file only once.
 
 It opens on **MH**, with all marketplaces and all statuses. You can switch to another company or to all companies together, and filter by Open, Overdue, Settled or No PO. You can search by invoice, party or either PO number, and download it for Excel.
 
@@ -207,11 +211,11 @@ Until the rest arrive, RAMS keeps working in the background: it copies the books
 
 ## 11. Ledgers: the bill-to-bill statement
 
-**Ledgers** has its own item in the top bar. It shows the statement of each party of the marketplaces that **pay bill to bill**: **Minutes, Now and Zepto** to begin with. Blinkit and Scootsy say *coming soon*, while their format is worked out.
+**Ledgers** is under *Tally Reports → Ledgers*. It shows the statement of each party of the marketplaces that **pay bill to bill**: **Minutes, Now and Zepto** to begin with. Blinkit and Scootsy say *coming soon*, while their format is worked out.
 
-1. Choose the **company** (or all), the **marketplace** (or all), the **states** and the **parties** (each can be *All*). Nothing is chosen until you choose it.
-2. Choose the **dates**. It starts on this month to date.
-3. RAMS shows one row per party:
+1. It opens on **MH**, **all** three marketplaces, **all** states and **all** parties, from the 1st of this month to today, with the statement already shown.
+2. Narrow it by **company** (or all), **marketplace**, **states** and **parties**, and change the **dates** for another range. A new company or marketplace sets the filters after it back to *All*.
+3. RAMS shows one row per party. With many parties, the list scrolls inside its own box (its headings and total stay in view), so the party you click opens just below it:
 
 | Opening | Invoice | DN | CN | TDS | Journal / Adjustment | Receipt | Closing |
 |---|---|---|---|---|---|---|---|
@@ -241,7 +245,7 @@ Each colour means one thing:
 | Yellow | No narration (see below) |
 | Orange | A row with no file yet (see below) |
 
-Click a party to see every Tally voucher on it, with its narration, its files and the running balance. *Needs attention* lists every party with a DN booked twice, rows without a file, or a state that differs.
+Click a party to see every Tally voucher on it, with its narration, its files and the running balance. The **Needs attention** button above the statement (with how many parties) opens a list of every party with a DN booked twice, rows without a file, or a state that differs, and since when; click a party there to open it.
 
 **The opening balance comes from Tally**, as before: each sync reads every ledger's balance. If a sync can't read it, the party starts on a placeholder of ₹10,000 on 8 June, carried forward by Tally's real vouchers.
 
@@ -251,7 +255,7 @@ Every row of a party can carry its proof: the invoice, the marketplace's DN, our
 - **A row without a file is orange**, across the whole row, until a file is added: every row from 8 June. *Needs attention* counts them for every party, and *Without a file* shows just those rows.
 - **Viewing:** a PDF or a photo opens inside RAMS, and any file can be downloaded. PDFs and emails come back **exactly as they were added**. Emails are not opened in RAMS: they open in Outlook or your mail app, with their attachments.
 - **Small on purpose:** photos are made smaller before they are sent (at most 2,000 pixels across; a 1.6 MB photo became 146 KB in our test, still easy to read). PDFs and emails are compressed without losing anything, and a file attached to several rows is kept once. One file for every DN, CN and invoice comes to about 1 GB a year. *Admin → File storage* shows the space used and saved, and the biggest files.
-- An invoice's files also show on *Debtors*.
+- An invoice's files, and those of the DN and CN against it, also show on *Debtors*, where an invoice whose DN or CN has no file is orange (section 10).
 - Adding and removing a file is in the Audit Log.
 
 **Later, once the NAS is bought:** a shared folder that RAMS checks every few minutes, attaching each file named by its DN, CN or invoice number to the right row by itself.
@@ -274,7 +278,7 @@ There are four roles. **Admin and Owner can always do everything**, and they dec
 | | Accountant (starting setup) | Viewer (starting setup) |
 |---|---|---|
 | See matching and auto-fill | ✓ | ✓ |
-| See Debtors (Reports) | ✓ | ✓ |
+| See Debtors (Tally Reports) | ✓ | ✓ |
 | See Ledgers | ✓ | ✓ |
 | Add and remove files on Ledgers | ✓ | – |
 | View and download files (on Ledgers and Debtors) | ✓ | ✓ |
@@ -326,6 +330,7 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 | – | Ledgers: the bill-to-bill statement for Minutes, Now and Zepto; narrations and states everywhere; Credit terms | Done, live on the test setup, with Connector 0.7.0 |
 | – | Files on Ledgers: PDFs, photos and emails on each row, viewed in RAMS and shown on Debtors; *File storage* | Built and tested; both databases updated for it (17 Nov) |
 | – | Ledgers from Tally only: debit and credit notes no longer typed in RAMS (559 of 559 entries checked against Tally first); every row without its document is orange | Built and tested; goes on the test setup after your review |
+| – | *Tally Reports* menu (Debtors, Ledgers) and *Purchase Reports* coming soon; Ledgers opens on every party, with *Needs attention* as a button and a scrolling list; Debtors shows an invoice orange while a DN or CN against it has no file | Built and tested; goes on the test setup after your review |
 | Later | A NAS folder RAMS checks every few minutes, attaching files by their DN, CN or invoice number | Designed; waits for the NAS |
 | 8 | Go-live: production database, Connector installed on the office PC, the trial weeks | Prepared (see *go-live.md*); needs the office PC and your go-ahead |
 

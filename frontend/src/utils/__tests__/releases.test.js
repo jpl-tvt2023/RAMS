@@ -29,7 +29,10 @@ describe('screens held for later delivery', () => {
       }
     }
     expect(NAV.map((n) => n.label)).toContain('Matching');
-    expect(NAV.find((n) => n.label === 'Reports').children.map((c) => c.label)).toEqual(['Debtors']);
+    expect(NAV.find((n) => n.label === 'Tally Reports').children.map((c) => c.label)).toEqual(['Debtors', 'Ledgers']);
+    expect(NAV.find((n) => n.label === 'Ledgers')).toBeUndefined(); // no longer its own top-bar entry
+    expect(NAV.find((n) => n.label === 'Purchase Reports')).toMatchObject({ comingSoon: true });
+    expect(NAV.find((n) => n.label === 'Purchase Reports').path).toBeUndefined();
   });
 
   test('a held screen has no Help section', () => {
