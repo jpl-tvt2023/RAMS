@@ -22,8 +22,9 @@ export const PERM_SCREENS = {
   'reports.settings': ['/admin/credit-terms', '/reports/receivables'],
   'sync.run': ['/sync'],
   'statements.view': ['/reports/party-statements'],
-  'statements.files': ['/reports/party-statements'],
+  'statements.files': ['/reports/party-statements', '/reports/attachments'],
   'statements.settings': ['/reports/party-statements'],
+  'attachments.view': ['/reports/attachments'],
 };
 
 export const permissionReleased = (key) => !PERM_SCREENS[key] || PERM_SCREENS[key].some(isReleased);

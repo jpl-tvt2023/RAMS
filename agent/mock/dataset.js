@@ -77,7 +77,7 @@ const round2 = (n) => Math.round(n * 100) / 100;
 // debit).
 function invoice({
   kind = 'sale', type, date, number, party, items, tax = 'intra', orders = [], reference = '', narration = '',
-  bills = null, cancelled = false,
+  bills = null, cancelled = false, einvoice = null,
 }) {
   const sign = kind === 'sale' ? 1 : -1; // returns and purchases run the other way
   const taxable = round2(items.reduce((n, i) => n + i.qty * i.rate, 0));
@@ -89,7 +89,7 @@ function invoice({
     : [{ ledger: `${prefix} IGST`, amount: sign * gst }];
   const itemLedger = { sale: 'Sales GST 5%', return: 'Sales Returns', purchase: 'Purchase GST' }[kind];
   return {
-    view: 'invoice', type, date, number, party, orders, reference, narration, cancelled,
+    view: 'invoice', type, date, number, party, orders, reference, narration, cancelled, einvoice,
     items: items.map((i) => ({ ...i, amount: round2(sign * i.qty * i.rate), ledger: itemLedger, inward: kind !== 'sale' })),
     ledgerLines: cancelled ? [] : [
       { ledger: party, amount: -sign * total, party: true, bills: bills || [{ name: number, type: 'New Ref', amount: -sign * total }] },
@@ -119,7 +119,7 @@ function buildDataset() {
     ledgers: [
       ...COMMON_LEDGERS,
       // owed since before the books in this file begin (Tally's way round)
-      { name: ZEPTO, parent: 'Marketplaces', gstin: '27AAJCK8213B1Z5', state: 'Maharashtra', opening: -1500 },
+      { name: ZEPTO, parent: 'Marketplaces', gstin: '27AAJCK8213B1Z5', state: 'Maharashtra', city: 'Mumbai', pincode: '400072', opening: -1500 },
       // its address said West Bengal until it was corrected (the latest counts)
       { name: INSTAMART, parent: 'Marketplaces', gstin: '27AAICS4785M1ZW', state: 'Maharashtra', priorState: 'West Bengal' },
       { name: NOW, parent: 'Sundry Debtors', gstin: '27AAGCC9876D1ZQ', state: 'Maharashtra' },
@@ -127,7 +127,7 @@ function buildDataset() {
       { name: NAMES.WB, parent: 'Branch / Divisions' }, // internal by name only
     ],
     vouchers: [
-      invoice({ type: 'Sales', date: '2026-04-05', number: 'RM/26-27/001', party: ZEPTO, orders: [{ no: 'ZPO-778812', date: '2026-04-02' }], items: [{ item: 'RMB-RED-01', qty: 100, rate: 50 }, { item: 'RMB-BLU-01', qty: 50, rate: 50 }] }),
+      invoice({ type: 'Sales', date: '2026-04-05', number: 'RM/26-27/001', party: ZEPTO, orders: [{ no: 'ZPO-778812', date: '2026-04-02' }], einvoice: { irn: '9f2c4e7a1b3d5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8', ackNo: '122633138683008', ackDate: '2026-04-05' }, items: [{ item: 'RMB-RED-01', qty: 100, rate: 50 }, { item: 'RMB-BLU-01', qty: 50, rate: 50 }] }),
       invoice({ type: 'Sales-Zepto', date: '2026-04-10', number: 'RM/26-27/002', party: ZEPTO, orders: [{ no: 'ZPO-778813', date: '2026-04-08' }], items: [{ item: 'Bandana Green', qty: 40, rate: 55 }] }),
       invoice({ type: 'Sales', date: '2026-04-12', number: 'RM/26-27/003', party: INSTAMART, orders: [{ no: '1301234567', date: '2026-04-10' }], items: [{ item: 'RMS-BLK-L', qty: 30, rate: 80 }] }),
       invoice({ type: 'Sales', date: '2026-05-02', number: 'RM/26-27/004', party: NOW, orders: [{ no: 'NOW-55501', date: '2026-04-28' }], items: [{ item: 'rmh-wht-6p', qty: 20, rate: 120 }] }),

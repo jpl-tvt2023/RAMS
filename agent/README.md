@@ -1,7 +1,7 @@
 # RAMS Connector
 
 Reads TallyPrime over its local XML port (`127.0.0.1:9000`) and **never writes to it**. Every request is an `Export`. It does two jobs:
-- **Sync (M3):** keeps RAMS's copy of the Tally books current. It runs a light sync hourly in office hours, an end-of-day check, and a backfill from ROMS go-live. Each sync ends with every ledger's balance (0.6.0).
+- **Sync (M3):** keeps RAMS's copy of the Tally books current. It runs a light sync hourly in office hours, an end-of-day check, and a backfill from the start of the financial year (1 April 2026). Each sync ends with every ledger's balance (0.6.0).
 - **Starting matching (M5) and auto-fill (M6):** RAMS on Vercel has no clock of its own.
   - When a heartbeat reply asks for a match (`commands: [{ type: 'match' }]`), the Connector calls `POST /api/agent/match`, and RAMS reads ROMS and matches.
   - When it asks for auto-fill (`{ type: 'autofill' }`, or the match answers `autofill_due`), the Connector calls `POST /api/agent/autofill` again while RAMS answers `more`, up to 20 rounds a cycle. RAMS writes into ROMS by each field's mode.
@@ -58,6 +58,7 @@ Reads TallyPrime over its local XML port (`127.0.0.1:9000`) and **never writes t
   - a resync is the same from scratch; it runs after a restored backup (counters went backward) or a ledger/item rename
 - **Ledger balances (0.6.0):** every run then reads each ledger's closing balance as at 31 March (one Ledger collection, under 0.1 s for MH) and sends it to RAMS, which starts each party on *Ledgers* from it. If Tally refuses, the run still finishes ok, the log says so, and Ledgers falls back to its placeholder until a run brings them.
 - **Ledger state and GSTIN (0.7.0):** Tally keeps a ledger's address and GST registration as dated lists, oldest first. The Connector reads the latest entry applicable today, never a GST rate block (whose state reads "Any"), and tells RAMS it does (`ledgerReading: 2`), so RAMS stores the corrected values even though Tally's AlterID hasn't moved. Narrations are kept up to 2,000 characters (was 300).
+- **E-invoice, City and PIN code (0.8.0):** each voucher now carries its e-invoice as Tally keeps it — the IRN, Ack No, Ack date and whether it was cancelled — for RAMS's *Attachments* page. Each ledger carries its latest address's City and PIN code, and the Connector tells RAMS it reads them (`ledgerReading: 3`), so an older Connector never blanks a city. Vouchers already in RAMS get their e-invoice on the next resync, which Setup's "Load all of Tally into RAMS now" runs.
 - **Watermarks:** they live in RAMS and move only when a run finishes ok, to the counters Tally had when it started. Anything altered during a run is fetched next time.
 - **Educational mode:** periods are widened to the 1st, 2nd or 31st and trimmed (`eduSafeRange`), and the heartbeat reports the licence mode.
 

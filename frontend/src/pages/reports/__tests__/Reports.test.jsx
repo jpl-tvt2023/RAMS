@@ -106,6 +106,21 @@ describe('Bills Receivable', () => {
     expect(screen.getByRole('tab', { name: 'Not known (1)' })).toBeInTheDocument();
   });
 
+  test('an invoice from before ROMS went live says so in its PO column, instead of a dash', async () => {
+    reports.getBillsReceivable.mockResolvedValue({
+      rows: [
+        { ...DEBTOR, guid: 'g7', number: '7/RM/26-27', date: '2026-04-10', pos: [], vendor_pos: [], before_matching: true },
+        { ...DEBTOR, guid: 'g8', number: '8/RM/26-27', pos: [], vendor_pos: [], before_matching: false },
+      ],
+      total: 2, page: 1, page_size: 50, companies: COMPANIES, company_id: 2, tabs: [], all: 2, unknown: 0, match_from: '2026-06-08',
+      totals: { invoices: 2, total_paise: 0, credit_notes_paise: 0, outstanding_paise: 0, overdue_paise: 0 },
+    });
+    renderWithProviders(<BillsReceivable />, { user: VIEWER });
+    const before = within((await screen.findByText('7/RM/26-27')).closest('tr')).getByText('Before ROMS');
+    expect(before).toHaveAttribute('title', expect.stringContaining('8 Jun 2026'));
+    expect(within(screen.getByText('8/RM/26-27').closest('tr')).queryByText('Before ROMS')).not.toBeInTheDocument();
+  });
+
   test('a marketplace tab and the status dropdown filter', async () => {
     renderWithProviders(<BillsReceivable />, { user: VIEWER });
     const user = userEvent.setup();
@@ -133,7 +148,7 @@ describe('Bills Receivable', () => {
     await user.click(screen.getByRole('button', { name: 'Files on 607/RM/26-27' }));
     const dialog = screen.getByRole('dialog', { name: 'Files — Invoice 607/RM/26-27' });
     expect(within(dialog).getByText('invoice 607.pdf')).toBeInTheDocument();
-    expect(within(dialog).getByText(/Files are added on Party Statements/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Files are added on Party Statements or Attachments/)).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'View invoice 607.pdf' })).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: /Choose files/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: /^Remove / })).not.toBeInTheDocument();

@@ -14,6 +14,7 @@ import {
   billsReceivableHelp, invoicesHelp, notesHelp, transfersHelp, receivablesHelp, exceptionsHelp, syncHealthHelp,
 } from './reports';
 import { partyStatementsHelp } from './statements';
+import { attachmentsHelp } from './attachments';
 import { isReleased } from '../utils/releases';
 
 export const HELP_SECTIONS = [
@@ -25,6 +26,7 @@ export const HELP_SECTIONS = [
   autoFill,
   billsReceivableHelp,
   partyStatementsHelp,
+  attachmentsHelp,
   invoicesHelp,
   notesHelp,
   transfersHelp,

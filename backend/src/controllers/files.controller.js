@@ -3,7 +3,7 @@ const { SYNC_FROM } = require('../config/env');
 const { logAction } = require('../services/auditLog.service');
 const files = require('../services/files');
 
-// Files on Party Statements rows (services/files.js): every row is a Tally voucher.
+// Files on Tally vouchers (services/files.js), added on Party Statements and Attachments.
 // Adding and removing is statements.files; viewing and downloading is
 // statements.view or reports.view; the storage figures are Admin and Owner only.
 // Every add and remove is audited on the voucher.

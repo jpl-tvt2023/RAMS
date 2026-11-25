@@ -85,6 +85,16 @@ describeIf('sync: mock Tally -> RAMS', () => {
     const cancelled = mh.vouchers.find((v) => v.cancelled);
     expect((await stored('MH', cancelled.guid)).is_cancelled).toBe(1);
 
+    // The e-invoice Tally keeps on a voucher, and a ledger's City and PIN
+    // code (Connector 0.8.0): every voucher is read for its e-invoice.
+    const einvoiced = mh.vouchers.find((v) => v.einvoice);
+    expect(await stored('MH', einvoiced.guid)).toMatchObject({
+      einvoice_read: 1, irn: einvoiced.einvoice.irn, irn_ack_no: '122633138683008', irn_ack_date: '2026-04-05', irn_cancelled: 0,
+    });
+    expect(await stored('MH', zepto.guid)).toMatchObject({ einvoice_read: 1, irn: null, irn_ack_no: null });
+    expect(await rams.one('SELECT city, pincode FROM tally_ledgers WHERE company_id = ? AND name = ?', [await companyId('MH'), einvoiced.party]))
+      .toEqual({ city: 'Mumbai', pincode: '400072' });
+
     expect((await sync('HR', 'backfill')).ok).toBe(true);
   });
 

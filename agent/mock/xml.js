@@ -46,10 +46,12 @@ function ledgerXml(l, style, i) {
     // then the GST registration and the address, each a dated list oldest
     // first (priorState: an older entry, corrected since).
     const dated = (from, state) => `<LEDGSTREGDETAILS.LIST><APPLICABLEFROM>${from}</APPLICABLEFROM><GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE>${tag('STATE', '')}${tag('PLACEOFSUPPLY', state)}${tag('GSTIN', l.gstin)}</LEDGSTREGDETAILS.LIST>`;
-    const mailing = (from, state) => `<LEDMAILINGDETAILS.LIST><APPLICABLEFROM>${from}</APPLICABLEFROM>${tag('MAILINGNAME', l.name)}${tag('STATE', state)}<COUNTRY>India</COUNTRY></LEDMAILINGDETAILS.LIST>`;
+    // The latest address carries the ledger's City and PIN code when it has them.
+    const mailing = (from, state, latest = false) => `<LEDMAILINGDETAILS.LIST><APPLICABLEFROM>${from}</APPLICABLEFROM>${tag('MAILINGNAME', l.name)}${tag('STATE', state)}`
+      + `${latest && l.pincode ? tag('PINCODE', l.pincode) : ''}${latest && l.city ? tag('CITY', l.city) : '<CITY/>'}<COUNTRY>India</COUNTRY></LEDMAILINGDETAILS.LIST>`;
     gst = '<STATEWISEDETAILS.LIST><STATENAME>&#4; Any</STATENAME></STATEWISEDETAILS.LIST>'
       + (l.priorState ? dated('20220401', l.priorState) : '') + dated('20250401', l.state)
-      + (l.priorState ? mailing('20220401', l.priorState) : '') + mailing('20250401', l.state);
+      + (l.priorState ? mailing('20220401', l.priorState) : '') + mailing('20250401', l.state, true);
   } else if (l.gstin) {
     gst = `<GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE>${tag('PARTYGSTIN', l.gstin)}${tag('LEDSTATENAME', l.state)}`;
   }
@@ -119,6 +121,9 @@ function voucherXml(v, company) {
     + (v.reference ? tag('REFERENCE', v.reference) + tag('REFERENCEDATE', d8(v.date)) : '')
     + '<CSTFORMISSUETYPE>&#4; Not Applicable</CSTFORMISSUETYPE>'
     + (v.narration ? tag('NARRATION', v.narration) : '')
+    // An e-invoice, as Tally keeps it at the top of the voucher once generated.
+    + (v.einvoice ? tag('IRN', v.einvoice.irn) + tag('IRNACKNO', v.einvoice.ackNo) + tag('IRNACKDATE', d8(v.einvoice.ackDate)) : '')
+    + `<IRNCANCELLED>${yn(v.einvoice && v.einvoice.cancelled)}</IRNCANCELLED>`
     + `<PERSISTEDVIEW>${invoiceView ? 'Invoice Voucher View' : 'Accounting Voucher View'}</PERSISTEDVIEW>`
     + `<ISINVOICE>${yn(invoiceView)}</ISINVOICE><ISCANCELLED>${yn(v.cancelled)}</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL>`
     + `<ALTERID> ${v.alterId}</ALTERID><MASTERID> ${v.masterId}</MASTERID>`

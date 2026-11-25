@@ -25,6 +25,7 @@ import Receivables from './pages/reports/Receivables';
 import Exceptions from './pages/reports/Exceptions';
 import SyncHealth from './pages/reports/SyncHealth';
 import PartyStatements from './pages/statements/PartyStatements';
+import Attachments from './pages/reports/Attachments';
 import Help from './pages/Help';
 import { ALL_ROLES, ADMIN_ONLY, PERM } from './utils/roles';
 
@@ -66,6 +67,7 @@ export default function App() {
           <Route path="/reports/receivables" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Receivables /></ProtectedRoute>} />
           <Route path="/reports/exceptions" element={<ProtectedRoute permission={PERM.REPORTS_VIEW}><Exceptions /></ProtectedRoute>} />
           <Route path="/reports/party-statements" element={<ProtectedRoute permission={PERM.STATEMENTS_VIEW}><PartyStatements /></ProtectedRoute>} />
+          <Route path="/reports/attachments" element={<ProtectedRoute permission={PERM.ATTACHMENTS_VIEW}><Attachments /></ProtectedRoute>} />
           <Route path="/sync" element={<ProtectedRoute roles={ALL_ROLES}><SyncHealth /></ProtectedRoute>} />
           <Route path="/help" element={<ProtectedRoute roles={ALL_ROLES}><Help /></ProtectedRoute>} />
           {/* The addresses the two pages had before they were renamed (2026-11-18), kept so old bookmarks still work. */}

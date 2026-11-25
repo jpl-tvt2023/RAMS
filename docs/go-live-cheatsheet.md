@@ -10,7 +10,7 @@ The short, do-it-today version of `go-live.md`. It takes RAMS production from "a
 | RAMS production database settings | `D:\My Projects\RAMS\.env` (the root one). **Not** `backend\.env`: that is the test database |
 | ROMS production API | https://api.theroyalmart.co.in/api — Vercel project **`royalmartportal`**, database **`royalmart-roms`** |
 | ROMS production database settings | `D:\My Projects\Royal Mart Portal\backend\.env.prod` |
-| Connector package | `RAMS-Connector-0.7.1.zip` (how to rebuild it: at the end) |
+| Connector package | `RAMS-Connector-0.8.0.zip` (how to rebuild it: at the end) |
 | On the office PC | the program in `C:\RAMS\Connector`, the settings and code in `C:\ProgramData\RAMS\connector.json`, the logs in `C:\ProgramData\RAMS\logs` |
 
 ## Today, in order
@@ -117,7 +117,7 @@ curl.exe -s https://api.theroyalmart.co.in/api/integration/refs/pos
 ## 5. Install the Connector on the office PC
 
 Do this at the PC where TallyPrime runs, signed in as the Windows user who uses Tally:
-1. Copy `RAMS-Connector-0.7.1.zip` there and unzip it (right-click → *Extract All*).
+1. Copy `RAMS-Connector-0.8.0.zip` there and unzip it (right-click → *Extract All*).
 2. Open **TallyPrime** and the three companies (MH, HR, WB).
 3. Double-click **Setup RAMS Connector**. If Windows asks *"Open File – Security Warning"*, click **Run**.
 4. Paste the code from step 2, leave **Load all of Tally into RAMS now** ticked, and click **Connect**. Wait until every line has a ✓ (about 5 minutes).
@@ -148,7 +148,7 @@ Do this at the PC where TallyPrime runs, signed in as the Windows user who uses 
 | Matching → Match review | Rows in Linked / Needs review / Waiting for Tally, after **Match now** |
 | Admin → Audit Log | The `DATA_RESET` row, then your own changes |
 
-On the office PC, `C:\RAMS\Connector\rams-connector.cmd status` lists every company, with version **0.7.1**.
+On the office PC, `C:\RAMS\Connector\rams-connector.cmd status` lists every company, with version **0.8.0**.
 
 ---
 
@@ -165,7 +165,7 @@ On the office PC, `C:\RAMS\Connector\rams-connector.cmd status` lists every comp
 | Connector status (office PC) | `C:\RAMS\Connector\rams-connector.cmd status` |
 | One sync now (office PC) | `C:\RAMS\Connector\rams-connector.cmd sync` |
 | Remove the Connector (office PC) | in `C:\RAMS\Connector`: `powershell -ExecutionPolicy Bypass -File .\uninstall-service.ps1` |
-| Rebuild the Connector zip | `cd "D:\My Projects\RAMS\agent"; npm run package; Compress-Archive -Path (Get-ChildItem dist\rams-connector \| Where-Object Name -ne 'out').FullName -DestinationPath "$env:USERPROFILE\Desktop\RAMS-Connector-0.7.1.zip" -Force` |
+| Rebuild the Connector zip | `cd "D:\My Projects\RAMS\agent"; npm run package; Compress-Archive -Path (Get-ChildItem dist\rams-connector \| Where-Object Name -ne 'out').FullName -DestinationPath "$env:USERPROFILE\Desktop\RAMS-Connector-0.8.0.zip" -Force` |
 
 **When something is wrong:**
 

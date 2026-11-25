@@ -1,7 +1,9 @@
 // Everything the engine reads, from RAMS's own tables: the Tally mirror of
 // the companies whose sync is on, the copy of ROMS, the rules, and people's
 // decisions. A handful of queries -- about 10,000 rows at today's size.
-const { SYNC_FROM } = require('../config/env');
+// Matching starts at MATCH_FROM (ROMS go-live): ROMS has no PO before it, so
+// an older invoice could only ever be "no PO".
+const { MATCH_FROM } = require('../config/env');
 const { loadSettings } = require('../services/matchSettings');
 
 const list = (v) => {
@@ -27,13 +29,13 @@ async function loadInputs(client, { settings, today = todayIst() } = {}) {
   const [vouchers, orders, items, agst, stockItems, ledgers] = await Promise.all([
     rowsOf(client, `SELECT v.id, v.company_id, v.guid, v.date, v.voucher_type, v.base_type, v.number, v.reference, v.party,
                            v.is_cancelled, v.is_optional, v.total_paise
-                      FROM tally_vouchers v WHERE ${vchWhere}`, [SYNC_FROM]),
+                      FROM tally_vouchers v WHERE ${vchWhere}`, [MATCH_FROM]),
     rowsOf(client, `SELECT o.voucher_id, o.order_no FROM tally_vch_orders o JOIN tally_vouchers v ON v.id = o.voucher_id
-                     WHERE ${vchWhere} AND v.base_type = 'Sales'`, [SYNC_FROM]),
+                     WHERE ${vchWhere} AND v.base_type = 'Sales'`, [MATCH_FROM]),
     rowsOf(client, `SELECT i.voucher_id, i.item, i.qty FROM tally_vch_inventory_lines i JOIN tally_vouchers v ON v.id = i.voucher_id
-                     WHERE ${vchWhere} AND v.base_type = 'Sales'`, [SYNC_FROM]),
+                     WHERE ${vchWhere} AND v.base_type = 'Sales'`, [MATCH_FROM]),
     rowsOf(client, `SELECT b.voucher_id, b.name FROM tally_vch_bill_allocations b JOIN tally_vouchers v ON v.id = b.voucher_id
-                     WHERE ${vchWhere} AND v.base_type = 'Credit Note' AND b.bill_type = 'Agst Ref' AND b.name IS NOT NULL`, [SYNC_FROM]),
+                     WHERE ${vchWhere} AND v.base_type = 'Credit Note' AND b.bill_type = 'Agst Ref' AND b.name IS NOT NULL`, [MATCH_FROM]),
     rowsOf(client, `SELECT company_id, name, aliases FROM tally_stock_items WHERE deleted_at IS NULL AND company_id ${inCompanies}`),
     rowsOf(client, `SELECT company_id, guid, name, gstin, gstins FROM tally_ledgers WHERE deleted_at IS NULL AND company_id ${inCompanies}`),
   ]);

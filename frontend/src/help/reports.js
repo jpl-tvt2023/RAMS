@@ -8,7 +8,7 @@ export const billsReceivableHelp = {
   area: 'Tally Reports',
   title: 'Bills Receivable',
   who: SEE,
-  summary: 'Each Tally sales invoice since RAMS started (8 June 2026), by marketplace: its internal and vendor PO numbers, the amount, the credit notes against it and what is still owed. RAMS works the figures out from Tally each time the page opens, so they are as fresh as the last sync. Stock transfers are left out.',
+  summary: 'Each Tally sales invoice since RAMS’s copy of Tally starts (1 April 2026), by marketplace: its internal and vendor PO numbers, the amount, the credit notes against it and what is still owed. RAMS works the figures out from Tally each time the page opens, so they are as fresh as the last sync. Stock transfers are left out.',
   flows: [
     {
       title: 'See what a marketplace owes',
@@ -42,6 +42,7 @@ export const billsReceivableHelp = {
       steps: [
         'Choose No PO as the status. These invoices aren’t linked to a ROMS PO.',
         'Usually the Buyer’s Order No is missing on the invoice in Tally. Once it is added and Tally syncs, the next match links it.',
+        'Invoices dated before ROMS went live (8 June 2026) never have a ROMS PO: they say “Before ROMS” in the PO column and are never listed as No PO.',
       ],
     },
     {
@@ -57,13 +58,13 @@ export const billsReceivableHelp = {
       steps: [
         'In the Files column, click the count (for example “1 file”). A dash means the invoice has no file.',
         'Click View to see a PDF or a photo inside RAMS, or Download to save it.',
-        'Files are added on Party Statements, in the party’s “In Tally” list. Bills Receivable only shows them.',
+        'Files are added on Attachments (any invoice) or on Party Statements (in the party’s “In Tally” list). Bills Receivable only shows them.',
       ],
     },
   ],
   faq: [
-    { q: 'Where do the files come from?', a: 'They are attached on Party Statements, to the invoice’s or the note’s row in the party’s “In Tally” list, by anyone with “Attach files”. Bills Receivable shows the same files.' },
-    { q: 'Why is an invoice orange?', a: 'A DN or CN set against it in Tally has no file yet. Click its CN amount to see which, and add the file on Party Statements. Only Minutes, Now and Zepto invoices turn orange: those are the parties on Party Statements, where files are added.' },
+    { q: 'Where do the files come from?', a: 'They are attached on Attachments or Party Statements, to the invoice’s or the note’s row, by anyone with “Attach files”. Bills Receivable shows the same files.' },
+    { q: 'Why is an invoice orange?', a: 'A DN or CN set against it in Tally has no file yet. Click its CN amount to see which, and add the file on Party Statements or Attachments. Only Minutes, Now and Zepto invoices turn orange: those are the parties on Party Statements, where files are added.' },
     { q: 'One credit note is against two invoices. Do I add its file twice?', a: 'No. Add it once, on the note’s row on Party Statements. Every invoice it is set against stops being orange.' },
     { q: 'Why is a narration highlighted in yellow?', a: 'Tally has no narration on that record, and the narration check (Admin → Tally companies) says it needs one. Ask the accountant to add it in Tally; it shows after the next sync.' },
     { q: 'Where are the credit days set?', a: 'On Admin → Credit terms, for anyone with “Change credit terms” (Accountants by default). A change shows what it would do before it is saved.' },
@@ -83,7 +84,7 @@ export const invoicesHelp = {
   area: 'Tally Reports',
   title: 'Invoices',
   who: SEE,
-  summary: 'Every Tally sales invoice since RAMS started (8 June 2026), with its marketplace and PO, what settled it and what is still owed. RAMS works the figures out from Tally each time the page opens, so they are as fresh as the last sync.',
+  summary: 'Every Tally sales invoice since RAMS’s copy of Tally starts (1 April 2026), with its marketplace and PO, what settled it and what is still owed. RAMS works the figures out from Tally each time the page opens, so they are as fresh as the last sync.',
   flows: [
     {
       title: 'Find what is owed',
@@ -99,6 +100,7 @@ export const invoicesHelp = {
       steps: [
         'Click the No PO tab. These invoices aren’t linked to a ROMS PO.',
         'Usually the Buyer’s Order No is missing on the invoice in Tally. Once it is added and Tally syncs, the next match links it.',
+        'Invoices dated before ROMS went live (8 June 2026) never have a ROMS PO, so they aren’t listed here.',
       ],
     },
     {
@@ -188,7 +190,7 @@ export const receivablesHelp = {
   faq: [
     { q: 'Why is so much under "Not known"?', a: 'Marketplaces often pay into a head-office ledger (for example "Blinkit Commerce Pvt Ltd") rather than the warehouse ledger the invoices use. Map that ledger to its marketplace on Matching → Party ledgers and its money moves to the right row.' },
     { q: 'Why does a marketplace show nothing received?', a: 'Its receipts are entered On Account in Tally, not against invoices. They show as Received on account, and Net outstanding takes them off. Setting them against invoices in Tally makes the invoice-level figures right too.' },
-    { q: 'What about bills from before RAMS started?', a: 'RAMS holds Tally from 8 June 2026. Older invoices, and payments against them, aren’t counted here.' },
+    { q: 'What about bills from before RAMS started?', a: 'RAMS holds Tally from 1 April 2026. Older invoices, and payments against them, aren’t counted here.' },
   ],
 };
 

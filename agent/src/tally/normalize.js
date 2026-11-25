@@ -75,11 +75,11 @@ function voucherTypesFrom(tree) {
   })).filter((t) => t.name);
 }
 
-// How ledgersFrom reads a ledger's state and GSTIN, sent with the masters. 2:
-// the latest dated address and GST registration (Tally keeps their history,
-// oldest first). RAMS takes state and GSTIN only from a Connector that reads
-// them at least this well.
-const LEDGER_READING = 2;
+// How ledgersFrom reads a ledger's address fields, sent with the masters. 2:
+// state and GSTIN from the latest dated address and GST registration (Tally
+// keeps their history, oldest first). 3: also the address's City and PIN
+// code. RAMS takes each field only from a Connector that reads it this well.
+const LEDGER_READING = 3;
 const usable = (s) => present(s) && !/^any$/i.test(s);
 
 // The latest value of one of `keys` in a ledger's dated list (an address or
@@ -116,6 +116,11 @@ function ledgersFrom(tree, { asOf = new Date().toISOString().slice(0, 10) } = {}
       latestOf(l, 'LEDGSTREGDETAILS.LIST', ['STATE', 'PLACEOFSUPPLY'], asOf),
       txt(l.PRIORSTATENAME),
     ].find(usable) || '';
+    // City and PIN code of the latest address (Tally's ledger "City" is often
+    // left blank, so RAMS falls back to the ROMS PO's city).
+    const city = latestOf(l, 'LEDMAILINGDETAILS.LIST', ['CITY'], asOf);
+    const pincode = latestOf(l, 'LEDMAILINGDETAILS.LIST', ['PINCODE'], asOf)
+      || [txt(l.LEDPINCODE), txt(l.PINCODE)].find(usable) || '';
     const name = field(l, 'NAME') || names(l)[0] || '';
     return {
       name,
@@ -126,6 +131,8 @@ function ledgersFrom(tree, { asOf = new Date().toISOString().slice(0, 10) } = {}
       alterId: num(l.ALTERID),
       gstins,
       state,
+      city,
+      pincode,
       billWise: yes(l.ISBILLWISEON),
     };
   }).filter((l) => l.name);
@@ -255,6 +262,20 @@ function inventoryLine(i, direction) {
   };
 }
 
+// A voucher's e-invoice once Tally generated it: the IRN (64 hex characters),
+// the acknowledgement number and date, and whether it was cancelled. Tally
+// keeps them at the top of the voucher (checked on the 4 Oct office copy).
+// Always an object, '' where Tally has nothing, so RAMS can tell a voucher
+// read for its e-invoice (0.8.0 and later) from one an older Connector sent.
+function einvoiceFrom(v) {
+  return {
+    irn: txt(v.IRN),
+    ackNo: txt(v.IRNACKNO),
+    ackDate: tallyDate(v.IRNACKDATE),
+    cancelled: yes(v.IRNCANCELLED),
+  };
+}
+
 // docFields (the Phase 0 discovery index) is left out of what the sync sends.
 function voucherFrom(v, { baseTypeOf = () => 'Unknown', docFields = true } = {}) {
   const type = txt(v.VOUCHERTYPENAME) || field(v, 'VCHTYPE');
@@ -289,6 +310,7 @@ function voucherFrom(v, { baseTypeOf = () => 'Unknown', docFields = true } = {})
     optional: yes(v.ISOPTIONAL),
     invoice: yes(v.ISINVOICE),
     total: partyLine && partyLine.amount != null ? Math.abs(partyLine.amount) : (amounts.length ? Math.max(...amounts) : null),
+    einvoice: einvoiceFrom(v),
     orders,
     ledgerLines,
     inventoryLines,

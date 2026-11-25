@@ -38,6 +38,24 @@ For the day itself, `go-live-cheatsheet.md` has the same steps as commands and c
    - **The timing:** the site in use breaks the moment 020 runs, and the new code breaks until it runs. So for each pair (the test database with the test site, then production with the PR merge), run `npm run migrate` and deploy back to back, and check the pages straight after.
    - **The guard:** 020 refuses, changing nothing, if a typed DN/CN or a file on one is still in the database.
    - **Old addresses:** the old page addresses (`/reports/debtors`, `/ledgers`) forward to `/reports/bills-receivable` and `/reports/party-statements`. The data addresses moved to `/api/reports/bills-receivable` and `/api/statements`.
+9. **Attachments (migration 021 and Connector 0.8.0, 2026-11-25).** The new page *Tally Reports → Attachments* shows each month's invoices, payments, debit and credit notes, with their files, e-invoice and narration. RAMS's copy of Tally now starts on **1 April 2026** (the start of the financial year), so every month matches Tally's registers. Matching still starts on **8 June 2026** (ROMS go-live), because ROMS has no POs before then.
+   - **Order, for each pair** (the test database with the test site first, then production with the PR merge), after hours:
+     1. Run `npm run migrate` (021). It only adds columns and the `attachments.view` permission, so the site in use keeps working.
+     2. In Vercel (the project's Environment Variables, **Production**), set `RAMS_SYNC_FROM=2026-04-01` and `RAMS_MATCH_FROM=2026-06-08`.
+     3. Deploy: the test site by CLI, production by the PR merge.
+     4. Install **Connector 0.8.0** on the PC that feeds that site (§3), with **Load all of Tally into RAMS now** ticked. That full load brings in April and May, and every voucher's e-invoice (IRN, Ack No, Ack date) and every ledger's City and PIN code. On a PC that already has the Connector, `C:\RAMS\Connector\rams-connector.cmd sync --kind resync` after the upgrade does the same.
+   - **Between the deploy and that load,** Bills Receivable and Party Statements have only part of April and May, and Attachments says "Not read yet" for e-invoices. So run the load straight after the deploy.
+   - **Check before:** `SELECT COUNT(*) FROM statement_openings` on the database. Rows there are openings loaded as at 8 June. They would now be applied at 1 April, so clear or reload them if there are any. Tally's own balances, read on every sync, don't need this.
+   - **Check after:**
+     - Attachments → Invoice: each month's Credit equals Tally's Sales Register (July 2026: ₹2,41,89,073.30), and the Closing too once April and May are in.
+     - Payments, DN and CN against Tally's Payment, Debit Note and Credit Note Registers.
+     - Matching → Match review shows the same counts as before (no April or May invoice in it).
+     - Bills Receivable's *No PO* doesn't list April or May invoices (they say "Before ROMS").
+     - A Zepto party's Party Statements closing is unchanged.
+   - **A day later:** count the Sales vouchers with an e-invoice in Tally and on Attachments. If RAMS has fewer, Tally didn't mark the voucher as changed when its e-invoice was generated later, and the hourly sync missed it. Tell the maintainer, and run a resync until it is fixed.
+   - **Decisions for the client:**
+     - Files are expected on every voucher from 1 April, here and on Party Statements, so both show April and May as orange until they have files.
+     - The narration check still starts on 8 June. An Admin can move it to 1 April on Admin → Tally companies. Tally's sales invoices carry no narration today, so every invoice counts as needing attention until the check leaves Sales out or narrations are added.
 
 ## 1. The production database for RAMS (you, then maintainer)
 
@@ -81,7 +99,8 @@ Until step 2 is done, ROMS production answers RAMS with "The integration is not 
    - Click the **star** on MH, so Tally Reports → Bills Receivable and Party Statements open on it. A fresh database has no default company until this is done, and the report opens on all companies instead.
    - Open **Party Statements** on a Zepto party: its opening should say *From Tally*, not *Placeholder*.
    - Matching → Party ledgers should show no "State differs" on *Flipkart India Private Limited - Bengalore* (it reads Karnataka now).
-   - `C:\RAMS\Connector\rams-connector.cmd status` on the office PC shows the version: it must be **0.7.1**.
+   - Open **Attachments** on the July invoices: the E-Invoice column shows Ack Nos, not "Not read yet".
+   - `C:\RAMS\Connector\rams-connector.cmd status` on the office PC shows the version: it must be **0.8.0**.
 5. **Stop the dev PC's Connector** if it points at the production site, so two Connectors don't sync the same books. One that feeds the test site can keep running.
 
 Running Setup again later checks the connection, or takes a new code. Logs are in `C:\ProgramData\RAMS\logs`. To remove the Connector, run `uninstall-service.ps1`. To install by hand instead, `install-service.ps1` still works (it needs `connector.json` filled in first).
@@ -103,6 +122,7 @@ Each step is a setting on **Matching → Auto-fill**, not a deploy. It can be pu
 
 - **Daily:** Matching → Match review → *Needs review*, and Matching → Auto-fill → *Needs a person* and *Refused by ROMS*.
 - **Daily:** **Tally Reports → Party Statements** → *Needs attention*: parties with a DN booked twice, rows without a file, or a state that differs.
+- **Daily:** **Tally Reports → Attachments**, this month on each tab: click *Needs attention* and add the missing files; ask the accountant for missing narrations.
 - **Weekly:** Matching → Party ledgers → *Not set*. Map any new ledger, including head-office ledgers that marketplaces pay into.
 - **Weekly:** Tally Reports → **Bills Receivable**, status *Overdue*: chase what is past its credit days. Status *No PO*: invoices to link to a ROMS PO.
 - **If something looks old:** the Dashboard's **Tally sync** card says whether the Connector is online, Tally is answering, and when each company last synced.
