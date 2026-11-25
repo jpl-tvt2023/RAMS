@@ -78,7 +78,7 @@ export const tallyCompanies = {
       steps: [
         'Load the company in Tally on the office PC. Within a few minutes it appears here with sync Off.',
         'Click the power icon on its row, read the message, and click Turn on.',
-        'The first time, RAMS copies everything from ROMS go-live (a backfill). It runs outside office hours unless the schedule allows otherwise.',
+        'The first time, RAMS copies everything from the start of the financial year, 1 April 2026 (a backfill). It runs outside office hours unless the schedule allows otherwise.',
         'The Dashboard’s Tally sync card shows its progress.',
       ],
     },
@@ -97,7 +97,7 @@ export const tallyCompanies = {
     {
       title: 'Choose which records need a narration',
       steps: [
-        'The Narration check panel says which Tally records are highlighted when they have no narration, and how many that is today. To begin with it is every voucher type, from 8 June 2026.',
+        'The Narration check panel says which Tally records are highlighted when they have no narration, and how many that is today. To begin with it is every voucher type, from 8 June 2026. Records from 1 April to 7 June aren’t checked until you move the date.',
         'Click Edit. The list shows each voucher type, how many records it has and how many have no narration.',
         'Untick the types that don’t need one (for example Sales, if invoices never carry a narration), or move the From date to start later.',
         'Click Save. Every screen that lists Tally records highlights only what the rule asks for. The change is in the Audit Log.',
@@ -173,7 +173,7 @@ export const fileStorage = {
   area: 'Admin',
   title: 'File storage',
   who: 'Admin and Owner only.',
-  summary: 'How much space the files attached on Party Statements take in RAMS’s database, how much RAMS saved, and the biggest files. Photos are made smaller before they are sent, PDFs and emails are compressed without losing anything, and a file attached to several rows is kept once.',
+  summary: 'How much space the files attached on Party Statements and Attachments take in RAMS’s database, how much RAMS saved, and the biggest files. Photos are made smaller before they are sent, PDFs and emails are compressed without losing anything, and a file attached to several rows is kept once.',
   flows: [
     {
       title: 'See how much space files take',
@@ -194,7 +194,7 @@ export const fileStorage = {
     {
       title: 'Free space',
       steps: [
-        'Open the file’s party on Party Statements and remove the files nobody needs (the bin in the row’s files).',
+        'Open the file on Party Statements or Attachments (the links next to it) and remove the files nobody needs (the bin in the row’s files).',
         'A file is deleted once no row uses it; the removal stays in the audit log.',
       ],
     },

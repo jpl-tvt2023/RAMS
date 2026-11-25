@@ -23,17 +23,27 @@ function requireServerEnv() {
   exitIfMissing(['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET']);
 }
 
-// The first day of Tally books RAMS mirrors: ROMS go-live by default. Changing
-// it later needs a re-backfill of each company.
-const SYNC_FROM = process.env.RAMS_SYNC_FROM || '2026-06-08';
-if (!/^\d{4}-\d{2}-\d{2}$/.test(SYNC_FROM)) {
-  console.error(`RAMS_SYNC_FROM must be YYYY-MM-DD, got "${SYNC_FROM}"`);
-  process.exit(1);
+// Two dates (YYYY-MM-DD):
+//   SYNC_FROM   the first day of Tally books RAMS mirrors: the start of the
+//               financial year, so every month matches Tally's registers.
+//               Moving it earlier needs a resync of each company.
+//   MATCH_FROM  the first day matching looks at: ROMS go-live, since ROMS
+//               has no POs before it. Never before SYNC_FROM.
+function dateEnv(key, fallback) {
+  const value = process.env[key] || fallback;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    console.error(`${key} must be YYYY-MM-DD, got "${value}"`);
+    process.exit(1);
+  }
+  return value;
 }
+const SYNC_FROM = dateEnv('RAMS_SYNC_FROM', '2026-04-01');
+const MATCH_FROM = [dateEnv('RAMS_MATCH_FROM', '2026-06-08'), SYNC_FROM].sort()[1];
 
 module.exports = {
   requireServerEnv,
   SYNC_FROM,
+  MATCH_FROM,
   PORT: process.env.PORT || 5001,
   NODE_ENV: process.env.NODE_ENV || 'development',
   JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET,

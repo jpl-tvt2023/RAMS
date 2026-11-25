@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { MATCH_FROM } = require('../config/env');
 const { logAction, diffFields } = require('../services/auditLog.service');
 const {
   DEFAULTS, loadSettings, loadRow, shape, toColumns, validate,
@@ -243,7 +244,7 @@ async function run(req, res, next) {
 // ------------------------------------------------------------ decisions
 
 // The voucher a decision names: a live one of the right kind, in a company
-// whose sync is on.
+// whose sync is on, dated from MATCH_FROM (ROMS go-live: no PO is older).
 async function voucherFor(kind, companyId, guid) {
   const base = kind === 'po' ? 'Sales' : 'Credit Note';
   const [v] = await rowsOf(
@@ -252,6 +253,7 @@ async function voucherFor(kind, companyId, guid) {
     [Number(companyId), String(guid || ''), base],
   );
   if (!v) throw fail(400, kind === 'po' ? 'That Tally sales invoice was not found' : 'That Tally credit note was not found');
+  if (v.date < MATCH_FROM) throw fail(400, `That ${noun(kind)} is dated ${v.date}, before matching starts on ${MATCH_FROM} (ROMS go-live)`);
   return v;
 }
 
@@ -324,10 +326,10 @@ async function searchVouchers(req, res, next) {
     const rows = await rowsOf(
       `SELECT v.company_id, c.code AS company, v.guid, v.number, v.date, v.party, v.voucher_type, v.base_type, v.narration, v.total_paise
          FROM tally_vouchers v JOIN tally_companies c ON c.id = v.company_id
-        WHERE v.deleted_at IS NULL AND c.sync_enabled = 1 AND v.base_type = ? AND v.is_cancelled = 0
+        WHERE v.deleted_at IS NULL AND c.sync_enabled = 1 AND v.base_type = ? AND v.is_cancelled = 0 AND v.date >= ?
           AND (v.number LIKE ? OR v.party LIKE ?)
         ORDER BY v.date DESC LIMIT 20`,
-      [kind === 'po' ? 'Sales' : 'Credit Note', `%${q}%`, `%${q}%`],
+      [kind === 'po' ? 'Sales' : 'Credit Note', MATCH_FROM, `%${q}%`, `%${q}%`],
     );
     const rule = await loadNarrationRule(db);
     res.json({

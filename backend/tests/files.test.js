@@ -178,15 +178,20 @@ describe('Who may', () => {
     expect((await remove(viewer.token, added.body.id)).status).toBe(403);
   });
 
-  test('seeing Bills Receivable alone is enough to download', async () => {
+  test('seeing Bills Receivable or Attachments alone is enough to download', async () => {
     const added = await upload(accountant.token, { ...onVoucher('fl-s1'), name: 'invoice.pdf' }, Buffer.concat([PDF, Buffer.from('% viewer')]));
-    await db.execute("DELETE FROM role_permissions WHERE role = 'Viewer' AND permission = 'statements.view'");
+    const drop = (key) => db.execute({ sql: "DELETE FROM role_permissions WHERE role = 'Viewer' AND permission = ?", args: [key] });
+    await drop('statements.view');
+    await drop('attachments.view');
     try {
-      expect((await download(viewer.token, added.body.id)).status).toBe(200);
-      await db.execute("DELETE FROM role_permissions WHERE role = 'Viewer' AND permission = 'reports.view'");
+      expect((await download(viewer.token, added.body.id)).status).toBe(200); // reports.view
+      await drop('reports.view');
       expect((await download(viewer.token, added.body.id)).status).toBe(403);
+      await db.execute("INSERT INTO role_permissions (role, permission) VALUES ('Viewer', 'attachments.view')");
+      expect((await download(viewer.token, added.body.id)).status).toBe(200); // attachments.view
+      expect((await upload(viewer.token, { ...onVoucher('fl-s1'), name: 'other.pdf' }, PDF)).status).toBe(403);
     } finally {
-      await db.execute("INSERT OR IGNORE INTO role_permissions (role, permission) VALUES ('Viewer', 'statements.view'), ('Viewer', 'reports.view')");
+      await db.execute("INSERT OR IGNORE INTO role_permissions (role, permission) VALUES ('Viewer', 'statements.view'), ('Viewer', 'reports.view'), ('Viewer', 'attachments.view')");
     }
   });
 
@@ -284,7 +289,7 @@ describe('File storage', () => {
     const { rows: [t] } = await db.execute('SELECT COUNT(*) AS files FROM voucher_files');
     const { rows: [b] } = await db.execute('SELECT COUNT(*) AS blobs, SUM(stored_size) AS stored FROM file_blobs');
     expect(body).toMatchObject({
-      files: Number(t.files), stored_files: Number(b.blobs), stored_bytes: Number(b.stored), max_upload_bytes: 4 * 1024 * 1024, sync_from: '2026-06-08',
+      files: Number(t.files), stored_files: Number(b.blobs), stored_bytes: Number(b.stored), max_upload_bytes: 4 * 1024 * 1024, sync_from: '2026-04-01',
     });
     expect(body.saved_bytes).toBe(body.picked_bytes - body.stored_bytes);
     expect(body.saved_bytes).toBeGreaterThan(3000000 - photo.length - 1);

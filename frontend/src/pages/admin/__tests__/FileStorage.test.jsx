@@ -32,13 +32,13 @@ const USAGE = {
     {
       id: 7, name: 'DN scan.jpg', kind: 'image', size: 900000, stored_size: 900000, uploaded_by_name: 'Asha', uploaded_at: '2026-11-02 09:00:00', company_id: 2, company: 'MH',
       on: {
-        type: 'voucher', voucher_type: 'Credit Note', number: '951', date: '2026-05-20', party: 'ZEPTO (PUNE)', party_guid: 'Z1', vendor: 'Zepto',
+        type: 'voucher', voucher_type: 'Credit Note', base_type: 'Credit Note', number: '951', date: '2026-05-20', party: 'ZEPTO (PUNE)', party_guid: 'Z1', vendor: 'Zepto',
       },
     },
     {
       id: 8, name: 'mail.eml', kind: 'email', size: 400000, stored_size: 120000, uploaded_by_name: 'Keshav', uploaded_at: '2026-11-03 09:00:00', company_id: 2, company: 'MH',
       on: {
-        type: 'voucher', voucher_type: 'Sales', number: '201/RM/26-27', date: '2026-11-01', party: 'Unmapped party', party_guid: 'U1', vendor: null,
+        type: 'voucher', voucher_type: 'Sales', base_type: 'Sales', number: '201/RM/26-27', date: '2026-11-01', party: 'Unmapped party', party_guid: 'U1', vendor: null,
       },
     },
   ],
@@ -77,6 +77,22 @@ describe('File storage', () => {
     expect(screen.getByText('Party Statements page')).toBeInTheDocument();
     expect(JSON.parse(sessionStorage.getItem('rams:statements.filters:v1'))).toMatchObject({
       company: '2', vendor: 'Zepto', states: 'all', parties: ['2:Z1'], from: '2026-06-08', to: '', open: '2:Z1', nofile: false,
+    });
+  });
+
+  test('Open on Attachments goes to the voucher’s month, on the tab of its type -- for any file, mapped party or not', async () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/admin/files" element={<FileStorage />} />
+        <Route path="/reports/attachments" element={<p>Attachments page</p>} />
+      </Routes>,
+      { user: ADMIN, route: '/admin/files' },
+    );
+    expect(await screen.findByRole('button', { name: 'Open DN scan.jpg on Attachments' })).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Open mail.eml on Attachments' }));
+    expect(screen.getByText('Attachments page')).toBeInTheDocument();
+    expect(JSON.parse(sessionStorage.getItem('rams:reports.attachments:v1'))).toEqual({
+      company_id: '2', fy: '2026', tab: 'invoice', month: '2026-11', only: false, q: '',
     });
   });
 });

@@ -144,13 +144,13 @@ export default function BillsReceivable() {
   const canStatements = can(PERM.STATEMENTS_VIEW);
 
   const invoiceFiles = (r) => setFilesOf({
-    title: `Invoice ${r.number}`, subtitle: `${r.party} · ${r.company} · ${formatDay(r.date)}. Files are added on Party Statements.`, files: r.files,
+    title: `Invoice ${r.number}`, subtitle: `${r.party} · ${r.company} · ${formatDay(r.date)}. Files are added on Party Statements or Attachments.`, files: r.files,
   });
   const noteFiles = (c) => {
     const inv = cnsOf;
     setCnsOf(null);
     setFilesOf({
-      title: `${c.voucher_type} ${c.number}`, subtitle: `${inv.party} · ${inv.company} · ${formatDay(c.date)}. Files are added on Party Statements.`, files: c.files,
+      title: `${c.voucher_type} ${c.number}`, subtitle: `${inv.party} · ${inv.company} · ${formatDay(c.date)}. Files are added on Party Statements or Attachments.`, files: c.files,
     });
   };
   // Party Statements, on the invoice's party from the note's date, showing just the
@@ -228,9 +228,11 @@ export default function BillsReceivable() {
             </td>
             <td className={`${td} max-w-[16rem]`}>{r.party}</td>
             <td className={`${td} whitespace-nowrap`}>
-              {r.pos.length > 0
-                ? <Link to="/matching" className="text-brand hover:underline">{r.pos.join(', ')}</Link>
-                : <span className="text-gray-400">—</span>}
+              {r.pos.length > 0 && <Link to="/matching" className="text-brand hover:underline">{r.pos.join(', ')}</Link>}
+              {!r.pos.length && r.before_matching && (
+                <span className="text-xs text-gray-400" title={`Dated before ROMS went live (${formatDay(shown?.match_from)}): it has no ROMS PO and is never “No PO”`}>Before ROMS</span>
+              )}
+              {!r.pos.length && !r.before_matching && <span className="text-gray-400">—</span>}
             </td>
             <td className={td}>{r.vendor_pos.length > 0 ? r.vendor_pos.join(', ') : <span className="text-gray-400">—</span>}</td>
             <td className={num}>{formatRupees(r.total_paise)}</td>

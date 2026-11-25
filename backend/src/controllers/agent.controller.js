@@ -31,11 +31,17 @@ const MAX_LIST = 20000;
 // A voucher's narration is shown on every screen that lists it, so it is kept
 // whole (a receipt's can list dozens of invoice numbers).
 const NARRATION_MAX = 2000;
-// How a ledger's state and GSTIN are read from Tally. Connector 0.7.0 reads
+// How a ledger's address fields are read from Tally. Connector 0.7.0 reads
 // the latest dated address and GST registration (2) where older ones took the
-// first value they met (1). State and GSTIN are taken only from a payload that
-// reads them at least this well, so an older Connector can't undo a fix.
-const LEDGER_READING = 2;
+// first value they met (1). Connector 0.8.0 also reads the address's City and
+// PIN code (3). Each field is taken only from a payload that reads it at its
+// level (MASTERS.ledgers.readings), so an older Connector can't undo a fix or
+// blank a city.
+const LEDGER_READING = 3;
+// An e-invoice as Tally keeps it: the IRN is 64 hex characters, the Ack No
+// digits (15 today).
+const IRN = /^[0-9a-f]{64}$/i;
+const ACK_NO = /^\d{1,20}$/;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const ABANDONED = JSON.stringify(['Abandoned: a newer run started before this one finished']);
 
@@ -283,14 +289,18 @@ const MASTERS = {
   },
   ledgers: {
     table: 'tally_ledgers', renames: true,
-    cols: ['name', 'parent', 'aliases', 'gstin', 'gstins', 'state', 'is_bill_wise', 'master_id', 'alter_id'],
-    // Kept as stored unless the payload reads them at LEDGER_READING.
-    readings: ['gstin', 'gstins', 'state'],
+    cols: ['name', 'parent', 'aliases', 'gstin', 'gstins', 'state', 'is_bill_wise', 'master_id', 'alter_id', 'city', 'pincode'],
+    // Kept as stored unless the payload's ledgerReading is at least the
+    // column's level (see LEDGER_READING).
+    readings: {
+      gstin: 2, gstins: 2, state: 2, city: 3, pincode: 3,
+    },
     values: (m) => {
       const gstins = Array.isArray(m.gstins) ? m.gstins.map((g) => text(g, 20)).filter(Boolean) : [];
       return [
         text(m.name, 300), text(m.parent, 300), json(Array.isArray(m.aliases) ? m.aliases.slice(0, 20) : []),
         gstins[0] || null, json(gstins), text(m.state, 60), flag(m.billWise), int(m.masterId), int(m.alterId),
+        text(m.city, 100), text(m.pincode, 10),
       ];
     },
   },
@@ -324,7 +334,7 @@ async function masters(req, res, next) {
   try {
     const run = await openRun(req);
     const body = req.body || {};
-    const readsWell = Number(body.ledgerReading) >= LEDGER_READING;
+    const reading = Number(body.ledgerReading) || 0;
     const stmts = [];
     const result = { upserted: 0, unchanged: 0, deleted: 0, renamed: 0 };
 
@@ -353,8 +363,10 @@ async function masters(req, res, next) {
         incoming.add(guid);
         const values = spec.values(m);
         const before = byGuid.get(guid);
-        if (before && spec.readings && !readsWell) {
-          for (const col of spec.readings) values[spec.cols.indexOf(col)] = before[col] ?? null;
+        if (before && spec.readings) {
+          for (const [col, level] of Object.entries(spec.readings)) {
+            if (reading < level) values[spec.cols.indexOf(col)] = before[col] ?? null;
+          }
         }
         if (before && !before.deleted_at) {
           if (spec.renames && before.name !== values[0]) result.renamed++;
@@ -400,6 +412,7 @@ async function masters(req, res, next) {
 const VOUCHER_COLS = [
   'master_id', 'alter_id', 'date', 'voucher_type', 'base_type', 'number', 'reference', 'reference_date',
   'party', 'party_gstin', 'cmp_gstin', 'narration', 'is_invoice', 'is_cancelled', 'is_optional', 'total_paise',
+  'einvoice_read', 'irn', 'irn_ack_no', 'irn_ack_date', 'irn_cancelled',
 ];
 const UPSERT_VOUCHER = `INSERT INTO tally_vouchers (company_id, guid, ${VOUCHER_COLS.join(', ')}, last_run_id)
   VALUES (?, ?, ${placeholders(VOUCHER_COLS.length)}, ?)
@@ -429,6 +442,22 @@ function checkVoucher(v, i) {
   if (!text(v.type, 200)) throw bad(`${where} (${v.guid}) has no voucher type`);
 }
 
+// The e-invoice columns: read (1) whenever the Connector sent an einvoice
+// object (0.8.0 and later), each value kept only in its expected shape.
+function einvoiceOf(v) {
+  const e = v.einvoice && typeof v.einvoice === 'object' ? v.einvoice : null;
+  if (!e) return [0, null, null, null, 0];
+  const irn = text(e.irn, 100);
+  const ackNo = text(e.ackNo, 40);
+  return [
+    1,
+    irn && IRN.test(irn) ? irn.toLowerCase() : null,
+    ackNo && ACK_NO.test(ackNo) ? ackNo : null,
+    ISO.test(e.ackDate || '') ? e.ackDate : null,
+    flag(e.cancelled),
+  ];
+}
+
 function voucherStatements(v, companyId, runId, replaceLines) {
   const guid = text(v.guid, 100);
   const ledgerLines = Array.isArray(v.ledgerLines) ? v.ledgerLines : [];
@@ -442,6 +471,7 @@ function voucherStatements(v, companyId, runId, replaceLines) {
       text(v.number, 200), text(v.reference, 200), ISO.test(v.referenceDate || '') ? v.referenceDate : null,
       text(v.party, 300), text(v.partyGstin, 20), text(v.cmpGstin, 20), text(v.narration, NARRATION_MAX),
       flag(v.invoice), flag(v.cancelled), flag(v.optional), paise(v.total),
+      ...einvoiceOf(v),
       runId,
     ],
   }];

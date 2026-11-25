@@ -192,7 +192,33 @@ describe('normalize', () => {
     // Read as of a day before the correction, the older entry applies.
     const before = ledgersFrom(tree, { asOf: '2024-01-01' }).find((l) => l.name === 'Scootsy Logistics Pvt Ltd');
     expect(before.state).toBe('West Bengal');
-    expect(LEDGER_READING).toBe(2);
+    expect(LEDGER_READING).toBe(3);
+  });
+
+  test('a ledger’s City and PIN code come from its latest address, blank when Tally has none', () => {
+    const mh = buildDataset().companies.find((c) => c.code === 'MH');
+    const tree = parseXml(xml.mastersXml(mh, 'Ledgers'));
+    expect(ledgersFrom(tree).find((l) => l.name === 'Kiranakart Technologies Pvt Ltd (Zepto)')).toMatchObject({ city: 'Mumbai', pincode: '400072' });
+    expect(ledgersFrom(tree).find((l) => l.name === 'Scootsy Logistics Pvt Ltd')).toMatchObject({ city: '', pincode: '' }); // <CITY/>
+    // An older dated address doesn't lend its city to the latest.
+    const l = ledgersFrom(parseXml('<ENVELOPE><LEDGER NAME="A"><GUID>g</GUID>'
+      + '<LEDMAILINGDETAILS.LIST><APPLICABLEFROM>20220401</APPLICABLEFROM><CITY>Pune</CITY><PINCODE>411001</PINCODE></LEDMAILINGDETAILS.LIST>'
+      + '<LEDMAILINGDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM><CITY>Nagpur</CITY><PINCODE>440001</PINCODE></LEDMAILINGDETAILS.LIST>'
+      + '</LEDGER></ENVELOPE>'))[0];
+    expect(l).toMatchObject({ city: 'Nagpur', pincode: '440001' });
+  });
+
+  test('a voucher’s e-invoice: IRN, Ack No, Ack date and cancelled, empty when Tally has none', () => {
+    const mh = buildDataset().companies.find((c) => c.code === 'MH');
+    const parse = (no) => voucherFrom(findAll(parseXml(xml.voucherXml(mh.vouchers.find((v) => v.number === no), mh)), 'VOUCHER')[0]);
+    expect(parse('RM/26-27/001').einvoice).toEqual({
+      irn: '9f2c4e7a1b3d5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8', ackNo: '122633138683008', ackDate: '2026-04-05', cancelled: false,
+    });
+    expect(parse('RM/26-27/003').einvoice).toEqual({ irn: '', ackNo: '', ackDate: '', cancelled: false });
+    const cancelled = voucherFrom({
+      VOUCHERTYPENAME: 'Sales', GUID: 'g2', DATE: '20260701', IRN: 'ab'.repeat(32), IRNACKNO: '122633027185512', IRNACKDATE: '20260702', IRNCANCELLED: 'Yes',
+    });
+    expect(cancelled.einvoice).toEqual({ irn: 'ab'.repeat(32), ackNo: '122633027185512', ackDate: '2026-07-02', cancelled: true });
   });
 
   test('a long narration is kept whole, up to 2,000 characters', () => {

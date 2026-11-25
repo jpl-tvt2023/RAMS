@@ -5,7 +5,7 @@ const {
 } = require('../books/book');
 const { narrationLookup } = require('../services/narration');
 const { filesFor } = require('../services/files');
-const { SYNC_FROM } = require('../config/env');
+const { SYNC_FROM, MATCH_FROM } = require('../config/env');
 const { loadSettings: loadStatementSettings, loadParties } = require('../statements/statement');
 
 // Reports: Bills Receivable, Invoices, Credit & debit notes, Stock transfers,
@@ -43,6 +43,9 @@ const matches = (q, ...values) => {
   return !s || values.some((v) => v != null && String(v).toLowerCase().includes(s));
 };
 const sum = (list, k) => list.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+// No PO yet: an invoice from MATCH_FROM (ROMS go-live) with no PO linked. An
+// older one can never have a PO, so it never counts.
+const noPo = (i) => !i.pos.length && !i.before_matching;
 
 // ------------------------------------------------------------ bills receivable
 
@@ -65,7 +68,7 @@ async function billsReceivable(req, res, next) {
     const companyId = companyOf(q, book);
     const base = book.invoices.filter((i) => !i.internal
       && (!companyId || i.company_id === companyId)
-      && (!q.status || (q.status === 'no_po' ? !i.pos.length : i.status === q.status))
+      && (!q.status || (q.status === 'no_po' ? noPo(i) : i.status === q.status))
       && matches(q.q, i.number, i.party, ...i.pos, ...i.vendor_pos));
 
     // The tabs count everything the other filters let through.
@@ -112,6 +115,7 @@ async function billsReceivable(req, res, next) {
     ]);
     const ledgerOf = new Map(onStatements.filter((x) => x.bill_to_bill).map((x) => [`${x.company_id}|${String(x.name).toLowerCase()}`, x]));
     page.sync_from = SYNC_FROM;
+    page.match_from = MATCH_FROM;
     page.rows = page.rows.map((i) => {
       const ledger = ledgerOf.get(`${i.company_id}|${String(i.party || '').toLowerCase()}`) || null;
       const notes = cnsOf(i).map((s) => ({
@@ -127,6 +131,7 @@ async function billsReceivable(req, res, next) {
         party: i.party,
         vendor: i.vendor,
         pos: i.pos,
+        before_matching: i.before_matching,
         vendor_pos: i.vendor_pos,
         total_paise: i.total_paise,
         credit_notes_paise: i.credit_notes_paise,
@@ -158,7 +163,7 @@ async function invoices(req, res, next) {
       && (!companyId || i.company_id === companyId)
       && (!q.vendor || (q.vendor === '-' ? !i.vendor : i.vendor === q.vendor))
       && (!q.from || i.date >= q.from) && (!q.to || i.date <= q.to)
-      && (!q.status || (q.status === 'no_po' ? !i.pos.length : i.status === q.status))
+      && (!q.status || (q.status === 'no_po' ? noPo(i) : i.status === q.status))
       && matches(q.q, i.number, i.party, ...i.pos));
     const sorts = {
       oldest: (a, b) => a.date.localeCompare(b.date) || a.number.localeCompare(b.number),
@@ -333,7 +338,7 @@ async function exceptions(req, res, next) {
       {
         code: 'invoice_no_po',
         rows: book.invoices
-          .filter((i) => !i.internal && !i.pos.length && !unmatched.has(i.vendor) && i.age_days > days && (!companyId || i.company_id === companyId))
+          .filter((i) => !i.internal && noPo(i) && !unmatched.has(i.vendor) && i.age_days > days && (!companyId || i.company_id === companyId))
           .sort((a, b) => a.date.localeCompare(b.date))
           .map((i) => ({
             company_id: i.company_id, company: i.company, guid: i.guid, number: i.number, date: i.date, party: i.party, vendor: i.vendor, total_paise: i.total_paise, age_days: i.age_days,
@@ -367,9 +372,9 @@ async function exceptions(req, res, next) {
         })),
       },
     ].map((c) => ({ code: c.code, count: c.rows.length, rows: c.rows.slice(0, EXCEPTION_LIMIT) }));
-    const noPo = categories.find((c) => c.code === 'invoice_no_po');
-    const narrationOf = await narrationLookup(db, noPo.rows.map((r) => [r.company_id, r.guid]));
-    noPo.rows = noPo.rows.map((r) => ({ ...r, ...narrationOf(r.company_id, r.guid) }));
+    const withoutPo = categories.find((c) => c.code === 'invoice_no_po');
+    const narrationOf = await narrationLookup(db, withoutPo.rows.map((r) => [r.company_id, r.guid]));
+    withoutPo.rows = withoutPo.rows.map((r) => ({ ...r, ...narrationOf(r.company_id, r.guid) }));
     res.json({
       categories, exception_days: days, as_of: book.today, companies: book.companies,
     });

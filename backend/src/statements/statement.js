@@ -441,4 +441,5 @@ module.exports = {
   partyDetailOf,
   attentionOf,
   monthStart,
+  asOfFor,
 };

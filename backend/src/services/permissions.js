@@ -61,11 +61,15 @@ const CATALOG = [
   },
   {
     key: 'statements.files', area: 'Party Statements', label: 'Attach files',
-    description: 'Add and remove PDFs, photos and emails on a party\'s Tally rows. Anyone who sees Party Statements or Bills Receivable can view and download them',
+    description: 'Add and remove PDFs, photos and emails on Tally vouchers, on Party Statements and Attachments. Anyone who sees Party Statements, Attachments or Bills Receivable can view and download them',
   },
   {
     key: 'statements.settings', area: 'Party Statements', label: 'Change statement settings',
     description: 'Which marketplaces Party Statements covers, and the placeholder opening',
+  },
+  {
+    key: 'attachments.view', area: 'Attachments', label: 'See Attachments',
+    description: 'Tally Reports → Attachments: each month\'s invoices, payments, debit and credit notes, with their files, e-invoice and narration',
   },
   {
     key: 'sync.companies', area: 'Tally sync', label: 'Turn company sync on or off',

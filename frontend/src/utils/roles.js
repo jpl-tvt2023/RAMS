@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Settings, Users, ScrollText, Building2, Link2, ListChecks, SlidersHorizontal, BookUser, ShieldCheck, LifeBuoy, PenLine,
-  FileText, Receipt, ArrowLeftRight, Wallet, AlertTriangle, Activity, BarChart3, IndianRupee, BookOpen, CalendarClock, HardDrive, ShoppingCart,
+  FileText, Receipt, ArrowLeftRight, Wallet, AlertTriangle, Activity, BarChart3, IndianRupee, BookOpen, CalendarClock, HardDrive, ShoppingCart, Paperclip,
 } from 'lucide-react';
 import { isReleased } from './releases';
 
@@ -42,6 +42,7 @@ export const PERM = {
   STATEMENTS_VIEW: 'statements.view',
   STATEMENTS_FILES: 'statements.files',
   STATEMENTS_SETTINGS: 'statements.settings',
+  ATTACHMENTS_VIEW: 'attachments.view',
   SYNC_COMPANIES: 'sync.companies',
   SYNC_SCHEDULE: 'sync.schedule',
   NARRATION_SETTINGS: 'narration.settings',
@@ -112,6 +113,9 @@ export const NAV = withoutHeld([
       },
       {
         label: 'Party Statements', path: '/reports/party-statements', icon: BookOpen, description: 'Each party’s statement from Tally, with its documents', permission: PERM.STATEMENTS_VIEW,
+      },
+      {
+        label: 'Attachments', path: '/reports/attachments', icon: Paperclip, description: 'Each month’s invoices, payments, debit and credit notes, with their files', permission: PERM.ATTACHMENTS_VIEW,
       },
       {
         label: 'Invoices', path: '/reports/invoices', icon: FileText, description: 'Every Tally sales invoice, what settled it and what is owed', permission: PERM.REPORTS_VIEW,

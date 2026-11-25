@@ -67,6 +67,7 @@ app.use('/api/autofill',   require('./src/routes/autofill.routes'));
 app.use('/api/reports',    require('./src/routes/reports.routes'));
 app.use('/api/statements', require('./src/routes/statements.routes'));
 app.use('/api/files',      require('./src/routes/files.routes'));
+app.use('/api/attachments', require('./src/routes/attachments.routes'));
 app.use('/api/agent',      require('./src/routes/agent.routes'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));

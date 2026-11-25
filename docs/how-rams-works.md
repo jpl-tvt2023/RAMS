@@ -1,6 +1,6 @@
 # How RAMS works
 
-*Royal Mart Accounts (RAMS), explained without the technical words. Last updated 18 October 2026.*
+*Royal Mart Accounts (RAMS), explained without the technical words. Last updated 25 November 2026.*
 
 ---
 
@@ -8,7 +8,7 @@
 
 Royal Mart keeps its **accounts in Tally** and its **marketplace orders in ROMS** (the Royal Mart portal). Until now, the two never spoke to each other. Someone had to read an invoice number in Tally and type it into ROMS, and nobody could easily see which order had been invoiced, paid or credited.
 
-**RAMS is the bridge between them.** It reads the books from Tally, matches each ROMS order to the Tally invoice that billed it, and each return to the credit note that settled it. With your permission, it then writes Tally's invoice and credit-note numbers into ROMS. Report screens, such as what every marketplace owes, follow one at a time. On **Party Statements**, each bill-to-bill party's statement comes straight from Tally, and your team attaches each row's document.
+**RAMS is the bridge between them.** It reads the books from Tally, matches each ROMS order to the Tally invoice that billed it, and each return to the credit note that settled it. With your permission, it then writes Tally's invoice and credit-note numbers into ROMS. Report screens, such as what every marketplace owes, follow one at a time. On **Party Statements**, each bill-to-bill party's statement comes straight from Tally, and your team attaches each row's document. On **Attachments**, every invoice, payment, debit note and credit note of the year is listed month by month, as in Tally's registers, with its document, e-invoice number and narration.
 
 ```
    TALLY                      RAMS                         ROMS
@@ -33,7 +33,7 @@ Royal Mart keeps its **accounts in Tally** and its **marketplace orders in ROMS*
 
 ## 3. What RAMS will never do
 
-- **It never changes Tally.** Every request it makes to Tally is "export" (read). There is no way for it to write. What your team enters on *Party Statements* stays in RAMS.
+- **It never changes Tally.** Every request it makes to Tally is "export" (read). There is no way for it to write. What your team adds on *Party Statements* and *Attachments* stays in RAMS.
 - **It never deletes anything in ROMS.**
 - **It writes only four fields in ROMS:**
   - the **Bill No** and **Bill Date** of an order
@@ -62,7 +62,7 @@ Royal Mart keeps its **accounts in Tally** and its **marketplace orders in ROMS*
 
 ## 5. What RAMS reads from Tally
 
-RAMS keeps a copy of the books of **MH, HR and WB** from **8 June 2026** (when ROMS went live) onwards. Other companies in Tally are ignored, and an Admin chooses which companies are synced.
+RAMS keeps a copy of the books of **MH, HR and WB** from **1 April 2026** (the start of the financial year) onwards, so every month on *Attachments* matches Tally's registers. **Matching starts on 8 June 2026**, when ROMS went live: ROMS has no orders before then, so an earlier invoice is never called "no PO". Other companies in Tally are ignored, and an Admin chooses which companies are synced.
 
 ### Company
 
@@ -79,6 +79,7 @@ RAMS keeps a copy of the books of **MH, HR and WB** from **8 June 2026** (when R
 |---|---|
 | Ledger name, alias and group (for example *Sundry Debtors*, *Sales Accounts*, *Duties & Taxes*) | To know which ledgers are customers, which are sales and which are GST |
 | Ledger GSTIN and state (the latest dated entry) | To tell which marketplace a party ledger belongs to and which ledgers are Roymax's own registrations, and to filter *Party Statements* by state |
+| City and PIN code (the latest address) | The *City* on *Attachments*. Today no ledger in Tally has its City filled in (159 of 820 MH ledgers have a PIN code), so RAMS uses the city on the ROMS order until it is |
 | Bill-wise on/off | To know whether Tally tracks a party's invoices one by one |
 | Each ledger's closing balance | To start each party's balance on *Party Statements* from Tally's own figure |
 
@@ -103,6 +104,7 @@ RAMS keeps a copy of the books of **MH, HR and WB** from **8 June 2026** (when R
 | Ledger lines (ledger, amount, debit or credit) | Taxable value, GST, and TDS on journals |
 | **Bill-wise details** (New Ref / Agst Ref / On Account, bill name, amount) | **What settled each invoice:** a receipt, credit note or TDS journal entered "Agst Ref" against it. A credit note's Agst Ref also tells RAMS which invoice, and so which order, a return belongs to. |
 | Item lines: stock item, quantity, rate, amount, godown, order no | The product and quantity checks |
+| **E-invoice:** IRN, Ack No, Ack date, cancelled or not | Shown on *Attachments* next to each invoice and credit note, with the IRN ready to copy. In August, 207 of 211 MH invoices and all 114 credit notes had one |
 | Change counter and unique ID | So an edited voucher replaces the old copy, and a deleted one is noticed |
 
 **What RAMS does not keep:** Tally sends addresses, e-way bill details and the GST breakdown along with each voucher. RAMS discards them.
@@ -186,28 +188,28 @@ Checked on the real books (MH, HR, WB) and the ROMS test copy, October 2026:
 
 The report screens (what has been invoiced, what has been paid, and what is still owed) are delivered **one at a time**. We go through each one with you, adjust it to what you need, and only then switch it on in RAMS.
 
-In the top bar they are under **Tally Reports**: *Bills Receivable* and *Party Statements* (section 11). **Purchase Reports** is there too, greyed and marked *Coming soon*: it can't be clicked yet.
+In the top bar they are under **Tally Reports**: *Bills Receivable*, *Party Statements* (section 11) and *Attachments* (section 12). **Purchase Reports** is there too, greyed and marked *Coming soon*: it can't be clicked yet.
 
 **New names (18 November):** *Debtors* is now **Bills Receivable**, Tally's own name for the bill-wise list of what is owed. *Ledgers* is now **Party Statements**, since it shows each party's statement from opening to closing. They are the same pages with the same permissions. Their addresses moved to */reports/bills-receivable* and */reports/party-statements*, and the old ones still lead there.
 
-**Bills Receivable** is the first one (*Tally Reports → Bills Receivable*). It lists every sales invoice since 8 June, with a tab for each marketplace (All, Amazon, Blinkit and so on). For each invoice it shows:
+**Bills Receivable** is the first one (*Tally Reports → Bills Receivable*). It lists every sales invoice since 1 April, with a tab for each marketplace (All, Amazon, Blinkit and so on). For each invoice it shows:
 
 | Column | What it is |
 |---|---|
 | Invoice | The Tally invoice number, with its company and date |
 | Party | The party ledger it was billed to |
-| Internal PO no | ROMS's own PO id (for example B002) |
+| Internal PO no | ROMS's own PO id (for example B002). An invoice from before 8 June says *Before ROMS*: it can't have one |
 | Vendor PO no | The marketplace's purchase order number |
 | Amount | The invoice total |
 | CN | The credit notes set against it in Tally (ours, and the marketplace's DNs, which Tally books as credit notes). Click the amount to see each one: its number, date, amount, the ROMS return (RTV) it belongs to, and its files |
 | Outstanding | What is still owed after receipts, credit notes, TDS and adjustments, and how many days it is overdue |
-| Files | The invoice's files (PDF, photo or email), added on *Party Statements*. Click to view or download them |
+| Files | The invoice's files (PDF, photo or email), added on *Attachments* or *Party Statements*. Click to view or download them |
 
-**An invoice is orange while a DN or CN against it has no file**, with "1 without a file" (or more) under its CN amount. In the credit-note window the note without a file is orange too, with a link, *Add it on Party Statements*, that opens that party on Party Statements showing just its rows without a file. Once each DN and CN against the invoice has its file, the orange goes. Only Minutes, Now and Zepto invoices can turn orange: files are added on Party Statements, which covers those three. A credit note set against two invoices needs its file only once.
+**An invoice is orange while a DN or CN against it has no file**, with "1 without a file" (or more) under its CN amount. In the credit-note window the note without a file is orange too, with a link, *Add it on Party Statements*, that opens that party on Party Statements showing just its rows without a file. Once each DN and CN against the invoice has its file, the orange goes. Only Minutes, Now and Zepto invoices can turn orange here, the parties Party Statements covers. (*Attachments* marks every voucher without its document, whatever the party.) A credit note set against two invoices needs its file only once.
 
 It opens on **MH**, with all marketplaces and all statuses. You can switch to another company or to all companies together, and filter by Open, Overdue, Settled or No PO. You can search by invoice, party or either PO number, and download it for Excel.
 
-Until the rest arrive, RAMS keeps working in the background: it copies the books, matches orders and returns, and writes the numbers into ROMS once you switch that on. Each report covers everything since 8 June, so nothing is missed by waiting.
+Until the rest arrive, RAMS keeps working in the background: it copies the books, matches orders and returns, and writes the numbers into ROMS once you switch that on. Each report covers everything since 1 April, so nothing is missed by waiting.
 
 **Something to start on in Tally now:** several marketplaces pay into a *head-office* ledger "On Account", not against the warehouse-ledger invoices. In Tally's bill-wise view, those invoices therefore look unpaid. Setting those receipts against their invoices in Tally will make the figures exact when the reports arrive.
 
@@ -249,12 +251,12 @@ Each colour means one thing:
 
 Click a party to see every Tally voucher on it, with its narration, its files and the running balance. The **Needs attention** button above the statement (with how many parties) opens a list of every party with a DN booked twice, rows without a file, or a state that differs, and since when; click a party there to open it.
 
-**The opening balance comes from Tally**, as before: each sync reads every ledger's balance. If a sync can't read it, the party starts on a placeholder of ₹10,000 on 8 June, carried forward by Tally's real vouchers.
+**The opening balance comes from Tally**, as before: each sync reads every ledger's balance. If a sync can't read it, the party starts on a placeholder of ₹10,000 on 1 April, carried forward by Tally's real vouchers.
 
 ### Files: each row's PDF, photo or email
 Every row of a party can carry its proof: the invoice, the marketplace's DN, our CN, the receipt's advice or the TDS certificate.
 - **Adding:** in the *Files* column, drag files in, choose them, or paste a screenshot with Ctrl+V. RAMS takes PDFs, photos (JPG, PNG, WebP) and emails saved from Gmail (.eml) or Outlook (.msg): up to 4 MB each after compression, and 10 per row.
-- **A row without a file is orange**, across the whole row, until a file is added: every row from 8 June. *Needs attention* counts them for every party, and *Without a file* shows just those rows.
+- **A row without a file is orange**, across the whole row, until a file is added: every row from 1 April. *Needs attention* counts them for every party, and *Without a file* shows just those rows.
 - **Viewing:** a PDF or a photo opens inside RAMS, and any file can be downloaded. PDFs and emails come back **exactly as they were added**. Emails are not opened in RAMS: they open in Outlook or your mail app, with their attachments.
 - **Small on purpose:** photos are made smaller before they are sent (at most 2,000 pixels across; a 1.6 MB photo became 146 KB in our test, still easy to read). PDFs and emails are compressed without losing anything, and a file attached to several rows is kept once. One file for every DN, CN and invoice comes to about 1 GB a year. *Admin → File storage* shows the space used and saved, and the biggest files.
 - An invoice's files, and those of the DN and CN against it, also show on *Bills Receivable*, where an invoice whose DN or CN has no file is orange (section 10).
@@ -270,10 +272,48 @@ Each party has two states: the one on its ledger in Tally, and the one its GSTIN
 
 **To decide together:**
 - **Zepto's head-office ledgers.** Zepto pays into *ZEPTO PAYMENT* and *ZEPTO PVT LTD*, not each warehouse, so its warehouse rows show invoices but no receipts. Map those two ledgers to Zepto on *Matching → Party ledgers*. Three new Zepto dark stores (Coimbatore, Gurgaon Sohna, Hoogly) need mapping too.
-- **Files volume.** No document is attached yet, so every row since 8 June starts orange: 559 rows on Minutes, Now and Zepto today. They clear as documents are added.
+- **Files volume.** No document is attached yet, so every row since 1 April starts orange: 559 rows from 8 June on Minutes, Now and Zepto today, and April and May once they are loaded. They clear as documents are added. If April and May don't need files, a setting for the date files are needed from can be added, like the narration check's.
 - **Narration volume.** Until narrations are written, most invoices and receipts are highlighted. The *Narration check* can narrow it.
 
-## 12. Who can do what
+## 12. Attachments: every voucher's document, month by month
+
+**Attachments** is under *Tally Reports → Attachments*. It answers one question for the whole year: **does every voucher have its document and its narration?** It looks like Tally's own registers (*Display More Reports → Account Books → Sales Register* and the others), so it reads the way your accountants already know.
+
+**Choose the company and the year.** It opens on MH and this financial year (2026-27). One company is shown at a time, as in Tally.
+
+**Four tabs**, each Tally's own voucher type:
+| Tab | Tally's vouchers | Side, as in Tally's register |
+|---|---|---|
+| Invoice | Sales | Credit |
+| Payments | Payment (money paid out) | Debit |
+| DN | Debit Note (our returns to suppliers) | Credit |
+| CN | Credit Note (including a marketplace's DN, which Tally books as a credit note) | Debit |
+
+**Each tab lists the months, April to March**, with: how many vouchers, how many **need attention**, the Debit or Credit, and the **Closing balance** (the running total from April, Cr or Dr). These are Tally's own figures: July's sales of MH on RAMS are **₹2,41,89,073.30**, August's ₹2,24,14,905.82 and September's ₹2,29,84,111.78, exactly as Tally's Sales Register shows them.
+
+**A voucher needs attention** when it has no document attached, or no narration while the *Narration check* asks for one. Click a month's *Needs attention* number to see just those.
+
+**Click a month to see its vouchers**, in Tally's order:
+| Column | What it is |
+|---|---|
+| Invoice no (or Voucher, DN, CN no) | The Tally number and date |
+| Ledger | The party. For a payment, who was paid (the ledger it debits), not the bank or cash it was paid from: in August, 135 of 243 MH payments show a different name from Tally's "party" this way |
+| City | From the ledger's address in Tally. No ledger has its City filled in yet, so for now it comes from the ROMS order the invoice is linked to, or the party's latest order (marked *from ROMS*): 269 of 284 July invoices have one. Fill in City on the ledgers in Tally and it shows everywhere |
+| Amount | The voucher's total |
+| E-Invoice (Ack No) | The e-invoice acknowledgement number and date Tally holds (15 digits, for example 122633978676286). Hover over it to see the full IRN, and click the copy button to copy it. *IRN cancelled* when it was cancelled on the portal |
+| Invoice PDF / Files | The documents attached: PDFs, photos or emails. Add, view, download or remove them here; they are the same files *Party Statements* and *Bills Receivable* show |
+| Narration | *Yes* (hover to read it), or the yellow *No narration* |
+| Audit Log | Who last changed the voucher in RAMS (added or removed a file) and when. Click it for the full history. Changes made in Tally itself are in Tally's own Edit Log |
+
+A voucher **without a document is orange**, across the row, until one is added. Tick *Needs attention only* to see only what is left to do, search by number, ledger, city or Ack No, and download the list for Excel.
+
+**From 1 April.** RAMS's copy of Tally now starts on 1 April 2026, so every month of the year is there and the Closing matches Tally's. Matching still starts on 8 June (section 5).
+
+**To decide together:**
+- **Sales narrations.** None of Tally's 1,175 MH sales invoices since 8 June has a narration, so every invoice counts as needing attention. Either the accountants add one, or an Admin takes Sales out of the *Narration check*. The check starts on 8 June today; move it to 1 April to cover the whole year.
+- **E-invoice numbers** show once the new Connector (0.8.0) has loaded all of Tally into RAMS again. Until then the column says *Not read yet*.
+
+## 13. Who can do what
 
 There are four roles. **Admin and Owner can always do everything**, and they decide what the other two may do, on *Admin → Roles & permissions*.
 
@@ -282,8 +322,9 @@ There are four roles. **Admin and Owner can always do everything**, and they dec
 | See matching and auto-fill | ✓ | ✓ |
 | See Bills Receivable (Tally Reports) | ✓ | ✓ |
 | See Party Statements | ✓ | ✓ |
-| Add and remove files on Party Statements | ✓ | – |
-| View and download files (on Party Statements and Bills Receivable) | ✓ | ✓ |
+| See Attachments | ✓ | ✓ |
+| Add and remove files (on Party Statements and Attachments) | ✓ | – |
+| View and download files (on Party Statements, Attachments and Bills Receivable) | ✓ | ✓ |
 | Change the statement settings (marketplaces, placeholder opening) | – (Admin/Owner) | – |
 | Change the credit days (*Admin → Credit terms*) | ✓ | – |
 | Change the narration check | – (Admin/Owner) | – |
@@ -294,7 +335,7 @@ There are four roles. **Admin and Owner can always do everything**, and they dec
 
 Every change anyone makes in RAMS is recorded in the **Audit Log**, with who made it and when.
 
-## 13. What you can change yourselves (no programmer needed)
+## 14. What you can change yourselves (no programmer needed)
 
 - **Which Tally companies sync, and the office hours**
 - **Which company the reports open on** (the star on *Admin → Tally companies*; MH for now)
@@ -307,7 +348,7 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 - **The narration check:** which voucher types need a narration, and from which date
 - **What Accountants and Viewers may do**
 
-## 14. Safety and privacy
+## 15. Safety and privacy
 
 - **Tally:** read only.
 - **ROMS:** read, plus four fields that can only be written when switched on. Each write is checked by ROMS's own rules and recorded in its history.
@@ -315,10 +356,10 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 - **Sessions** expire, and a password reset or role change signs that person out.
 - **The Connector and ROMS** each use a private key. The key can be withdrawn at any time, which stops the connection.
 - **The data** is held in a database in **Mumbai**. The website is set to run in Mumbai too, which also makes it faster.
-- **Files** on Party Statements are kept in that same database, never on a public link: only people signed in to RAMS who can see Party Statements or Bills Receivable can open them. RAMS checks each file is really a PDF, photo or email before keeping it.
+- **Files** on Party Statements and Attachments are kept in that same database, never on a public link: only people signed in to RAMS who can see Party Statements, Attachments or Bills Receivable can open them. RAMS checks each file is really a PDF, photo or email before keeping it.
 - **Every change** in RAMS is in the Audit Log; every change in ROMS is in ROMS's history.
 
-## 15. Progress and next steps
+## 16. Progress and next steps
 
 | Step | What | State |
 |---|---|---|
@@ -333,12 +374,13 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 | – | Files on Party Statements: PDFs, photos and emails on each row, viewed in RAMS and shown on Bills Receivable; *File storage* | Built and tested; both databases updated for it (17 Nov) |
 | – | Party Statements from Tally only: debit and credit notes no longer typed in RAMS (559 of 559 entries checked against Tally first); every row without its document is orange | Built and tested; goes on the test setup after your review |
 | – | *Tally Reports* menu (Debtors and Ledgers renamed *Bills Receivable* and *Party Statements*) and *Purchase Reports* coming soon; Party Statements opens on every party, with *Needs attention* as a button and a scrolling list; Bills Receivable shows an invoice orange while a DN or CN against it has no file | Built and tested; goes on the test setup after your review |
+| – | *Attachments*: every invoice, payment, debit and credit note of the year, month by month as Tally's registers, with documents, e-invoice numbers, city, narration and who changed it; RAMS's copy of Tally from 1 April (matching still from 8 June); Connector 0.8.0 | Built and tested (Tally's July–September sales figures match to the paisa); goes on the test setup after your review |
 | Later | A NAS folder RAMS checks every few minutes, attaching files by their DN, CN or invoice number | Designed; waits for the NAS |
 | 8 | Go-live: production database, Connector installed on the office PC, the trial weeks | Prepared (see *go-live.md*); needs the office PC and your go-ahead |
 
 **Still to be decided:** how to link Flipkart and Amazon stock transfers to their ROMS rows.
 
-## 16. Words used
+## 17. Words used
 
 | Word | Meaning |
 |---|---|
@@ -348,6 +390,8 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 | **Bill No** | The invoice number, as recorded in ROMS on the Builty page |
 | **RTV** | Return to vendor: goods a marketplace sent back, or was short |
 | **CN / DN** | Credit note / debit note |
+| **E-invoice, IRN, Ack No** | The GST e-invoice of a sale or credit note: the IRN is its 64-character reference number, the Ack No the 15-digit acknowledgement number printed on it |
+| **Register** | Tally's month-by-month list of one voucher type (Sales Register, Payment Register and so on) |
 | **Agst Ref** | Tally's "against reference": which invoice a payment or credit note settles |
 | **On Account** | Money entered in Tally without saying which invoice it is for |
 | **Connector** | The small RAMS program on the office PC that reads Tally |

@@ -7,10 +7,11 @@ import HelpLink from '../shared/HelpLink';
 export const selectCls = 'px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand/30';
 
 // The frame every Reports page shares: title, a line on what it shows, the
-// company filter (All = consolidated), a search box, extra filters, and a CSV
-// download.
+// company filter (All = consolidated, unless allCompanies is false: one
+// company at a time), a search box, extra filters (before the search box with
+// filtersFirst), and a CSV download.
 export default function ReportFrame({
-  title, help, intro, companies = [], companyId, onCompany, search, onSearch, searchHint, filters, onCsv, children,
+  title, help, intro, companies = [], companyId, onCompany, allCompanies = true, search, onSearch, searchHint, filters, filtersFirst = false, onCsv, children,
 }) {
   const [text, setText] = useState(search || '');
   return (
@@ -25,10 +26,11 @@ export default function ReportFrame({
       <div className="flex flex-wrap items-center gap-2 mb-3">
         {onCompany && (
           <select aria-label="Company" value={companyId} onChange={(e) => onCompany(e.target.value)} className={selectCls}>
-            <option value="">All companies (consolidated)</option>
+            {allCompanies && <option value="">All companies (consolidated)</option>}
             {companies.map((c) => <option key={c.id} value={c.id}>{c.code || c.name}</option>)}
           </select>
         )}
+        {filtersFirst && filters}
         {onSearch && (
           <form onSubmit={(e) => { e.preventDefault(); onSearch(text.trim()); }} className="relative">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -36,7 +38,7 @@ export default function ReportFrame({
               placeholder={searchHint} className="pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm w-64 max-w-full" />
           </form>
         )}
-        {filters}
+        {!filtersFirst && filters}
         {onCsv && (
           <Button size="sm" variant="outline" className="ml-auto" onClick={onCsv}><Download size={14} /> Download CSV</Button>
         )}

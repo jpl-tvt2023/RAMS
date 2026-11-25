@@ -46,10 +46,12 @@ function Field({ label, children }) {
 
 // Every bill-to-bill party with something for a person, in every company --
 // opened from the "Needs attention" button.
-function Attention({ rows, total, onOpen }) {
+function Attention({
+  rows, total, since, onOpen,
+}) {
   return (
     <section aria-label="Needs attention" className="mb-4">
-      <p className="text-xs text-gray-500 mb-2">Parties where something needs a person, since 8 June 2026. Click one to see it{total > rows.length ? ` (first ${rows.length} of ${total})` : ''}.</p>
+      <p className="text-xs text-gray-500 mb-2">Parties where something needs a person, since {since ? formatDay(since) : 'RAMS’s copy of Tally starts'}. Click one to see it{total > rows.length ? ` (first ${rows.length} of ${total})` : ''}.</p>
       <ReportTable head={['Party', 'Marketplace', 'What is off', 'Since']} maxHeight={LIST_HEIGHT}>
         {rows.map((a) => (
           <tr key={keyOf(a.party)} className="border-b border-gray-100 hover:bg-gray-50 align-top">
@@ -236,7 +238,7 @@ export default function PartyStatements() {
           </Button>
         </div>
       )}
-      {attentionOpen && attentionTotal > 0 && <Attention rows={p.attention} total={attentionTotal} onOpen={openAttention} />}
+      {attentionOpen && attentionTotal > 0 && <Attention rows={p.attention} total={attentionTotal} since={p.sync_from} onOpen={openAttention} />}
 
       {p && !ready && !soon && !noParty && (
         <p className="text-sm text-gray-500 bg-white rounded-xl border border-gray-200 px-4 py-6 text-center">Choose at least one state and one party.</p>

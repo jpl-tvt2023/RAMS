@@ -46,7 +46,7 @@ describe('POST /api/agent/heartbeat', () => {
       version: '0.2.0', tally: { reachable: true, educational: true }, companies: [on, off],
     });
     expect(res.status).toBe(200);
-    expect(res.body.settings.syncFrom).toBe('2026-06-08');
+    expect(res.body.settings.syncFrom).toBe('2026-04-01');
     expect(res.body.settings.schedule).toEqual(expect.objectContaining({ heavyAfter: expect.stringMatching(/^\d{2}:\d{2}$/) }));
     // Only matching asks for anything yet (tests/matching.test.js).
     expect(res.body.commands.every((c) => c.type === 'match')).toBe(true);

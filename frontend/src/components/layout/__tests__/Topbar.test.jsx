@@ -4,21 +4,21 @@ import userEvent from '@testing-library/user-event';
 import Topbar from '../Topbar';
 import { renderWithProviders, VIEWER } from '../../../test/renderWithProviders';
 
-// The top bar: Bills Receivable and Party Statements under Tally Reports, each by its
-// permission, and Purchase Reports greyed as coming soon.
+// The top bar: Bills Receivable, Party Statements and Attachments under Tally
+// Reports, each by its permission, and Purchase Reports greyed as coming soon.
 describe('Topbar', () => {
-  test('Tally Reports holds Bills Receivable and Party Statements', async () => {
+  test('Tally Reports holds Bills Receivable, Party Statements and Attachments', async () => {
     renderWithProviders(<Topbar />, { user: VIEWER });
     const user = userEvent.setup();
-    expect(screen.queryByRole('link', { name: /Party Statements|Ledgers/ })).not.toBeInTheDocument(); // only inside the menu
+    expect(screen.queryByRole('link', { name: /Party Statements|Ledgers|Attachments/ })).not.toBeInTheDocument(); // only inside the menu
     await user.click(screen.getByRole('button', { name: 'Tally Reports' }));
     const menu = screen.getByRole('menu');
-    expect(within(menu).getAllByRole('menuitem').map((m) => m.getAttribute('href'))).toEqual(['/reports/bills-receivable', '/reports/party-statements']);
-    expect(within(menu).getAllByRole('menuitem').map((m) => m.querySelector('span span').textContent)).toEqual(['Bills Receivable', 'Party Statements']);
+    expect(within(menu).getAllByRole('menuitem').map((m) => m.getAttribute('href'))).toEqual(['/reports/bills-receivable', '/reports/party-statements', '/reports/attachments']);
+    expect(within(menu).getAllByRole('menuitem').map((m) => m.querySelector('span span').textContent)).toEqual(['Bills Receivable', 'Party Statements', 'Attachments']);
   });
 
   test('each report shows only with its permission', async () => {
-    renderWithProviders(<Topbar />, { user: { ...VIEWER, permissions: VIEWER.permissions.filter((k) => k !== 'statements.view') } });
+    renderWithProviders(<Topbar />, { user: { ...VIEWER, permissions: VIEWER.permissions.filter((k) => k !== 'statements.view' && k !== 'attachments.view') } });
     await userEvent.setup().click(screen.getByRole('button', { name: 'Tally Reports' }));
     expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((m) => m.getAttribute('href'))).toEqual(['/reports/bills-receivable']);
   });

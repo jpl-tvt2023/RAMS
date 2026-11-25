@@ -14,8 +14,9 @@
 // ledger sits under in Tally (Sales Accounts, Duties & Taxes). The marketplace
 // is the linked PO's vendor, else the party ledger's mapping (Matching -> Party
 // ledgers), else its suggestion. Sales to our own registrations are stock
-// transfers and stay out of receivables.
-const { SYNC_FROM } = require('../config/env');
+// transfers and stay out of receivables. An invoice dated before MATCH_FROM
+// (ROMS go-live) is before_matching: it can never have a PO.
+const { SYNC_FROM, MATCH_FROM } = require('../config/env');
 const { todayIst } = require('../matching/load');
 
 const BUCKETS = [
@@ -215,6 +216,7 @@ async function loadBook(client, { today = todayIst() } = {}) {
       vendor_from: vendorFrom,
       internal,
       pos: pos.map((p) => p.po_id),
+      before_matching: v.date < MATCH_FROM,
       vendor_pos: [...new Set(pos.map((p) => String(p.vendor_po_id || '').trim()).filter(Boolean))],
       bills: names,
       total_paise: total,

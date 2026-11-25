@@ -22,7 +22,9 @@ async function migrate(db) {
 }
 
 // One RAMS per test file: { url, db, token, enable(guid), one(sql, args), all(sql, args), close() }.
-async function startRams({ name, syncFrom = '2026-04-01' }) {
+// The mock books start in April, so matching does too (RAMS's default is ROMS
+// go-live, 8 June).
+async function startRams({ name, syncFrom = '2026-04-01', matchFrom = syncFrom }) {
   const tmp = path.resolve(__dirname, '..', '.tmp');
   fs.mkdirSync(tmp, { recursive: true });
   const file = path.join(tmp, `${name}.db`);
@@ -36,6 +38,7 @@ async function startRams({ name, syncFrom = '2026-04-01' }) {
     JWT_ACCESS_SECRET: 'agent-tests-access',
     JWT_REFRESH_SECRET: 'agent-tests-refresh',
     RAMS_SYNC_FROM: syncFrom,
+    RAMS_MATCH_FROM: matchFrom,
     DOTENV_CONFIG_QUIET: 'true',
   });
   const app = require(path.join(BACKEND, 'app'));

@@ -26,6 +26,7 @@ const TITLES = [
   ['/reports/receivables', 'Receivables'],
   ['/reports/exceptions', 'Exceptions'],
   ['/reports/party-statements', 'Party Statements'],
+  ['/reports/attachments', 'Attachments'],
   ['/sync', 'Sync health'],
   ['/help', 'Help & FAQ'],
 ];

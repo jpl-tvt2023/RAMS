@@ -32,7 +32,7 @@ describe('GET /api/sync/status', () => {
       const { token } = await signIn(who);
       const res = await status(token);
       expect(res.status).toBe(200);
-      expect(res.body.sync_from).toBe('2026-06-08');
+      expect(res.body.sync_from).toBe('2026-04-01');
       expect(res.body.connector).toMatchObject({
         name: 'Status suite PC', version: '0.2.0', online: true,
         tally: { reachable: true, educational: true }, activity: { state: 'idle' }, last_error: null,

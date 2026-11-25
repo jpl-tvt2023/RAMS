@@ -10,8 +10,8 @@ const get = (token) => bearer(request(app).get('/api/settings/permissions'), tok
 const put = (token, roles) => bearer(request(app).put('/api/settings/permissions'), token).send({ roles });
 const DEFAULTS = {
   Accountant: ['matching.view', 'matching.run', 'matching.review', 'matching.rules', 'matching.parties', 'autofill.view', 'autofill.approve',
-    'reports.view', 'reports.settings', 'statements.view', 'statements.files', 'sync.run'],
-  Viewer: ['matching.view', 'autofill.view', 'reports.view', 'statements.view'],
+    'reports.view', 'reports.settings', 'statements.view', 'statements.files', 'attachments.view', 'sync.run'],
+  Viewer: ['matching.view', 'autofill.view', 'reports.view', 'statements.view', 'attachments.view'],
 };
 
 let admin;

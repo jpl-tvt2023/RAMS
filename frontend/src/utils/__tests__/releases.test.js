@@ -38,7 +38,7 @@ describe('screens held for later delivery', () => {
       }
     }
     expect(NAV.map((n) => n.label)).toContain('Matching');
-    expect(NAV.find((n) => n.label === 'Tally Reports').children.map((c) => c.label)).toEqual(['Bills Receivable', 'Party Statements']);
+    expect(NAV.find((n) => n.label === 'Tally Reports').children.map((c) => c.label)).toEqual(['Bills Receivable', 'Party Statements', 'Attachments']);
     expect(NAV.find((n) => n.label === 'Party Statements')).toBeUndefined(); // only under Tally Reports
     expect(NAV.find((n) => n.label === 'Purchase Reports')).toMatchObject({ comingSoon: true });
     expect(NAV.find((n) => n.label === 'Purchase Reports').path).toBeUndefined();

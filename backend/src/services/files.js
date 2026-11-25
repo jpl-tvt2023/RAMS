@@ -219,10 +219,10 @@ async function usage(client) {
                      GROUP BY kind`),
     // Where each file is: the Tally voucher, its party, and the party's
     // marketplace (as Party Statements decides it: the mapping, else the suggestion),
-    // so File storage can open it on Party Statements.
+    // so File storage can open it on Party Statements, or on Attachments by its type.
     rowsOf(client, `SELECT f.id, f.file_name, f.kind, f.company_id, f.voucher_guid, f.uploaded_at,
                            b.size, b.stored_size, u.name AS uploaded_by_name, c.code AS company,
-                           v.voucher_type, v.number AS voucher_number, v.date AS voucher_date, v.party AS voucher_party, vl.guid AS voucher_ledger,
+                           v.voucher_type, v.base_type AS voucher_base_type, v.number AS voucher_number, v.date AS voucher_date, v.party AS voucher_party, vl.guid AS voucher_ledger,
                            CASE WHEN vp.kind = 'vendor' THEN vp.vendor WHEN vp.kind IS NULL THEN vp.suggested_vendor END AS voucher_vendor
                       FROM voucher_files f JOIN file_blobs b ON b.id = f.blob_id
                       LEFT JOIN users u ON u.id = f.uploaded_by
@@ -259,7 +259,7 @@ async function usage(client) {
       company_id: Number(r.company_id),
       company: r.company ?? null,
       on: {
-        type: 'voucher', voucher_type: r.voucher_type ?? null, number: r.voucher_number ?? null, date: r.voucher_date ?? null, party: r.voucher_party ?? null, party_guid: r.voucher_ledger ?? null, vendor: r.voucher_vendor ?? null,
+        type: 'voucher', voucher_type: r.voucher_type ?? null, base_type: r.voucher_base_type ?? null, number: r.voucher_number ?? null, date: r.voucher_date ?? null, party: r.voucher_party ?? null, party_guid: r.voucher_ledger ?? null, vendor: r.voucher_vendor ?? null,
       },
     })),
   };

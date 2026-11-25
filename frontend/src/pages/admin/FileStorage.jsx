@@ -10,12 +10,14 @@ import { KIND_ICON } from '../../components/files/icons';
 import { getFileUsage } from '../../api/files.api';
 import { KINDS, sizeText } from '../../utils/files';
 import { openStatementsAt } from '../../utils/statementLinks';
+import { openAttachmentsAt, TAB_OF } from '../../utils/attachmentLinks';
 import { formatDay, formatDateTime } from '../../utils/formatters';
 
 // Admin -> File storage (Admin and Owner): how much space the files on
-// Party Statements take in RAMS's database, how much shrinking photos, compressing PDFs
-// and emails, and storing a file once saved, and the biggest files -- each
-// can be viewed, or opened on Party Statements where it is.
+// Tally vouchers (added on Party Statements and Attachments) take in RAMS's
+// database, how much shrinking photos, compressing PDFs and emails, and storing
+// a file once saved, and the biggest files -- each can be viewed, or opened on
+// Party Statements or Attachments where it is.
 
 function Tile({ label, value, detail }) {
   return (
@@ -49,6 +51,9 @@ export default function FileStorage() {
     });
     navigate('/reports/party-statements');
   };
+  const openOnAttachments = (f) => {
+    if (openAttachmentsAt({ companyId: f.company_id, baseType: f.on.base_type, date: f.on.date })) navigate('/reports/attachments');
+  };
 
   const savedShare = data?.picked_bytes ? Math.round((data.saved_bytes / data.picked_bytes) * 100) : 0;
 
@@ -60,7 +65,7 @@ export default function FileStorage() {
           <HelpLink section="file-storage" />
         </div>
         <p className="text-gray-500 text-sm mt-1">
-          The PDFs, photos and emails attached on Party Statements are kept in RAMS’s database. Photos are made smaller, PDFs and emails are compressed without losing anything, and a file attached to several rows is kept once.
+          The PDFs, photos and emails attached on Party Statements and Attachments are kept in RAMS’s database. Photos are made smaller, PDFs and emails are compressed without losing anything, and a file attached to several rows is kept once.
         </p>
       </div>
 
@@ -98,6 +103,7 @@ export default function FileStorage() {
             {data.biggest.map((f, i) => {
               const Icon = KIND_ICON[f.kind] || Paperclip;
               const canOpen = Boolean(f.on?.party_guid && f.on?.vendor);
+              const onAttachments = Boolean(TAB_OF[f.on?.base_type] && f.on?.date);
               return (
                 <tr key={f.id} className="border-b border-gray-100 align-top">
                   <td className={`${td} max-w-[18rem]`}>
@@ -117,13 +123,16 @@ export default function FileStorage() {
                     {canOpen && (
                       <button type="button" onClick={() => openOnStatements(f)} aria-label={`Open ${f.name} on Party Statements`} className="ml-3 text-sm text-brand hover:underline">Open on Party Statements</button>
                     )}
+                    {onAttachments && (
+                      <button type="button" onClick={() => openOnAttachments(f)} aria-label={`Open ${f.name} on Attachments`} className="ml-3 text-sm text-brand hover:underline">Open on Attachments</button>
+                    )}
                   </td>
                 </tr>
               );
             })}
           </ReportTable>
           <p className="text-xs text-gray-500 mt-3">
-            Your database plan’s storage limit is on the Turso dashboard; RAMS can’t read it from inside. To free space, remove files nobody needs on Party Statements.
+            Your database plan’s storage limit is on the Turso dashboard; RAMS can’t read it from inside. To free space, remove files nobody needs on Party Statements or Attachments.
             A file goes once no row uses it.
           </p>
         </>

@@ -132,7 +132,7 @@ describe('Choosing parties', () => {
     });
     expect(mine.find((p) => p.guid === 'LGZ1')).toMatchObject({ state: 'Maharashtra', state_differs: false });
     expect(body.attention.find((a) => a.party.guid === 'LGZ2' && a.party.company_id === company.id)).toMatchObject({ state_differs: true });
-    expect(body).toMatchObject({ sync_from: '2026-06-08', today: expect.any(String), month_start: expect.any(String) });
+    expect(body).toMatchObject({ sync_from: '2026-04-01', today: expect.any(String), month_start: expect.any(String) });
   });
 });
 
@@ -182,7 +182,7 @@ describe('The statement', () => {
     await refused(`company_id=${company.id}&vendor=Blinkit&states=all&parties=all`, /coming soon/);
     await refused(`company_id=${company.id}&vendor=Zepto&states=all`, /Choose a company, a marketplace, states and parties/);
     await refused(`${pick('LGZ1')}&from=2026-09-01&to=2026-08-01`, /on or before To/);
-    await refused(`${pick('LGZ1')}&from=2026-05-01&to=2026-08-01`, /before 2026-06-08/);
+    await refused(`${pick('LGZ1')}&from=2026-03-01&to=2026-08-01`, /before 2026-04-01/);
     await refused(`${pick('LGZ1')}&from=2026-08-01&to=2099-01-01`, /future/);
   });
 });
