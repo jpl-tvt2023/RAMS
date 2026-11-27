@@ -18,15 +18,15 @@ import { ATTACHMENTS_KEY as KEY, ATTACHMENTS_DEFAULTS as DEFAULTS } from '../../
 
 // Tally Reports -> Attachments (/reports/attachments): a company's invoices,
 // payments, debit and credit notes in a financial year, a tab each, the way
-// Tally's voucher registers show them -- month by month with Debit, Credit and
-// the running Closing balance, and how many need attention (no file, or no
-// narration where the narration check wants one). A month opens its vouchers:
+// Tally's voucher registers show them -- month by month with the Debit or
+// Credit, and how many need attention (no file, or no narration where the
+// narration check wants one). A month opens its vouchers:
 // number, ledger, city, amount, e-invoice, the invoice PDF and other files,
 // narration and the last change made in RAMS. It opens on the starred company
 // and this financial year. A month is loaded whole (a few hundred vouchers at
 // most), so "Needs attention only" and the search work without asking again.
 const STATIC_TABS = [
-  { key: 'invoice', label: 'Invoice' }, { key: 'payment', label: 'Payments' }, { key: 'dn', label: 'DN' }, { key: 'cn', label: 'CN' },
+  { key: 'invoice', label: 'Invoice' }, { key: 'payment', label: 'Payments' }, { key: 'dn', label: 'Debit Note' }, { key: 'cn', label: 'Credit Note' },
 ];
 const ALL = 10000;
 const matches = (q, r) => {

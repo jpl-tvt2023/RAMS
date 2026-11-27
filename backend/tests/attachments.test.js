@@ -120,33 +120,35 @@ afterAll(async () => {
 });
 
 describe('The months', () => {
-  test('each tab, month by month, as Tally’s register: count, Debit or Credit, and the running Closing', async () => {
+  test('each tab, month by month, as Tally’s register: count, and Debit or Credit', async () => {
     const { status, body } = await months(viewer.token);
     expect(status).toBe(200);
     expect(body).toMatchObject({ company_id: company.id, fy: 2026, fy_label: '2026-27', sync_from: '2026-04-01' });
-    expect(body.tabs.map((t) => [t.key, t.base_type, t.side])).toEqual([
-      ['invoice', 'Sales', 'credit'], ['payment', 'Payment', 'debit'], ['dn', 'Debit Note', 'credit'], ['cn', 'Credit Note', 'debit'],
+    expect(body.tabs.map((t) => [t.key, t.label, t.base_type, t.side])).toEqual([
+      ['invoice', 'Invoice', 'Sales', 'credit'], ['payment', 'Payments', 'Payment', 'debit'],
+      ['dn', 'Debit Note', 'Debit Note', 'credit'], ['cn', 'Credit Note', 'Credit Note', 'debit'],
     ]);
     const sales = tabOf(body, 'invoice');
     expect(sales.months.map((m) => m.month)).toEqual([
       '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12', '2027-01', '2027-02', '2027-03',
     ]);
-    // Credit, and the closing a credit (negative) balance -- Tally's Cr.
+    // Sales are on the register's Credit side.
     expect(monthOf(sales, '2026-04')).toMatchObject({
-      label: 'April 2026', in_copy: true, from: null, vouchers: 1, credit_paise: 100000, debit_paise: 0, closing_paise: -100000,
+      label: 'April 2026', in_copy: true, from: null, vouchers: 1, credit_paise: 100000, debit_paise: 0,
     });
-    expect(monthOf(sales, '2026-05')).toMatchObject({ vouchers: 1, credit_paise: 40000, closing_paise: -140000 });
-    expect(monthOf(sales, '2026-06')).toMatchObject({ vouchers: 0, credit_paise: 0, closing_paise: -140000 });
+    expect(monthOf(sales, '2026-05')).toMatchObject({ vouchers: 1, credit_paise: 40000 });
+    expect(monthOf(sales, '2026-06')).toMatchObject({ vouchers: 0, credit_paise: 0 });
     // Cancelled, optional and deleted vouchers aren't counted.
-    expect(monthOf(sales, '2026-07')).toMatchObject({ vouchers: 2, credit_paise: 250000, closing_paise: -390000 });
-    expect(sales.totals).toMatchObject({ vouchers: 4, credit_paise: 390000, debit_paise: 0, closing_paise: -390000 });
-    // A month still to come has no closing yet.
-    if (todayIst() < '2027-03-01') expect(monthOf(sales, '2027-03').closing_paise).toBeNull();
+    expect(monthOf(sales, '2026-07')).toMatchObject({ vouchers: 2, credit_paise: 250000 });
+    expect(sales.totals).toMatchObject({ vouchers: 4, credit_paise: 390000, debit_paise: 0 });
+    // No running Closing balance: the page doesn't show one.
+    expect(monthOf(sales, '2026-07')).not.toHaveProperty('closing_paise');
+    expect(sales.totals).not.toHaveProperty('closing_paise');
 
     // Payments and credit notes debit; debit notes credit. A receipt is on no tab.
-    expect(monthOf(tabOf(body, 'payment'), '2026-07')).toMatchObject({ vouchers: 1, debit_paise: 35000, closing_paise: 35000 });
-    expect(monthOf(tabOf(body, 'dn'), '2026-08')).toMatchObject({ vouchers: 1, credit_paise: 12000, closing_paise: -12000 });
-    expect(monthOf(tabOf(body, 'cn'), '2026-07')).toMatchObject({ vouchers: 1, debit_paise: 10000, closing_paise: 10000 });
+    expect(monthOf(tabOf(body, 'payment'), '2026-07')).toMatchObject({ vouchers: 1, debit_paise: 35000 });
+    expect(monthOf(tabOf(body, 'dn'), '2026-08')).toMatchObject({ vouchers: 1, credit_paise: 12000 });
+    expect(monthOf(tabOf(body, 'cn'), '2026-07')).toMatchObject({ vouchers: 1, debit_paise: 10000 });
     expect(body.tabs.reduce((a, t) => a + t.totals.vouchers, 0)).toBe(7);
   });
 

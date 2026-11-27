@@ -1,6 +1,6 @@
 # How RAMS works
 
-*Royal Mart Accounts (RAMS), explained without the technical words. Last updated 25 November 2026.*
+*Royal Mart Accounts (RAMS), explained without the technical words. Last updated 27 November 2026.*
 
 ---
 
@@ -286,17 +286,17 @@ Each party has two states: the one on its ledger in Tally, and the one its GSTIN
 |---|---|---|
 | Invoice | Sales | Credit |
 | Payments | Payment (money paid out) | Debit |
-| DN | Debit Note (our returns to suppliers) | Credit |
-| CN | Credit Note (including a marketplace's DN, which Tally books as a credit note) | Debit |
+| Debit Note | Debit Note (our returns to suppliers) | Credit |
+| Credit Note | Credit Note (including a marketplace's DN, which Tally books as a credit note) | Debit |
 
-**Each tab lists the months, April to March**, with: how many vouchers, how many **need attention**, the Debit or Credit, and the **Closing balance** (the running total from April, Cr or Dr). These are Tally's own figures: July's sales of MH on RAMS are **₹2,41,89,073.30**, August's ₹2,24,14,905.82 and September's ₹2,29,84,111.78, exactly as Tally's Sales Register shows them.
+**Each tab lists the months, April to March**, with: how many vouchers, how many **need attention**, and the Debit or Credit. These are Tally's own figures: July's sales of MH on RAMS are **₹2,41,89,073.30**, August's ₹2,24,14,905.82 and September's ₹2,29,84,111.78, exactly as Tally's Sales Register shows them.
 
 **A voucher needs attention** when it has no document attached, or no narration while the *Narration check* asks for one. Click a month's *Needs attention* number to see just those.
 
 **Click a month to see its vouchers**, in Tally's order:
 | Column | What it is |
 |---|---|
-| Invoice no (or Voucher, DN, CN no) | The Tally number and date |
+| Invoice no (or Voucher, Debit Note, Credit Note no) | The Tally number and date |
 | Ledger | The party. For a payment, who was paid (the ledger it debits), not the bank or cash it was paid from: in August, 135 of 243 MH payments show a different name from Tally's "party" this way |
 | City | From the ledger's address in Tally. No ledger has its City filled in yet, so for now it comes from the ROMS order the invoice is linked to, or the party's latest order (marked *from ROMS*): 269 of 284 July invoices have one. Fill in City on the ledgers in Tally and it shows everywhere |
 | Amount | The voucher's total |
@@ -307,7 +307,7 @@ Each party has two states: the one on its ledger in Tally, and the one its GSTIN
 
 A voucher **without a document is orange**, across the row, until one is added. Tick *Needs attention only* to see only what is left to do, search by number, ledger, city or Ack No, and download the list for Excel.
 
-**From 1 April.** RAMS's copy of Tally now starts on 1 April 2026, so every month of the year is there and the Closing matches Tally's. Matching still starts on 8 June (section 5).
+**From 1 April.** RAMS's copy of Tally now starts on 1 April 2026, so every month of the year is there, as in Tally's registers. Matching still starts on 8 June (section 5).
 
 **To decide together:**
 - **Sales narrations.** None of Tally's 1,175 MH sales invoices since 8 June has a narration, so every invoice counts as needing attention. Either the accountants add one, or an Admin takes Sales out of the *Narration check*. The check starts on 8 June today; move it to 1 April to cover the whole year.
