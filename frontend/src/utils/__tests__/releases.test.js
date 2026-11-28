@@ -40,8 +40,9 @@ describe('screens held for later delivery', () => {
     expect(NAV.map((n) => n.label)).toContain('Matching');
     expect(NAV.find((n) => n.label === 'Tally Reports').children.map((c) => c.label)).toEqual(['Bills Receivable', 'Party Statements', 'Attachments']);
     expect(NAV.find((n) => n.label === 'Party Statements')).toBeUndefined(); // only under Tally Reports
-    expect(NAV.find((n) => n.label === 'Purchase Reports')).toMatchObject({ comingSoon: true });
-    expect(NAV.find((n) => n.label === 'Purchase Reports').path).toBeUndefined();
+    expect(NAV.find((n) => n.label === 'Purchase Reports').children.map((c) => [c.label, c.path, c.permission]))
+      .toEqual([['Warehouse', '/purchases/warehouse', 'purchases.view'], ['Stitching', '/purchases/stitching', 'purchases.view']]);
+    expect(NAV.some((n) => n.comingSoon)).toBe(false);
   });
 
   test('a held screen has no Help section', () => {

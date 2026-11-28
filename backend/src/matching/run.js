@@ -7,6 +7,7 @@ const { loadInputs, todayIst } = require('./load');
 const { writeResults } = require('./write');
 const { planAutofill } = require('./autofill');
 const { refreshRoms } = require('../services/romsRefs');
+const { refreshPurchases } = require('../purchases/refresh');
 const { loadSettings } = require('../services/matchSettings');
 const { loadSettings: loadSyncSettings } = require('../services/syncSettings');
 
@@ -44,6 +45,10 @@ async function runMatching(client, { trigger, userId = null, roms, romsSettings,
       sql: `UPDATE match_runs SET status = 'ok', roms_ok = ?, roms_error = ?, counts = ?, ms = ?, finished_at = datetime('now') WHERE id = ?`,
       args: [refresh.ok ? 1 : 0, refresh.ok ? null : refresh.error, JSON.stringify(counts), Date.now() - started, runId],
     });
+    // Purchase Reports reads ROMS's receipts and challans on the same beat, so
+    // its pages open on a fresh copy. It never fails the run: an older ROMS
+    // that doesn't send purchases only leaves a note on those pages.
+    if (refresh.ok) await refreshPurchases(client, { roms, settings: romsSettings });
     return { run_id: runId, counts, roms: { ok: refresh.ok, connected: refresh.connected, error: refresh.ok ? null : refresh.error }, ms: Date.now() - started };
   } catch (e) {
     await client.execute({

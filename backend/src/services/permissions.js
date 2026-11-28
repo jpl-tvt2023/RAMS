@@ -7,8 +7,10 @@
 // (allowRoles), so no role can be granted the power to promote itself.
 const { ADMIN_ROLES } = require('../middleware/rbac');
 
-// The roles an Admin or Owner sets permissions for (migration 010's CHECK).
-const GRANTABLE_ROLES = ['Accountant', 'Viewer'];
+// The roles an Admin or Owner sets permissions for (role_permissions' CHECK,
+// migration 022). The two heads are add-on roles: a person holds one alongside
+// Accountant or Viewer, and gets the union of what their roles hold.
+const GRANTABLE_ROLES = ['Accountant', 'Viewer', 'Purchase Head', 'Accountant Head'];
 
 const CATALOG = [
   {
@@ -70,6 +72,22 @@ const CATALOG = [
   {
     key: 'attachments.view', area: 'Attachments', label: 'See Attachments',
     description: 'Tally Reports → Attachments: each month\'s invoices, payments, debit and credit notes, with their files, e-invoice and narration',
+  },
+  {
+    key: 'purchases.view', area: 'Purchase Reports', label: 'See Purchase Reports',
+    description: 'Purchase Reports → Warehouse and Stitching: each ROMS receipt and challan, its files, bill check and approvals',
+  },
+  {
+    key: 'purchases.check', area: 'Purchase Reports', label: 'Bill check',
+    description: 'Attach the bill or challan copy and save the bill check, which sends the record to the Purchase Head',
+  },
+  {
+    key: 'purchases.approve_purchase', area: 'Purchase Reports', label: 'Approve as Purchase Head',
+    description: 'Approve a checked record (it goes on to the Accountant Head), or send it back with a reason',
+  },
+  {
+    key: 'purchases.approve_accounts', area: 'Purchase Reports', label: 'Approve as Accountant Head',
+    description: 'Give the final approval after the Purchase Head, or send the record back with a reason',
   },
   {
     key: 'sync.companies', area: 'Tally sync', label: 'Turn company sync on or off',

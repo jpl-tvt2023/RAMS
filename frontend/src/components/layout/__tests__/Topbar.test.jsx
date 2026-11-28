@@ -23,19 +23,23 @@ describe('Topbar', () => {
     expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((m) => m.getAttribute('href'))).toEqual(['/reports/bills-receivable']);
   });
 
-  test('Purchase Reports is greyed, says Coming soon, and is not a link', () => {
+  test('Purchase Reports opens Warehouse and Stitching, for whoever may see them', async () => {
     renderWithProviders(<Topbar />, { user: VIEWER });
-    const soon = screen.getByTitle('Purchase Reports: coming soon');
-    expect(soon).toHaveAttribute('aria-disabled', 'true');
-    expect(soon).toHaveTextContent('Purchase ReportsComing soon');
-    expect(screen.queryByRole('link', { name: /Purchase Reports/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Purchase Reports/ })).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Purchase Reports: coming soon')).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Purchase Reports' }));
+    expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((m) => m.getAttribute('href'))).toEqual(['/purchases/warehouse', '/purchases/stitching']);
+  });
+
+  test('without purchases.view there is no Purchase Reports', () => {
+    renderWithProviders(<Topbar />, { user: { ...VIEWER, permissions: VIEWER.permissions.filter((k) => k !== 'purchases.view') } });
+    expect(screen.queryByRole('button', { name: 'Purchase Reports' })).not.toBeInTheDocument();
   });
 
   test('the mobile menu shows the same', async () => {
     renderWithProviders(<Topbar />, { user: VIEWER });
     await userEvent.setup().click(screen.getByRole('button', { name: 'Open menu' }));
-    expect(screen.getAllByTitle('Purchase Reports: coming soon')).toHaveLength(2);
+    expect(screen.getAllByText('Purchase Reports').length).toBeGreaterThan(1);
+    expect(screen.getAllByRole('link', { name: 'Warehouse' })).toHaveLength(1);
     expect(screen.getAllByText('Tally Reports').length).toBeGreaterThan(1);
     expect(screen.getAllByRole('link', { name: 'Party Statements' })).toHaveLength(1);
     expect(screen.getAllByRole('link', { name: 'Bills Receivable' })).toHaveLength(1);

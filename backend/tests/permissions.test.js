@@ -10,8 +10,11 @@ const get = (token) => bearer(request(app).get('/api/settings/permissions'), tok
 const put = (token, roles) => bearer(request(app).put('/api/settings/permissions'), token).send({ roles });
 const DEFAULTS = {
   Accountant: ['matching.view', 'matching.run', 'matching.review', 'matching.rules', 'matching.parties', 'autofill.view', 'autofill.approve',
-    'reports.view', 'reports.settings', 'statements.view', 'statements.files', 'attachments.view', 'sync.run'],
-  Viewer: ['matching.view', 'autofill.view', 'reports.view', 'statements.view', 'attachments.view'],
+    'reports.view', 'reports.settings', 'statements.view', 'statements.files', 'attachments.view', 'purchases.view', 'purchases.check', 'sync.run'],
+  Viewer: ['matching.view', 'autofill.view', 'reports.view', 'statements.view', 'attachments.view', 'purchases.view'],
+  // Add-on roles (migration 022): each sees Purchase Reports and holds its own step.
+  'Purchase Head': ['purchases.view', 'purchases.approve_purchase'],
+  'Accountant Head': ['purchases.view', 'purchases.approve_accounts'],
 };
 
 let admin;
@@ -24,7 +27,7 @@ describe('roles & permissions', () => {
     const res = await get(admin.token);
     expect(res.status).toBe(200);
     expect(res.body.matrix).toEqual(DEFAULTS);
-    expect(res.body.roles).toEqual(['Accountant', 'Viewer']);
+    expect(res.body.roles).toEqual(['Accountant', 'Viewer', 'Purchase Head', 'Accountant Head']);
     expect(res.body.catalog.map((p) => p.key)).toEqual(CATALOG.map((p) => p.key));
 
     for (const [who, expected] of [
@@ -115,9 +118,18 @@ describe('roles & permissions', () => {
     for (const k of KEYS) expect(used.has(k)).toBe(true);
   });
 
-  test("migration 010's CHECK lists exactly the grantable roles", () => {
-    const sql = fs.readFileSync(path.resolve(__dirname, '../src/migrations/010_create_role_permissions.sql'), 'utf8');
-    const inList = /CHECK \(role IN \(([^)]*)\)\)/.exec(sql)[1];
-    expect(inList.split(',').map((s) => s.trim().replace(/'/g, ''))).toEqual(['Accountant', 'Viewer']);
+  test("role_permissions' CHECK lists exactly the grantable roles (migration 022)", () => {
+    const sql = fs.readFileSync(path.resolve(__dirname, '../src/migrations/022_purchase_reports.sql'), 'utf8');
+    const table = sql.slice(sql.indexOf('CREATE TABLE role_permissions_new'));
+    const inList = /CHECK \(role IN \(([^)]*)\)\)/.exec(table)[1];
+    expect(inList.split(',').map((s) => s.trim().replace(/'/g, ''))).toEqual(['Accountant', 'Viewer', 'Purchase Head', 'Accountant Head']);
+  });
+
+  test('a person holding two roles gets what both hold', async () => {
+    const { permissionsOf } = require('../src/services/permissions');
+    const both = await permissionsOf(db, ['Accountant', 'Accountant Head']);
+    expect(both).toEqual(CATALOG.map((p) => p.key).filter((k) => DEFAULTS.Accountant.includes(k) || DEFAULTS['Accountant Head'].includes(k)));
+    expect(both).toContain('purchases.approve_accounts');
+    expect(both).not.toContain('purchases.approve_purchase');
   });
 });

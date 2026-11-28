@@ -125,7 +125,7 @@ export default function FileViewer({ files, start = 0, onClose }) {
   useEffect(() => {
     if (!file || file.kind === 'email' || requested.current.has(file.id)) return;
     requested.current.add(file.id);
-    fetchFile(file.id)
+    fetchFile(file.id, file.store)
       .then((blob) => {
         const url = file.kind === 'image' ? URL.createObjectURL(blob) : null;
         if (url) urls.current.push(url);
@@ -158,7 +158,7 @@ export default function FileViewer({ files, start = 0, onClose }) {
   const download = async () => {
     setBusy(true);
     try {
-      saveBlob(file.name, got?.blob || await fetchFile(file.id));
+      saveBlob(file.name, got?.blob || await fetchFile(file.id, file.store));
     } catch (err) {
       setLoaded((m) => ({ ...m, [file.id]: { ...m[file.id], error: reasonOf(err) } }));
     } finally { setBusy(false); }

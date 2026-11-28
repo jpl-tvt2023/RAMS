@@ -4,16 +4,21 @@ import api from './axios';
 // photos and emails on a Tally voucher. Adding and removing is statements.files;
 // seeing and downloading is statements.view or reports.view (Bills Receivable shows an
 // invoice's files); the storage figures are Admin and Owner only.
+//
+// Files on a Purchase Reports record (controllers/purchases.controller.js) use
+// the same store: their target is { purchaseRecordId }, and each such file
+// carries store: 'purchase', which fetchFile and deleteFile follow.
+const base = (store) => (store === 'purchase' ? '/purchases/files' : '/files');
 
 // The file goes as the request body, after utils/files.js prepared it
 // (gzip when `gzip`). -> { id, name, kind, size, uploaded_by_name, uploaded_at, stored_once }
 export async function uploadFile({
-  companyId, voucherGuid, name, blob, gzip, originalSize,
+  companyId, voucherGuid, purchaseRecordId, name, blob, gzip, originalSize,
 }, onProgress) {
-  const { data } = await api.post('/files', blob, {
+  const purchase = purchaseRecordId != null;
+  const { data } = await api.post(purchase ? `/purchases/records/${purchaseRecordId}/files` : '/files', blob, {
     params: {
-      company_id: companyId,
-      voucher_guid: voucherGuid,
+      ...(purchase ? {} : { company_id: companyId, voucher_guid: voucherGuid }),
       name,
       gzip: gzip ? 1 : undefined,
       original_size: originalSize || undefined,
@@ -21,18 +26,18 @@ export async function uploadFile({
     headers: { 'Content-Type': 'application/octet-stream' },
     onUploadProgress: onProgress ? (e) => onProgress(e.total ? e.loaded / e.total : 0) : undefined,
   });
-  return data;
+  return purchase ? { ...data, store: 'purchase' } : data;
 }
 
 // The file as a Blob: a PDF or email exactly as it was picked, or the shrunk
 // photo. (A plain link can't send the sign-in token, so it comes this way.)
-export async function fetchFile(id) {
-  const { data } = await api.get(`/files/${id}`, { responseType: 'blob' });
+export async function fetchFile(id, store) {
+  const { data } = await api.get(`${base(store)}/${id}`, { responseType: 'blob' });
   return data;
 }
 
-export async function deleteFile(id) {
-  const { data } = await api.delete(`/files/${id}`);
+export async function deleteFile(id, store) {
+  const { data } = await api.delete(`${base(store)}/${id}`);
   return data;
 }
 

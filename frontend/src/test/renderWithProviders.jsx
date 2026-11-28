@@ -27,8 +27,15 @@ export const ADMIN = { id: 1, name: 'Keshav', username: 'admin', roles: ['Admin'
 export const ACCOUNTANT = {
   id: 3, name: 'Asha', username: 'asha', roles: ['Accountant'],
   permissions: ['matching.view', 'matching.run', 'matching.review', 'matching.rules', 'matching.parties', 'autofill.view', 'autofill.approve',
-    'reports.view', 'reports.settings', 'statements.view', 'statements.files', 'attachments.view', 'sync.run'],
+    'reports.view', 'reports.settings', 'statements.view', 'statements.files', 'attachments.view', 'purchases.view', 'purchases.check', 'sync.run'],
 };
 export const VIEWER = {
-  id: 4, name: 'Vik', username: 'vik', roles: ['Viewer'], permissions: ['matching.view', 'autofill.view', 'reports.view', 'statements.view', 'attachments.view'],
+  id: 4, name: 'Vik', username: 'vik', roles: ['Viewer'], permissions: ['matching.view', 'autofill.view', 'reports.view', 'statements.view', 'attachments.view', 'purchases.view'],
+};
+// The two add-on heads (migration 022), as Viewer + Purchase Head and Accountant + Accountant Head.
+export const PURCHASE_HEAD = {
+  id: 6, name: 'Pia', username: 'pia', roles: ['Viewer', 'Purchase Head'], permissions: [...VIEWER.permissions, 'purchases.approve_purchase'],
+};
+export const ACCOUNTANT_HEAD = {
+  id: 7, name: 'Asha Head', username: 'ashah', roles: ['Accountant', 'Accountant Head'], permissions: [...ACCOUNTANT.permissions, 'purchases.approve_accounts'],
 };

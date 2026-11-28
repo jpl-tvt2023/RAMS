@@ -162,5 +162,5 @@ async function usage(req, res, next) {
 }
 
 module.exports = {
-  upload, download, remove, usage, cleanName, disposition,
+  upload, download, remove, usage, cleanName, disposition, pickedSize,
 };
