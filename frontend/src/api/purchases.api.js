@@ -18,6 +18,8 @@ import api from './axios';
 //           lines: [{ key, incoming, date, billing, po, article, rate, qty, uom, from_stage, to_stage, removed? }] (one),
 //           files, check: { by, name, at, note }, draft_note (kept by a recall), purchase_approval, accounts_approval,
 //           sent_back: { name, at, step, reason }, changed: { at, changes }, last_change }
+//   status is the line's queue: to_check, with_purchase_head, with_accounts_head,
+//   approved (or removed, listed only under All). sent_back and changed are notes.
 export async function getPurchaseRecords(page, params) {
   const { data } = await api.get(`/purchases/${page}/records`, { params });
   return data;

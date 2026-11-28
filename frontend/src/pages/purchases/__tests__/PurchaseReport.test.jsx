@@ -7,6 +7,7 @@ import {
 } from '../../../test/renderWithProviders';
 import * as purchases from '../../../api/purchases.api';
 import * as filesApi from '../../../api/files.api';
+import toast from 'react-hot-toast';
 import { saveBlob } from '../../../utils/saveBlob';
 import { currentMonthIst } from '../../../utils/formatters';
 
@@ -44,11 +45,13 @@ const ROWS = [
   one(4, 'IN-3', {
     status: 'approved', check: { name: 'Asha', at: '2026-11-20 05:00:00' }, purchase_approval: { name: 'Pia', at: '2026-11-21 05:00:00' }, accounts_approval: { name: 'Ravi', at: '2026-11-22 05:00:00' },
   }),
-  one(5, 'IN-4', { status: 'sent_back', check: { name: 'Asha', at: '2026-11-20 05:00:00' }, sent_back: { name: 'Pia', at: '2026-11-21 05:00:00', step: 'purchase', reason: 'Rate is 20 on the bill' } }),
+  // Sent back by the Purchase Head: in the checker's queue, red.
+  one(5, 'IN-4', { status: 'to_check', check: { name: 'Asha', at: '2026-11-20 05:00:00' }, sent_back: { name: 'Pia', at: '2026-11-21 05:00:00', step: 'purchase', reason: 'Rate is 20 on the bill' } }),
 ];
+const BILL = [{ id: 41, name: 'bill.pdf', kind: 'pdf', size: 900 }];
 const answer = (rows = ROWS, over = {}) => ({
   rows, total: rows.length, page: 1, page_size: 50,
-  counts: { to_check: 2, with_purchase_head: 1, with_accounts_head: 0, sent_back: 1, changed: 0, approved: 1, removed: 0, all: 5 },
+  counts: { to_check: 3, with_purchase_head: 1, with_accounts_head: 0, approved: 1, removed: 0, all: 5 },
   companies: [{ id: 2, name: 'Roymax' }], fy: 2026, fy_label: '2026-27', years: [{ fy: 2026, label: '2026-27' }, { fy: 2025, label: '2025-26' }],
   months: ['2026-11', '2026-10', '2026-09'], today: '2026-11-28', roms: { connected: true, read_at: '2026-11-28 05:00:00', error: null }, ...over,
 });
@@ -70,6 +73,10 @@ describe('Purchase Reports', () => {
     expect(lastParams().fy).toBeUndefined();
     expect(screen.getByRole('combobox', { name: 'Financial year' })).toHaveValue('2026');
     expect(screen.getByRole('combobox', { name: 'Month' })).toHaveValue(currentMonthIst());
+    // Five tabs: the four queues, then All.
+    expect(within(screen.getByRole('tablist', { name: 'Status' })).getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      'To check (3)', 'With Purchase Head (1)', 'With Accountant Head (0)', 'Approved (1)', 'All (5)',
+    ]);
 
     // Two ROMS lines, one delivery: its Incoming No spans both rows; each line has its own cells.
     expect(screen.getByText('01/july').closest('td')).toHaveAttribute('rowspan', '2');
@@ -139,14 +146,15 @@ describe('Purchase Reports', () => {
   });
 
   test('the checker: one popup to upload the bill and save the check, on the ticked lines of the delivery', async () => {
-    purchases.getPurchaseRecord.mockResolvedValue({
-      ...ROWS[0],
-      delivery_lines: [
-        { id: 1, status: 'to_check', article: 'Socks', billing: '121', po: '002', qty: 103, uom: 'pcs', rate: 19.75, files: 0 },
-        { id: 2, status: 'to_check', article: 'Socks - Black', billing: '121', po: '002', qty: 57, uom: 'pcs', rate: 19.75, files: 0 },
-        { id: 7, status: 'with_purchase_head', article: 'Socks - Grey', billing: '121', po: '002', qty: 9, uom: 'pcs', rate: 19.75, files: 1 },
-      ],
-    });
+    const delivery = (files) => [
+      { id: 1, status: 'to_check', article: 'Socks', billing: '121', po: '002', qty: 103, uom: 'pcs', rate: 19.75, files },
+      { id: 2, status: 'to_check', article: 'Socks - Black', billing: '121', po: '002', qty: 57, uom: 'pcs', rate: 19.75, files },
+      { id: 7, status: 'with_purchase_head', article: 'Socks - Grey', billing: '121', po: '002', qty: 9, uom: 'pcs', rate: 19.75, files: 1 },
+    ];
+    // Before the upload, then after it (the popup reads the record again).
+    purchases.getPurchaseRecord
+      .mockResolvedValueOnce({ ...ROWS[0], delivery_lines: delivery(0) })
+      .mockResolvedValue({ ...ROWS[0], files: [{ id: 30, name: 'bill-121.pdf', kind: 'pdf', size: 17 }], delivery_lines: delivery(1) });
     filesApi.uploadFile.mockImplementation(async ({ name }) => ({ id: 30, name, also: { added: [{ record_id: 2, id: 31 }], skipped: [] } }));
     purchases.saveBillChecks.mockResolvedValue({ checked: 2, skipped: [] });
     const u = userEvent.setup();
@@ -168,6 +176,9 @@ describe('Purchase Reports', () => {
     expect(within(dialog).getByRole('checkbox', { name: 'This line (always included)' })).toBeDisabled();
     expect(within(dialog).getByRole('checkbox', { name: 'Include Socks - Grey (9 pcs)' })).toBeDisabled(); // with the Purchase Head already
     await u.click(within(dialog).getByRole('checkbox', { name: 'Include Socks - Black (57 pcs)' }));
+    // No bill yet: nothing can be sent.
+    expect(within(dialog).getByRole('button', { name: 'Send 2 lines for approval' })).toBeDisabled();
+    expect(within(dialog).getByText(/2 of the ticked lines have no bill yet/)).toBeInTheDocument();
 
     const pdf = new File(['%PDF-1.4 the bill'], 'bill-121.pdf', { type: 'application/pdf' });
     await u.upload(within(dialog).getByLabelText('Choose files to add'), pdf);
@@ -175,12 +186,15 @@ describe('Purchase Reports', () => {
     expect(filesApi.uploadFile.mock.calls[0][0]).toMatchObject({ purchaseRecordId: 1, also: [2], name: 'bill-121.pdf' });
 
     await u.type(within(dialog).getByLabelText('Note (optional)'), 'Matches the PO');
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Send 2 lines for approval' })).toBeEnabled());
+    expect(within(dialog).queryByText(/no bill yet/)).not.toBeInTheDocument();
     await u.click(within(dialog).getByRole('button', { name: 'Send 2 lines for approval' }));
     expect(purchases.saveBillChecks).toHaveBeenCalledWith([1, 2], 'Matches the PO');
   });
 
-  test('the checker ticks lines and sends them together, warned of those without a bill; a sent line can be recalled', async () => {
-    purchases.saveBillChecks.mockResolvedValue({ checked: 2, skipped: [] });
+  test('the checker ticks lines and sends together only those with a bill; a sent line can be recalled', async () => {
+    purchases.getPurchaseRecords.mockResolvedValue(answer([{ ...ROWS[0], files: BILL }, ...ROWS.slice(1)]));
+    purchases.saveBillChecks.mockResolvedValue({ checked: 1, skipped: [] });
     purchases.recallPurchaseRecords.mockResolvedValue({ recalled: 1, skipped: [] });
     const u = userEvent.setup();
     renderWithProviders(<PurchaseReport page="warehouse" />, { user: ACCOUNTANT });
@@ -188,11 +202,12 @@ describe('Purchase Reports', () => {
     // Ticks only on lines the checker can act on: not the approved one.
     expect(within(rowOf('IN-3')).queryByRole('checkbox')).not.toBeInTheDocument();
     await u.click(screen.getByRole('checkbox', { name: 'Select all 2 lines of Incoming 01/july (Shree Socks)' }));
-    await u.click(screen.getByRole('button', { name: 'Send 2 for approval' }));
-    const send = screen.getByRole('dialog', { name: 'Send 2 lines for approval?' });
-    expect(within(send).getByText(/None of them has a bill attached\./)).toBeInTheDocument();
+    // The second line has no bill: it is never sent.
+    expect(screen.getByText('1 ticked line has no bill, so it can’t be sent. Attach it first.')).toBeInTheDocument();
+    await u.click(screen.getByRole('button', { name: 'Send 1 for approval' }));
+    const send = screen.getByRole('dialog', { name: 'Send this line for approval?' });
     await u.click(within(send).getByRole('button', { name: 'Send for approval' }));
-    await waitFor(() => expect(purchases.saveBillChecks).toHaveBeenCalledWith([1, 2], ''));
+    await waitFor(() => expect(purchases.saveBillChecks).toHaveBeenCalledWith([1], ''));
 
     await u.click(within(rowOf('IN-2')).getByRole('button', { name: /^Recall: / }));
     const recall = screen.getByRole('dialog', { name: 'Recall this line?' });
@@ -219,9 +234,40 @@ describe('Purchase Reports', () => {
     const dialog = screen.getByRole('dialog', { name: /^Send back — Incoming IN-2/ });
     const send = within(dialog).getByRole('button', { name: 'Send back as Purchase Head' });
     expect(send).toBeDisabled();
+    expect(within(dialog).getByText(/^It goes back to the checker \(Asha\) with your reason/)).toBeInTheDocument();
     await u.type(within(dialog).getByLabelText('Why? (required)'), 'Wrong bill attached');
     await u.click(send);
     expect(purchases.sendBackPurchaseRecord).toHaveBeenCalledWith('purchase', 3, 'Wrong bill attached');
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Sent back to the checker'));
+  });
+
+  test('a line the Accountant Head sent back is red with the Purchase Head, who approves it again; the checker can\'t recall it', async () => {
+    purchases.getPurchaseRecords.mockResolvedValue(answer([one(3, 'IN-2', {
+      status: 'with_purchase_head', files: BILL, check: { name: 'Asha', at: '2026-11-20 05:00:00' },
+      sent_back: { name: 'Ravi', at: '2026-11-22 05:00:00', step: 'accounts', reason: 'Paid twice' },
+    })]));
+    renderWithProviders(<PurchaseReport page="warehouse" />, { user: PURCHASE_HEAD });
+    await screen.findByText('IN-2');
+    expect(rowOf('IN-2').className).toMatch(/bg-red-50/);
+    expect(within(rowOf('IN-2')).getByText('Sent back by Ravi (Accountant Head): Paid twice')).toBeInTheDocument();
+    expect(within(rowOf('IN-2')).getByText('Pending approval')).toBeInTheDocument();
+    expect(within(rowOf('IN-2')).getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+  });
+
+  test('a line changed in ROMS is To check with a note; a saved Sent back tab opens on the person\'s own', async () => {
+    sessionStorage.setItem(`rams:purchases-warehouse-${ACCOUNTANT.id}:v1`, JSON.stringify({
+      company_id: '', fy: '', month: '', status: 'sent_back', q: '',
+    }));
+    purchases.getPurchaseRecords.mockResolvedValue(answer([one(8, 'IN-8', {
+      status: 'to_check', files: BILL, check: { name: 'Asha', at: '2026-11-20 05:00:00' },
+      changed: { at: '2026-11-24 05:00:00', changes: [{ field: 'Socks, PO 002: Qty', old: '103', new: '100' }] },
+    })]));
+    renderWithProviders(<PurchaseReport page="warehouse" />, { user: ACCOUNTANT });
+    await screen.findByText('IN-8');
+    expect(lastParams()).toMatchObject({ status: 'to_check' });
+    expect(screen.getByRole('tab', { name: /^To check/ })).toHaveAttribute('aria-selected', 'true');
+    expect(within(rowOf('IN-8')).getByText('Changes were made in ROMS: Socks, PO 002: Qty: 103 → 100')).toBeInTheDocument();
+    expect(rowOf('IN-8').className).not.toMatch(/bg-(green|red)-50/);
   });
 
   test('a head can change their mind: Send back under their green approval, even once the line is approved', async () => {
@@ -234,7 +280,7 @@ describe('Purchase Reports', () => {
     expect(approved.getAllByRole('button', { name: /^Send back after approving/ })).toHaveLength(1);
     await u.click(approved.getByRole('button', { name: /^Send back after approving/ }));
     const dialog = screen.getByRole('dialog', { name: /^Send back — Incoming IN-3/ });
-    expect(within(dialog).getByText('This line is approved. Sending it back clears both approvals and returns it to the checker.')).toBeInTheDocument();
+    expect(within(dialog).getByText('This line is approved. Sending it back clears both approvals and returns it to the Purchase Head.')).toBeInTheDocument();
     await u.type(within(dialog).getByLabelText('Why? (required)'), 'Paid twice');
     await u.click(within(dialog).getByRole('button', { name: 'Send back as Accountant Head' }));
     expect(purchases.sendBackPurchaseRecord).toHaveBeenCalledWith('accounts', 4, 'Paid twice');
@@ -243,9 +289,9 @@ describe('Purchase Reports', () => {
   test('ticked lines are approved together, and one tick takes a whole delivery', async () => {
     const d5 = { key: 'inc:warehouse:6:IN-5', at: '2026-09-08 06:00:00', label: 'Incoming IN-5 (Shree Socks)' };
     purchases.getPurchaseRecords.mockResolvedValue(answer([
-      one(3, 'IN-2', { status: 'with_purchase_head' }),
-      rec({ id: 5, status: 'with_purchase_head', incoming: 'IN-5', delivery: d5, label: 'Incoming IN-5 (Shree Socks) — Socks', lines: [line({ key: 'r5', incoming: 'IN-5' })] }),
-      rec({ id: 6, status: 'with_purchase_head', incoming: 'IN-5', delivery: d5, label: 'Incoming IN-5 (Shree Socks) — Socks - Black', lines: [line({ key: 'r6', incoming: 'IN-5', article: 'Socks - Black' })] }),
+      one(3, 'IN-2', { status: 'with_purchase_head', files: BILL }),
+      rec({ id: 5, status: 'with_purchase_head', files: BILL, incoming: 'IN-5', delivery: d5, label: 'Incoming IN-5 (Shree Socks) — Socks', lines: [line({ key: 'r5', incoming: 'IN-5' })] }),
+      rec({ id: 6, status: 'with_purchase_head', files: BILL, incoming: 'IN-5', delivery: d5, label: 'Incoming IN-5 (Shree Socks) — Socks - Black', lines: [line({ key: 'r6', incoming: 'IN-5', article: 'Socks - Black' })] }),
     ]));
     purchases.approvePurchaseRecords.mockResolvedValue({ approved: 2, skipped: [] });
     const u = userEvent.setup();
@@ -263,7 +309,7 @@ describe('Purchase Reports', () => {
       id: 9, kind: 'challan', status: 'with_accounts_head', incoming: 'PCL151', party: 'Mahakali creation', label: 'Challan 003 from Mahakali creation — Handkerchief',
       delivery: { key: 'chal:9', at: '2026-09-30 06:00:00', label: 'Challan 003 from Mahakali creation' },
       lines: [line({ key: 'c1', billing: '003', from_stage: 'Stitching', to_stage: 'Warehouse', qty: 1700, uom: 'dz', rate: 11 })],
-      purchase_approval: { name: 'Pia', at: '2026-11-21 05:00:00' },
+      purchase_approval: { name: 'Pia', at: '2026-11-21 05:00:00' }, files: BILL,
     })]));
     renderWithProviders(<PurchaseReport page="stitching" />, { user: ACCOUNTANT_HEAD });
     expect(await screen.findByText('Stitching → Warehouse')).toBeInTheDocument();

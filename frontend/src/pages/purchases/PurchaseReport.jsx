@@ -18,7 +18,7 @@ import { PERM } from '../../utils/roles';
 import { formatDate, formatDateTime, currentMonthIst } from '../../utils/formatters';
 import { downloadTable } from '../../utils/download';
 import {
-  STATUSES, statusOf, defaultStatus, stepOf, HEAD_OF, approvalOf, purchasesKey, notesOf, maySend, mayApprove, mayRecall,
+  QUEUES, isTab, statusOf, defaultStatus, stepOf, HEAD_OF, SENT_BACK_TO, approvalOf, purchasesKey, notesOf, mayAttach, maySend, mayApprove, mayRecall,
 } from '../../utils/purchaseText';
 
 // Purchase Reports -> Warehouse (/purchases/warehouse) and Stitching
@@ -32,9 +32,12 @@ import {
 // ticked and sent together (the user, 2026-11-29). The Purchase Head approves,
 // then the Accountant Head, each in a column of their own. A head can send it
 // back with a reason, even after approving it; whoever sent it on can recall
-// it until the next person acts. The page opens on this financial year and
-// month. RAMS reads ROMS when the page opens (if its copy is more than a few
-// minutes old) and on Refresh.
+// it until the next person acts. Five tabs (the user, 2026-11-29): To check,
+// With Purchase Head, With Accountant Head, Approved, All -- a line sent back
+// goes to the queue before the head, a line changed in ROMS back To check, and
+// a line never goes on without a bill. The page opens on this financial year
+// and month. RAMS reads ROMS when the page opens (if its copy is more than a
+// few minutes old) and on Refresh.
 const PAGES = {
   warehouse: {
     title: 'Warehouse',
@@ -68,16 +71,18 @@ export default function PurchaseReport({ page }) {
   };
   // Per person: whoever signs in next on this tab opens on their own step.
   // The year '' is the current one; the month opens on this month.
-  const [pick, setPick] = useSessionState(purchasesKey(page, user), () => ({
+  const [saved, setPick] = useSessionState(purchasesKey(page, user), () => ({
     company_id: '', fy: '', month: currentMonthIst(), status: defaultStatus(user, can, PERM), q: '',
   }));
+  // A tab saved before the five queues (Sent back, Changed in ROMS) opens on the person's own.
+  const pick = isTab(saved.status) ? saved : { ...saved, status: defaultStatus(user, can, PERM) };
   const [pageNo, setPageNo] = useState(1);
   const [pageSize, setPageSize] = useState(() => loadPersistedPageSize('purchases', 50));
   const [selected, setSelected] = useState(() => new Set());
   const [dialog, setDialog] = useState(null); // { type: 'check'|'send'|'sendback'|'approve'|'recall', id?, ids?, step? }
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const set = (patch) => { setPick((p) => ({ ...p, ...patch })); setPageNo(1); setSelected(new Set()); };
+  const set = (patch) => { setPick((p) => ({ ...p, status: pick.status, ...patch })); setPageNo(1); setSelected(new Set()); };
 
   const fetcher = useCallback((params) => getPurchaseRecords(page, params), [page]);
   const params = {
@@ -166,21 +171,14 @@ export default function PurchaseReport({ page }) {
 
   const open = dialog?.id != null ? recordOf(dialog.id) : null;
   const counts = d?.counts || {};
-  const shownStatuses = STATUSES.filter((s) => s.key !== 'removed' || counts.removed);
   const roms = d?.roms;
   // What the ticked lines allow: each button counts only the lines it fits.
   const ticked = [...selected].map(recordOf).filter(Boolean);
   const sendable = ticked.filter((r) => maySend(r, canDo)).map((r) => r.id);
+  // Ticked by the checker but with no bill: never sent (the user, 2026-11-29).
+  const billless = ticked.filter((r) => mayAttach(r, canDo) && !maySend(r, canDo)).length;
   const approvable = ticked.filter((r) => mayApprove(r, canDo)).map((r) => r.id);
   const recallable = ticked.filter((r) => mayRecall(r, canDo)).map((r) => r.id);
-  // A file is not required, but say so before lines go without one.
-  const billWarning = (ids) => {
-    const k = ids.filter((id) => !recordOf(id)?.files?.length).length;
-    if (!k) return '';
-    if (ids.length === 1) return ' It has no bill attached.';
-    if (k === ids.length) return ' None of them has a bill attached.';
-    return ` ${k} of them ${k === 1 ? 'has' : 'have'} no bill attached.`;
-  };
   const fyValue = pick.fy || String(d?.fy ?? '');
 
   return (
@@ -210,7 +208,7 @@ export default function PurchaseReport({ page }) {
       )}
     >
       <div role="tablist" aria-label="Status" className="flex flex-wrap gap-1 mb-3 border-b border-gray-200">
-        {[...shownStatuses, { key: 'all', label: 'All' }].map((s) => (
+        {[...QUEUES, { key: 'all', label: 'All' }].map((s) => (
           <button key={s.key} type="button" role="tab" aria-selected={pick.status === s.key} onClick={() => set({ status: s.key })}
             className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${pick.status === s.key ? 'border-brand text-brand' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
             {s.label} <span className="ml-1 text-gray-400">({(counts[s.key] ?? 0).toLocaleString('en-IN')})</span>
@@ -228,8 +226,13 @@ export default function PurchaseReport({ page }) {
         {roms?.error && (
           <span className="inline-flex items-center gap-1 text-gray-700"><CircleAlert size={14} aria-hidden="true" />{roms.error}</span>
         )}
-        {(sendable.length > 0 || approvable.length > 0 || recallable.length > 0) && (
+        {(sendable.length > 0 || billless > 0 || approvable.length > 0 || recallable.length > 0) && (
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            {billless > 0 && (
+              <span className="text-gray-700" role="status">
+                {billless} ticked {billless === 1 ? 'line has' : 'lines have'} no bill, so {billless === 1 ? 'it' : 'they'} can’t be sent. Attach it first.
+              </span>
+            )}
             {sendable.length > 0 && (
               <Button size="sm" onClick={() => setDialog({ type: 'send', ids: sendable })}>Send {sendable.length} for approval</Button>
             )}
@@ -281,7 +284,7 @@ export default function PurchaseReport({ page }) {
           step={dialog.step}
           saving={busy}
           onClose={() => setDialog(null)}
-          onSend={(reason) => run(() => sendBackPurchaseRecord(dialog.step, open.id, reason), 'Sent back to the bill check')}
+          onSend={(reason) => run(() => sendBackPurchaseRecord(dialog.step, open.id, reason), `Sent back to ${SENT_BACK_TO[dialog.step]}`)}
         />
       )}
       <ConfirmDialog
@@ -306,7 +309,7 @@ export default function PurchaseReport({ page }) {
         variant="primary"
         title={dialog?.ids?.length > 1 ? `Send ${dialog.ids.length} lines for approval?` : 'Send this line for approval?'}
         message={dialog?.type === 'send'
-          ? `${dialog.ids.length > 1 ? 'They go' : 'It goes'} to the Purchase Head, and ${dialog.ids.length > 1 ? 'their' : 'its'} files are locked once sent. You can recall ${dialog.ids.length > 1 ? 'them' : 'it'} until the Purchase Head acts.${billWarning(dialog.ids)} To add a note, use View/Attach bill instead.`
+          ? `${dialog.ids.length > 1 ? 'They go' : 'It goes'} to the Purchase Head, and ${dialog.ids.length > 1 ? 'their' : 'its'} files are locked once sent. You can recall ${dialog.ids.length > 1 ? 'them' : 'it'} until the Purchase Head acts. To add a note, use View/Attach bill instead.`
           : ''}
         confirmLabel="Send for approval"
       />

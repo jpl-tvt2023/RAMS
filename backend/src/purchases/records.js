@@ -12,7 +12,11 @@ const {
   PAGES, receiptLine, challanLine, recordLabel, deliveryLabel, linesOf,
 } = require('./lines');
 
-const STATUSES = ['to_check', 'with_purchase_head', 'with_accounts_head', 'sent_back', 'changed', 'approved', 'removed'];
+// The status is the line's queue (the user, 2026-11-29). Sent back and Changed
+// in ROMS are notes on a line now, not statuses: a filter saved with one of
+// them reads as To check. A removed line is in no queue, only under All.
+const STATUSES = ['to_check', 'with_purchase_head', 'with_accounts_head', 'approved', 'removed'];
+const OLD_STATUSES = { sent_back: 'to_check', changed: 'to_check' };
 const PAGE_SIZE = 50;
 const PAGE_SIZE_MAX = 10000;
 const LIST_CHUNK = 400;
@@ -72,7 +76,8 @@ function readQuery(page, query = {}, today = todayIst()) {
   const { fy, years } = pickYear(noYear && month && /^\d{4}-\d{2}$/.test(month) ? fyOf(`${month}-01`) : query.fy, today);
   const fyMonths = monthsOf(fy).map((m) => m.month);
   if (month && !fyMonths.includes(month)) throw fail(400, `Choose a month of FY ${fyLabel(fy)} (YYYY-MM)`);
-  const status = query.status && query.status !== 'all' ? String(query.status) : null;
+  const asked = query.status && query.status !== 'all' ? String(query.status) : null;
+  const status = asked ? (OLD_STATUSES[asked] || asked) : null;
   if (status && !STATUSES.includes(status)) throw fail(400, `status must be one of ${STATUSES.join(', ')} or all`);
   const q = String(query.q || '').trim().slice(0, 100) || null;
   const pageNo = Math.max(1, Number.parseInt(query.page, 10) || 1);
