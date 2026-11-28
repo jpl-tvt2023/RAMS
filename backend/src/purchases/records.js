@@ -154,6 +154,8 @@ function shape(r, lines, files, last) {
     lines: shown,
     files,
     check: r.checked_at ? { ...stamp(r.checked_by, r.checked_by_name, r.checked_at), note: r.check_note || null } : null,
+    // The note of a send that was recalled: kept for the next send.
+    draft_note: !r.checked_at && r.check_note ? r.check_note : null,
     purchase_approval: stamp(r.purchase_approved_by, r.purchase_approved_by_name, r.purchase_approved_at),
     accounts_approval: stamp(r.accounts_approved_by, r.accounts_approved_by_name, r.accounts_approved_at),
     sent_back: r.sent_back_at ? { ...stamp(r.sent_back_by, r.sent_back_by_name, r.sent_back_at), step: r.sent_back_step, reason: r.sent_back_reason } : null,

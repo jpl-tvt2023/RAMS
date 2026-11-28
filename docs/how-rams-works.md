@@ -192,7 +192,7 @@ The report screens (what has been invoiced, what has been paid, and what is stil
 
 In the top bar they are under **Tally Reports**: *Bills Receivable*, *Party Statements* (section 11) and *Attachments* (section 12). **Purchase Reports** has its own menu (section 13).
 
-**On every report (28 November):** *Download CSV* has a neighbour, **Download Excel**. It gives the same rows as an Excel file, with a bold header that stays in view, a filter on each column, and amounts as real numbers you can add up. And on every table in RAMS, the **header row stays in view** while you scroll: a long table scrolls inside its own box, with its sideways scrollbar on screen too.
+**On every report (29 November):** the download is **Download Excel** (it replaced *Download CSV*). It gives the rows as an Excel file, with a bold header that stays in view, a filter on each column, and amounts as real numbers you can add up. If another program needs a CSV, Excel can save one. And on every table in RAMS, the **header row stays in view** while you scroll: a long table scrolls inside its own box, with its sideways scrollbar on screen too.
 
 **New names (18 November):** *Debtors* is now **Bills Receivable**, Tally's own name for the bill-wise list of what is owed. *Ledgers* is now **Party Statements**, since it shows each party's statement from opening to closing. They are the same pages with the same permissions. Their addresses moved to */reports/bills-receivable* and */reports/party-statements*, and the old ones still lead there.
 
@@ -326,7 +326,7 @@ A voucher **without a document is orange**, across the row, until one is added. 
 | **Warehouse** | Each line ROMS books in for goods that don't go through Stitching: packaging, barcodes, socks and the like |
 | **Stitching** | Each line of fabric and other goods that go through Stitching, and **every challan line** that hands goods from one stage to the next (for example Stitching → Warehouse) |
 
-**One row per line, listed by delivery** (changed on 28 November, after your first look). Every line ROMS books in is its own row, with its own files, its own bill check and its own two approvals.
+**One row per line, listed by delivery** (changed on 28 November, after your first look). Every line ROMS books in is its own row, with its own bill, its own check and its own two approvals.
 - **Deliveries:** lines that share an **Incoming No** from the same vendor came in together, so they are listed together under it, with how many lines there are.
   - For example, Incoming **PNL349** from Nirvan Textiles is bill 5019/26-27 with four handkerchief lines. Each is checked and approved by itself.
   - The same Incoming No from another vendor is another delivery. A challan's lines are listed together the same way.
@@ -336,32 +336,33 @@ A voucher **without a document is orange**, across the row, until one is added. 
 
 | Column | What it is |
 |---|---|
-| Files | The bill or challan copy: PDFs, photos or emails, kept the same way as on Attachments. Click the count to view them |
-| Bill check by | Who saved the bill check, and when. Click it for the line's full history |
+| Bill check by | Who sent the line for approval, and when. Click it for the line's full history |
 | Purchase Head | *Not approved*, *Pending approval* (waiting for the Purchase Head now), or **Approved by** the name and time, in green |
 | Accountant Head | The same, for the Accountant Head |
-| Status | Where the line is: To check → With Purchase Head → With Accountant Head → **Approved** |
+| Note | The line's story so far, one short note per stage: *No bill attached* at first, then the bill, who sent it for approval (with their note), each head's approval, and a send-back in red with its reason |
 
-**The steps:**
-1. **Bill check** (an Accountant): click **Upload bill & check** on the line. One window does it all:
-   - It shows the delivery's lines.
-   - It takes the bill: drop a PDF, photo or email, or paste a screenshot.
-   - It saves the check, with a note if useful.
-   - When one bill covers several lines, tick them, and the file and the check go on every ticked line at once.
-   - The files are then locked, so the heads approve exactly what was checked.
-2. **The Purchase Head** approves each line, or **sends it back** with a reason. To approve several together, tick them; one tick under the Incoming No takes a whole delivery.
-3. **The Accountant Head** gives the final approval, or sends it back.
+The bill itself (PDFs, photos or emails, kept the same way as on Attachments) is in the line's window: **View/Attach bill** for whoever attaches and sends bills, **View bill** for everyone else.
 
-**Send-backs:** a line sent back returns to the bill check. Once it is checked again, it starts over at the Purchase Head.
+**The steps** (changed on 29 November, after your second look):
+1. **Attach the bill** (an Accountant): click **View/Attach bill** on the line.
+   - The window shows the delivery's lines and takes the bill: drop a PDF, photo or email, or paste a screenshot. When one bill covers several lines, tick them and it goes on each.
+   - **Attaching sends nothing.** Close the window and the bill stays on the line, with you.
+2. **Send for approval**, when the line is ready: in the window (with a note if useful), or tick several lines on the page and click **Send N for approval**. RAMS warns if any of them has no bill. The files are then locked, so the heads approve exactly what was sent.
+3. **The Purchase Head** approves each line, or **sends it back** with a reason. To approve several together, tick them; one tick under the Incoming No takes a whole delivery.
+4. **The Accountant Head** gives the final approval, or sends it back.
+
+**Recall:** whoever sent a line on can take it back until the next person acts. The Accountant recalls it from the Purchase Head (it comes back with its bill unlocked and the note kept), and the Purchase Head can recall their approval from the Accountant Head. If the next person has already acted, RAMS says who and when.
+
+**Send-backs:** a head can send a line back with a reason at any time, **even after approving it**, including after the final approval. Both approvals are cleared and the line returns to the Accountant. Once it is sent again, it starts over at the Purchase Head.
 
 **Colours:** only two are used.
 - **Green** means approved: the whole row once both heads approved, and each head's own column once that head approved.
 - **Red** means sent back, with the reason.
 - Everything else is plain words.
 
-**If ROMS changes a line after its bill check** (its quantity, rate, bill number, article or Incoming No), RAMS clears that line's approvals and shows *Changed in ROMS*, with what changed. It needs a bill check again, and the history keeps both. The delivery's other lines are not touched. A line deleted in ROMS is kept as *Removed in ROMS*, with its files.
+**If ROMS changes a line after it was sent** (its quantity, rate, bill number, article or Incoming No), RAMS clears that line's approvals and the Note says *Changed in ROMS*, with what changed. It needs checking and sending again, and the history keeps both. The delivery's other lines are not touched. A line deleted in ROMS is kept as *Removed in ROMS*, with its files.
 
-**Downloads:** *Download CSV* and *Download Excel* give the rows the filters show, one per line, with both heads' columns.
+**Download:** *Download Excel* gives the rows the filters show, one per line, with both heads' columns and the Note.
 
 **How fresh:** RAMS reads ROMS when the page is opened (if it hasn't for five minutes), when someone clicks *Refresh from ROMS*, and after each matching run. Nothing on these pages changes ROMS.
 

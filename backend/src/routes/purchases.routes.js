@@ -1,13 +1,15 @@
 const express = require('express');
 const auth = require('../middleware/auth');
-const { requirePermission } = require('../middleware/permission');
+const { requirePermission, requireAnyPermission } = require('../middleware/permission');
 const { MAX_UPLOAD_BYTES, TOO_BIG } = require('../services/files');
 const c = require('../controllers/purchases.controller');
 
 // Purchase Reports -> Warehouse and Stitching. Seeing the pages, a record and
 // its files is purchases.view. The bill check, and adding or removing files,
 // is purchases.check. Each head's approval -- approve, or send back with a
-// reason -- is that head's own permission. Admin and Owner hold every one.
+// reason -- is that head's own permission. A recall takes back one's own step:
+// the checker's (purchases.check) or the Purchase Head's; the controller checks
+// which. Admin and Owner hold every one.
 const router = express.Router();
 const view = requirePermission('purchases.view');
 const checker = requirePermission('purchases.check');
@@ -25,6 +27,7 @@ router.post('/refresh', auth, view, c.refresh);
 router.get('/records/:id', auth, view, c.one);
 router.post('/check', auth, checker, c.checkMany);
 router.post('/records/:id/check', auth, checker, c.check);
+router.post('/recall', auth, requireAnyPermission('purchases.check', 'purchases.approve_purchase'), c.recallMany);
 router.post('/records/:id/files', auth, checker, rawFile, c.uploadFile);
 router.get('/files/:id', auth, view, c.downloadFile);
 router.delete('/files/:id', auth, checker, c.removeFile);

@@ -91,13 +91,30 @@ For the day itself, `go-live-cheatsheet.md` has the same steps as commands and c
      - Any work done on an old record (files, bill check, approvals) is copied to each of its lines, with a "Split from …" line in each history.
      - Expect on production: 466 records → 964 (906 receipt lines + 58 challan lines).
    - **Order:**
-     1. Run `npm run migrate` (023) on the test database, then on production.
+     1. Run 023 on the test database, then on production, **before** the merge. `npm run migrate` in `backend/` reads `backend/.env`, which is the **test** database; production needs the root `.env` (a wrapper that loads it and refuses any other database).
      2. Deploy the test site and check it.
      3. Merge the PR (production deploys).
    - **Check after:**
      - *Purchase Reports → Warehouse* opens on this year and month.
-     - Incoming PNL349 (Stitching) shows four rows, each with its own Upload bill & check button.
+     - Incoming PNL349 (Stitching) shows four rows, each with its own bill button.
      - *Download Excel* opens in Excel with a bold, frozen header.
+   - **Status (29 Nov):** 023 is applied on both databases. The code reached production a few minutes before 023 did (production was at 022 because 023 had only been run with `backend/.env`), so the pages answered 500 until 023 was applied at 18:39 UTC on 28 Nov. The next read of ROMS made the 964 records (708 Warehouse, 256 Stitching), all To check.
+12. **Purchase Reports: View/Attach bill, Send for approval, Recall, Note (2026-11-29, the client's second look). No migration.**
+   - **What changes on the pages:**
+     - *Upload bill & check* becomes **View/Attach bill**, or **View bill** (read-only) for whoever can only look. The Files column goes, since the bill is in that window.
+     - Attaching sends nothing. **Send for approval** (in the window, or *Send N for approval* for ticked lines) sends lines to the Purchase Head.
+     - **Recall** takes a line back until the next person acts: the checker from the Purchase Head, the Purchase Head their approval from the Accountant Head. An approved line is not recalled.
+     - A head can **send back** a line they approved, even after the final approval (a *Send back* link under their green approval).
+     - The Status column becomes **Note**: one short note per stage, starting with *No bill attached*.
+     - **Download Excel only**: *Download CSV* is gone from every report.
+     - Every popup is drawn above the page, so a long title wraps instead of running over the close button.
+   - **Backend:** `POST /api/purchases/recall`; send-back accepts a line at or after that head's step; a recalled line deleted in ROMS is marked Removed (it has a history), not dropped.
+   - **Order:** test deploy, check, then merge the PR. No database change.
+   - **Check after:**
+     - A line with a bill attached but not sent stays on *To check*; its Note says *Bill attached*.
+     - Send it, recall it, and it is back on *To check* with its bill.
+     - As the Accountant Head, *Send back* under an approved line turns it red with the reason.
+     - Only *Download Excel* on every report.
 
 ## 1. The production database for RAMS (you, then maintainer)
 

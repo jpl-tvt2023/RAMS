@@ -16,7 +16,7 @@ import api from './axios';
 // record: { id, kind, status, label, date, delivery: { key, at, label }, incoming, no_incoming,
 //           billing: [], vendor, party,
 //           lines: [{ key, incoming, date, billing, po, article, rate, qty, uom, from_stage, to_stage, removed? }] (one),
-//           files, check: { name, at, note }, purchase_approval, accounts_approval,
+//           files, check: { by, name, at, note }, draft_note (kept by a recall), purchase_approval, accounts_approval,
 //           sent_back: { name, at, step, reason }, changed: { at, changes }, last_change }
 export async function getPurchaseRecords(page, params) {
   const { data } = await api.get(`/purchases/${page}/records`, { params });
@@ -36,8 +36,9 @@ export async function refreshPurchases() {
   return data;
 }
 
-// Save one bill check on these records (the ticked lines of a delivery): each
-// goes to the Purchase Head. -> { checked, skipped: [{ id, reason }] }
+// Send these lines for approval (the bill check; the ticked lines of a delivery,
+// or those ticked on the page): each
+// goes to the Purchase Head, its files locked. -> { checked, skipped: [{ id, reason }] }
 export async function saveBillChecks(ids, note) {
   const { data } = await api.post('/purchases/check', { ids, note });
   return data;
@@ -49,8 +50,18 @@ export async function approvePurchaseRecords(step, ids) {
   return data;
 }
 
-// -> record
+// A head sends a line back with a reason: at their step, or after approving it
+// (even once it is approved). -> record
 export async function sendBackPurchaseRecord(step, id, reason) {
   const { data } = await api.post(`/purchases/records/${id}/${step === 'purchase' ? 'purchase' : 'accounts'}-head/send-back`, { reason });
+  return data;
+}
+
+// Take lines back one step before the next person acts: from the Purchase
+// Head (back to the bill check), or the Purchase Head's approval from the
+// Accountant Head. items: [{ id, from: the status seen }], so a line that moved
+// on meanwhile is refused, not recalled. -> { recalled, skipped: [{ id, reason }] }
+export async function recallPurchaseRecords(items) {
+  const { data } = await api.post('/purchases/recall', { items });
   return data;
 }

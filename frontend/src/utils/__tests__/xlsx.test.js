@@ -4,9 +4,9 @@ import {
 import { toXlsx, colName } from '../xlsx';
 import { crc32 } from '../zip';
 import { downloadTable } from '../download';
-import { saveBlob } from '../csv';
+import { saveBlob } from '../saveBlob';
 
-vi.mock('../csv', async (original) => ({ ...(await original()), saveBlob: vi.fn() }));
+vi.mock('../saveBlob', () => ({ saveBlob: vi.fn() }));
 
 // Reads back a stored (uncompressed) zip: { name: text }, checking each CRC.
 function unzip(bytes) {
@@ -80,20 +80,16 @@ describe('Excel downloads (utils/xlsx.js, no library)', () => {
     expect([0, 25, 26, 51, 701, 702].map(colName)).toEqual(['A', 'Z', 'AA', 'AZ', 'ZZ', 'AAA']);
   });
 
-  test('downloadTable: the CSV keeps writing money as rupees; Excel is an .xlsx', async () => {
-    // The CSV goes through csv.js's own link (its saveBlob isn't the mocked export).
-    const made = [];
-    URL.createObjectURL = vi.fn((blob) => { made.push(blob); return 'blob:x'; });
-    URL.revokeObjectURL = vi.fn();
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function remember() { made.push(this.download); });
-    downloadTable('csv', 'rams-test', COLUMNS, ROWS);
-    click.mockRestore();
-    expect(made[1]).toBe('rams-test.csv');
-    const text = await new Promise((resolve) => { const fr = new FileReader(); fr.onload = () => resolve(fr.result); fr.readAsText(made[0]); });
-    expect(text.replace(String.fromCharCode(0xfeff), '').split(String.fromCharCode(10))).toEqual([
-      'PO,Rate,Amount,Note,Empty', '095,19.75,129883.95,"A & B <c> ""d""",', '161,0,,ok,',
-    ]);
-    downloadTable('xlsx', 'rams-test', COLUMNS, ROWS);
-    expect(saveBlob.mock.calls[0][0]).toBe('rams-test.xlsx');
+  test('downloadTable: an .xlsx named after the report, its sheet named too (Excel only, no CSV)', async () => {
+    downloadTable('rams-test', COLUMNS, ROWS);
+    downloadTable('rams-test', COLUMNS, ROWS, { sheet: 'Warehouse' });
+    const [name, blob] = saveBlob.mock.calls[0];
+    expect(name).toBe('rams-test.xlsx');
+    expect(blob.type).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    const bytesOf = (b) => new Promise((resolve) => { const fr = new FileReader(); fr.onload = () => resolve(new Uint8Array(fr.result)); fr.readAsArrayBuffer(b); });
+    const bytes = await bytesOf(blob);
+    expect(unzip(bytes)['xl/workbook.xml']).toContain('<sheet name="rams-test" ');
+    const second = await bytesOf(saveBlob.mock.calls[1][1]);
+    expect(unzip(second)['xl/workbook.xml']).toContain('<sheet name="Warehouse" ');
   });
 });

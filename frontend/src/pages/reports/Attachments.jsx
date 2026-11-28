@@ -12,7 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
 import { formatDay } from '../../utils/formatters';
 import { downloadTable } from '../../utils/download';
-import { narrationForCsv } from '../../utils/highlights';
+import { narrationForFile } from '../../utils/highlights';
 import { ATTACHMENTS_KEY as KEY, ATTACHMENTS_DEFAULTS as DEFAULTS } from '../../utils/attachmentLinks';
 
 // Tally Reports -> Attachments (/reports/attachments): a company's invoices,
@@ -61,12 +61,12 @@ export default function Attachments() {
   const canFiles = can(PERM.STATEMENTS_FILES);
 
   const reload = () => { months.reload(); vouchers.reload(); };
-  const download = (format) => {
-    downloadTable(format, `rams-attachments-${tab.key}-${pick.month}`, [
+  const download = () => {
+    downloadTable(`rams-attachments-${tab.key}-${pick.month}`, [
       [tab.number_label || 'No', (r) => r.number], ['Date', (r) => r.date], ['Type', (r) => r.voucher_type], ['Ledger', (r) => r.ledgers.join('; ')],
       ['City', (r) => r.city || ''], ['PIN', (r) => r.pincode || ''], ['Amount', (r) => r.amount_paise, 'money'],
       ...(tab.einvoice ? [['Ack No', (r) => r.einvoice.ack_no || ''], ['Ack date', (r) => r.einvoice.ack_date || ''], ['IRN', (r) => r.einvoice.irn || '']] : []),
-      ['Files', (r) => r.files.map((f) => f.name).join('; ')], ['Narration', narrationForCsv],
+      ['Files', (r) => r.files.map((f) => f.name).join('; ')], ['Narration', narrationForFile],
       ['Last updated by', (r) => r.last_change?.user_name || ''], ['Last updated at', (r) => r.last_change?.at || ''],
     ], list);
   };
@@ -84,7 +84,7 @@ export default function Attachments() {
       search={open ? pick.q : undefined}
       onSearch={open ? (q) => set({ q }) : undefined}
       searchHint="Number, ledger, city or Ack No"
-      onDownload={open && v ? (format) => { try { download(format); } catch { toast.error('The download failed'); } } : undefined}
+      onDownload={open && v ? () => { try { download(); } catch { toast.error('The download failed'); } } : undefined}
       filters={(
         <select aria-label="Financial year" value={String(m?.fy ?? '')} onChange={(e) => set({ fy: e.target.value, month: '' })} className={selectCls}>
           {(m?.years || []).map((y) => <option key={y.fy} value={y.fy}>FY {y.label}</option>)}

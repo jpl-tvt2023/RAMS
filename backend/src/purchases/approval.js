@@ -8,11 +8,16 @@
 //   to_check / sent_back / changed --(bill check)--> with_purchase_head
 //   with_purchase_head --(Purchase Head approves)--> with_accounts_head
 //   with_accounts_head --(Accountant Head approves)--> approved
-//   with_purchase_head / with_accounts_head --(that head sends back, with a reason)--> sent_back
+//   with_purchase_head / with_accounts_head / approved --(a head sends back, with a reason)--> sent_back
+//   with_purchase_head --(recall: the checker takes it back)--> to_check
+//   with_accounts_head --(recall: the Purchase Head takes back their approval)--> with_purchase_head
 //
 // Sending back is the heads' "reject": the record returns to the bill check,
-// and once it is saved again it starts over at the Purchase Head. A change in
-// ROMS after the bill check also sends it back (refresh.js).
+// and once it is sent again it starts over at the Purchase Head. A head may
+// send back a line they already approved, even after the final approval (the
+// user, 2026-11-29). A recall undoes one's own step until the next person acts
+// on it; an approved line is not recalled but sent back. A change in ROMS
+// after the bill check also sends it back (refresh.js).
 const { logAction } = require('../services/auditLog.service');
 const { snapshotOf, recordLabel } = require('./lines');
 const { currentLines } = require('./records');
@@ -67,6 +72,20 @@ function notNow(status, step) {
   if (!step) return `This record is ${STATUS_WORDS[status].toLowerCase()} — it can be changed again once a head sends it back`;
   if (status !== STEPS[step].from) return `This record is ${STATUS_WORDS[status].toLowerCase()}, not waiting for the ${STEPS[step].head}`;
   return null;
+}
+
+// The statuses a head may send a line back from: their own step, and any
+// later one (they approved it, and change their mind).
+const SEND_BACK_FROM = {
+  purchase: ['with_purchase_head', 'with_accounts_head', 'approved'],
+  accounts: ['with_accounts_head', 'approved'],
+};
+
+function cantSendBack(status, step) {
+  if (SEND_BACK_FROM[step].includes(status)) return null;
+  if (status === 'removed') return 'This record was removed in ROMS, so it can\'t be sent back';
+  if (WITH_CHECKER.includes(status)) return `This record is ${STATUS_WORDS[status].toLowerCase()}, so it is with the checker already`;
+  return `This record is ${STATUS_WORDS[status].toLowerCase()}, not yet with the ${STEPS[step].head}`;
 }
 
 async function recordFor(tx, id) {
@@ -192,7 +211,7 @@ async function sendBack(db, id, step, user, { reason } = {}) {
   if (why.length > REASON_MAX) throw fail(400, `Keep the reason to ${REASON_MAX} characters`);
   return inTx(db, async (tx) => {
     const r = await recordFor(tx, id);
-    const blocked = notNow(r.status, step);
+    const blocked = cantSendBack(r.status, step);
     if (blocked) throw fail(409, blocked);
     const res = await tx.execute({
       sql: `UPDATE purchase_records
@@ -200,23 +219,131 @@ async function sendBack(db, id, step, user, { reason } = {}) {
                    purchase_approved_by = NULL, purchase_approved_at = NULL, accounts_approved_by = NULL, accounts_approved_at = NULL,
                    updated_at = datetime('now')
              WHERE id = ? AND status = ?`,
-      args: [user.id, step, why, r.id, s.from],
+      args: [user.id, step, why, r.id, r.status],
     });
     if (!res.rowsAffected) throw fail(409, 'Someone changed this record just now — open it again');
     const label = recordLabel(r.kind, await currentLines(tx, r.id));
+    const after = r.status === s.from ? '' : ' after approving it';
     await logAction({
       client: tx,
       userId: user.id,
       actionType: 'PURCHASE_SEND_BACK',
-      description: `Sent back by the ${s.head} — ${label}. Reason: ${why}`,
+      description: `Sent back by the ${s.head}${after} — ${label}. Reason: ${why}`,
       entityType: 'purchase_records',
       entityId: r.id,
-      changes: [{ field: 'Status', old: STATUS_WORDS[s.from], new: STATUS_WORDS.sent_back }],
+      changes: [{ field: 'Status', old: STATUS_WORDS[r.status], new: STATUS_WORDS.sent_back }],
     });
     return { id: Number(r.id), status: 'sent_back' };
   });
 }
 
+// A recall: the step it undoes, who may do it, and what it clears.
+const RECALL = {
+  with_purchase_head: {
+    to: 'to_check',
+    need: 'check',
+    what: 'Recalled from the Purchase Head, back to the bill check',
+    // The bill check is undone; its note stays as a draft for the next send.
+    clear: 'checked_by = NULL, checked_at = NULL, purchase_approved_by = NULL, purchase_approved_at = NULL, accounts_approved_by = NULL, accounts_approved_at = NULL',
+    notAllowed: 'Only someone who does the bill check can take it back from the Purchase Head',
+  },
+  with_accounts_head: {
+    to: 'with_purchase_head',
+    need: 'purchase',
+    what: 'Purchase Head approval taken back from the Accountant Head',
+    clear: 'purchase_approved_by = NULL, purchase_approved_at = NULL, accounts_approved_by = NULL, accounts_approved_at = NULL',
+    notAllowed: 'Only the Purchase Head can take back their approval',
+  },
+};
+
+// "29 Nov, 14:05" in Indian time, for a reason shown on the page.
+function istText(at) {
+  const d = new Date(`${String(at).replace(' ', 'T')}Z`);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+}
+
+// Why a line can't be recalled now. from: where the caller saw it, so a line
+// that moved on meanwhile is refused, not recalled from a later step.
+function cantRecall(r, from, can) {
+  const who = (name, at) => `${name || 'Someone'}${at ? ` (${istText(at)})` : ''}`;
+  if (from && r.status !== from) {
+    if (from === 'with_purchase_head' && r.purchase_approved_at) {
+      return `${who(r.purchase_name, r.purchase_approved_at)} approved it already, so it can’t be recalled. Ask them to send it back`;
+    }
+    if (from === 'with_accounts_head' && r.accounts_approved_at) {
+      return `${who(r.accounts_name, r.accounts_approved_at)} approved it already, so it can’t be recalled. Ask them to send it back`;
+    }
+  }
+  if (r.status === 'approved') return 'An approved line can’t be recalled. A head can send it back instead';
+  if (WITH_CHECKER.includes(r.status)) return 'It is with the checker already';
+  if (r.status === 'removed') return 'This line was removed in ROMS';
+  const m = RECALL[r.status];
+  if (!m) return `This line is ${(STATUS_WORDS[r.status] || r.status).toLowerCase()}`;
+  if (from && r.status !== from) return 'Someone changed this line just now. Open it again';
+  if (!can[m.need]) return m.notAllowed;
+  return null;
+}
+
+/**
+ * Takes lines back one step, before the next person acts on them: the checker
+ * from the Purchase Head (back to the bill check, files unlocked, the note kept
+ * as a draft), or the Purchase Head their approval from the Accountant Head.
+ * items: [{ id, from? }] -- from is the status the caller saw.
+ * can: { check, purchase } -- the caller's permissions.
+ * { recalled, skipped: [{ id, reason }] }
+ */
+async function recall(db, items, user, can) {
+  const list = [];
+  const seen = new Set();
+  for (const it of Array.isArray(items) ? items : []) {
+    const id = Number(it && typeof it === 'object' ? it.id : it);
+    if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue;
+    seen.add(id);
+    list.push({ id, from: it && typeof it === 'object' && RECALL[it.from] ? it.from : null });
+  }
+  if (!list.length) throw fail(400, 'Choose the lines to recall');
+  if (list.length > APPROVE_MAX) throw fail(400, `Recall at most ${APPROVE_MAX} lines at a time`);
+  return inTx(db, async (tx) => {
+    const rows = await rowsOf(tx, `
+      SELECT r.id, r.kind, r.status, r.purchase_approved_at, r.accounts_approved_at,
+             pa.name AS purchase_name, aa.name AS accounts_name
+        FROM purchase_records r
+        LEFT JOIN users pa ON pa.id = r.purchase_approved_by
+        LEFT JOIN users aa ON aa.id = r.accounts_approved_by
+       WHERE r.id IN (${list.map(() => '?').join(',')})`, list.map((l) => l.id));
+    const found = new Map(rows.map((r) => [Number(r.id), r]));
+    const skipped = [];
+    let recalled = 0;
+    for (const { id, from } of list) {
+      const r = found.get(id);
+      if (!r) { skipped.push({ id, reason: 'That purchase record isn’t in RAMS' }); continue; }
+      const why = cantRecall(r, from, can);
+      if (why) { skipped.push({ id, reason: why }); continue; }
+      const m = RECALL[r.status];
+      const res = await tx.execute({
+        sql: `UPDATE purchase_records SET status = ?, ${m.clear}, updated_at = datetime('now') WHERE id = ? AND status = ?`,
+        args: [m.to, id, r.status],
+      });
+      if (!res.rowsAffected) { skipped.push({ id, reason: 'Someone changed this line just now. Open it again' }); continue; }
+      const label = recordLabel(r.kind, await currentLines(tx, id));
+      await logAction({
+        client: tx,
+        userId: user.id,
+        actionType: 'PURCHASE_RECALL',
+        description: `${m.what} — ${label}`,
+        entityType: 'purchase_records',
+        entityId: id,
+        changes: [{ field: 'Status', old: STATUS_WORDS[r.status], new: STATUS_WORDS[m.to] }],
+      });
+      recalled += 1;
+    }
+    return { recalled, skipped };
+  });
+}
+
 module.exports = {
-  saveCheck, saveChecks, approve, sendBack, WITH_CHECKER, STEPS, STATUS_WORDS, notNow,
+  saveCheck, saveChecks, approve, sendBack, recall, WITH_CHECKER, STEPS, STATUS_WORDS, notNow, SEND_BACK_FROM,
 };

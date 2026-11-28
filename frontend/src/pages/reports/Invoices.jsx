@@ -12,7 +12,7 @@ import { useSessionState } from '../../hooks/useSessionState';
 import { formatDay, formatRupees } from '../../utils/formatters';
 import { downloadTable } from '../../utils/download';
 import Narration from '../../components/shared/Narration';
-import { narrationForCsv } from '../../utils/highlights';
+import { narrationForFile } from '../../utils/highlights';
 
 // Reports -> Invoices: every Tally sales invoice since RAMS started, with its
 // marketplace, PO, what settled it and what is still owed. Stock transfers are
@@ -37,11 +37,11 @@ export default function Invoices() {
   const set = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
   const view = data || { rows: [], total: last?.total || 0 };
 
-  const download = async (format) => {
+  const download = async () => {
     try {
       const all = await getInvoices({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page_size: 10000 });
-      downloadTable(format, 'rams-invoices', [
-        ['Company', (r) => r.company], ['Invoice', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForCsv], ['Party', (r) => r.party],
+      downloadTable('rams-invoices', [
+        ['Company', (r) => r.company], ['Invoice', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForFile], ['Party', (r) => r.party],
         ['Marketplace', (r) => r.vendor || ''], ['PO', (r) => r.pos.join(' ')], ['Taxable', (r) => r.taxable_paise, 'money'],
         ['GST', (r) => r.gst_paise, 'money'], ['Total', (r) => r.total_paise, 'money'], ['Received', (r) => r.received_paise, 'money'],
         ['Credit notes', (r) => r.credit_notes_paise, 'money'], ['TDS', (r) => r.tds_paise, 'money'], ['Adjustments', (r) => r.adjustments_paise, 'money'],
