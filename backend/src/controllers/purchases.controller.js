@@ -128,7 +128,7 @@ async function recordForFiles(client, id) {
   if (!WITH_CHECKER.includes(r.status)) {
     throw fail(409, r.status === 'removed'
       ? 'This record was removed in ROMS, so its files can no longer change'
-      : 'The files are locked once the bill check is saved. A head can send the record back to change them');
+      : 'The files are locked once the line is sent for approval. Recall it, or ask the Purchase Head to send it back, to change them');
   }
   const label = recordLabel(r.kind, await currentLines(client, r.id));
   return { id: Number(r.id), label };

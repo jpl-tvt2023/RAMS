@@ -12,11 +12,13 @@
 //     date and delivery (an Incoming No corrected in ROMS moves the line to
 //     its new delivery and keeps its record)
 //   - a record waiting on a head, or approved, whose line ROMS changed since
-//     the bill check becomes "Changed in ROMS": its approvals are cleared, the
-//     change is audited, and it goes back to the bill check (the user's rule)
+//     the bill check goes back To check (the start, the checker's queue) with
+//     a note of what changed (changed_at/changes): its approvals are cleared
+//     and the change is audited (the user, 2026-11-29)
 //   - a record whose line is gone is "Removed in ROMS" if anyone worked on it
-//     (a bill check or a file), else it is dropped
-//   - a removed record whose line comes back returns to the bill check
+//     (a bill check or a file), else it is dropped. A removed record is in no
+//     queue, only under All
+//   - a removed record whose line comes back goes To check again
 //
 // It reads ROMS when a page is opened and the copy is older than FRESH_MINUTES,
 // when someone presses Refresh, and after each matching run. A short lease
@@ -44,7 +46,7 @@ const SPECS = {
   'purchase-challans': { table: 'roms_purchase_challans', key: ['id'], cols: CHALLAN_COLS },
 };
 
-// The statuses in which a ROMS change sends the record back to the bill check.
+// The statuses in which a ROMS change sends the record back To check.
 const WATCHED = ['with_purchase_head', 'with_accounts_head', 'approved'];
 const NOT_CONNECTED = 'ROMS isn\'t connected — set ROMS_API_URL and ROMS_INTEGRATION_TOKEN';
 const NOT_SERVED = 'ROMS doesn\'t send purchases yet — it needs the ROMS update that adds Purchase Reports';
@@ -215,24 +217,23 @@ async function regroup(client) {
 
     const lines = linesOf(g);
     const label = recordLabel(g.kind, lines);
-    // Back in ROMS after being removed: to the bill check again.
+    // Back in ROMS after being removed: To check again.
     if (rec.status === 'removed') {
-      const to = rec.checked_at ? 'changed' : 'to_check';
       stmts.push({
-        sql: `UPDATE purchase_records SET status = ?, changed_at = datetime('now'), changes = ?, updated_at = datetime('now')
+        sql: `UPDATE purchase_records SET status = 'to_check', changed_at = datetime('now'), changes = ?, updated_at = datetime('now')
                WHERE id = ? AND status = 'removed'`,
-        args: [to, JSON.stringify([{ field: 'Line', old: 'removed in ROMS', new: 'back in ROMS' }]), id],
+        args: [JSON.stringify([{ field: 'Line', old: 'removed in ROMS', new: 'back in ROMS' }]), id],
       });
       stmts.push(auditStmt({ actionType: 'PURCHASE_ROMS_CHANGED', description: `Back in ROMS — ${label}`, entityId: id }));
       out.back += 1;
       continue;
     }
-    // Changed in ROMS after its bill check: approvals cleared, back to the check.
+    // Changed in ROMS after its bill check: approvals cleared, back To check.
     if (WATCHED.includes(rec.status) && parse(rec.snapshot)) {
       const changes = diffSnapshot(parse(rec.snapshot), lines);
       if (changes.length) {
         stmts.push({
-          sql: `UPDATE purchase_records SET status = 'changed', changed_at = datetime('now'), changes = ?,
+          sql: `UPDATE purchase_records SET status = 'to_check', changed_at = datetime('now'), changes = ?,
                        purchase_approved_by = NULL, purchase_approved_at = NULL, accounts_approved_by = NULL, accounts_approved_at = NULL,
                        updated_at = datetime('now')
                  WHERE id = ? AND status = ?`,
@@ -240,16 +241,21 @@ async function regroup(client) {
         });
         stmts.push(auditStmt({
           actionType: 'PURCHASE_ROMS_CHANGED',
-          description: `Changed in ROMS after its bill check — ${label}. Its approvals were cleared, so it needs a bill check again`,
+          description: `Changed in ROMS after its bill check — ${label}. Its approvals were cleared and it is back To check`,
           entityId: id,
           changes,
         }));
         out.changed += 1;
       }
-    } else if (rec.status === 'changed') {
-      // Still waiting for the check: keep "what changed" current against the snapshot.
+    } else if (rec.status === 'to_check' && rec.changed_at && parse(rec.snapshot)) {
+      // Changed and still To check: keep "what changed" current against the snapshot.
       const changes = diffSnapshot(parse(rec.snapshot), lines);
-      stmts.push({ sql: "UPDATE purchase_records SET changes = ? WHERE id = ? AND status = 'changed'", args: [JSON.stringify(changes), id] });
+      if (JSON.stringify(changes) !== (rec.changes || '[]')) {
+        stmts.push({
+          sql: "UPDATE purchase_records SET changes = ? WHERE id = ? AND status = 'to_check' AND changed_at IS NOT NULL",
+          args: [JSON.stringify(changes), id],
+        });
+      }
     }
   }
 

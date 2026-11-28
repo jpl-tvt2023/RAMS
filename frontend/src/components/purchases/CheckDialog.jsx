@@ -5,7 +5,7 @@ import Button from '../ui/Button';
 import FilesPanel from '../files/FilesPanel';
 import { getPurchaseRecord } from '../../api/purchases.api';
 import {
-  numText, statusOf, WITH_CHECKER, HEAD_OF,
+  numText, statusOf, WITH_CHECKER, sentBackText, changedText,
 } from '../../utils/purchaseText';
 import { formatDateTime } from '../../utils/formatters';
 import {
@@ -26,6 +26,8 @@ const th = `px-3 py-2 text-left font-semibold whitespace-nowrap ${HEAD_CELL}`;
  * sends nothing (the user, 2026-11-29): only "Send for approval" sends the
  * ticked lines to the Purchase Head and locks their files -- each line keeping
  * its own files, history and approvals. A note kept by a recall is filled in.
+ * A line never goes on without a file (the user, 2026-11-29): Send stays off
+ * until every ticked line has its bill.
  *
  * record: the list row it opened from. canEdit: purchases.check.
  * onChanged: reload the page's list (files added or removed). onSave(ids, note).
@@ -44,6 +46,9 @@ export default function CheckDialog({
   const others = lines.filter((l) => l.id !== record.id && open(l));
   const also = [...ticked].filter((id) => id !== record.id);
   const editable = canEdit && WITH_CHECKER.includes(r.status);
+  // The ticked lines still without a file: none of them can be sent yet.
+  const filesOf = (id) => (id === record.id ? r.files.length : (lines.find((l) => l.id === id)?.files || 0));
+  const bare = [...ticked].filter((id) => !filesOf(id));
 
   const load = async () => {
     try {
@@ -70,14 +75,12 @@ export default function CheckDialog({
 
   return (
     <Modal isOpen onClose={onClose} title={`${editable ? 'Bill check' : 'Bill'} — ${r.delivery?.label || r.label}`} size="xl">
-      {r.status === 'sent_back' && r.sent_back && (
-        <p className="text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2 mb-3">
-          Sent back by the {HEAD_OF[r.sent_back.step] || 'head'} ({r.sent_back.name || 'someone'}): {r.sent_back.reason}
-        </p>
+      {r.sent_back && r.status !== 'removed' && (
+        <p className="text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2 mb-3">{sentBackText(r.sent_back)}</p>
       )}
-      {r.status === 'changed' && (
+      {r.changed && r.status === 'to_check' && (
         <p className="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2 mb-3">
-          ROMS changed this line after its last bill check, so its approvals were cleared. Check it against the bill again.
+          {changedText(r.changed)}. Its approvals were cleared: check it against the bill and send it again.
         </p>
       )}
 
@@ -178,12 +181,19 @@ export default function CheckDialog({
           <p className="text-xs text-gray-500 mt-2">
             Send for approval puts {ticked.size === 1 ? 'this line' : `the ${ticked.size} ticked lines`} with the Purchase Head and locks {ticked.size === 1 ? 'its' : 'their'} files, so the heads approve what you checked. Until the Purchase Head acts, you can recall it.
           </p>
+          {bare.length > 0 && (
+            <p className="text-sm text-gray-800 mt-2" role="status">
+              {ticked.size === 1
+                ? 'Attach the bill first: a line is never sent for approval without one.'
+                : `${bare.length} of the ticked lines ${bare.length === 1 ? 'has' : 'have'} no bill yet. Attach it, or untick ${bare.length === 1 ? 'that line' : 'them'}: a line is never sent for approval without one.`}
+            </p>
+          )}
         </>
       )}
       <div className="flex gap-3 justify-end mt-4">
         <Button variant="ghost" onClick={onClose} disabled={saving}>Close</Button>
         {editable && (
-          <Button onClick={() => onSave([...ticked], note.trim())} loading={saving}>
+          <Button onClick={() => onSave([...ticked], note.trim())} loading={saving} disabled={bare.length > 0}>
             {ticked.size === 1 ? 'Send for approval' : `Send ${ticked.size} lines for approval`}
           </Button>
         )}

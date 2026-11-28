@@ -5,19 +5,25 @@
 // a delivery at once, and a head may approve several lines at once -- each
 // line still gets its own history row.
 //
-//   to_check / sent_back / changed --(bill check)--> with_purchase_head
+// The status is the queue the line is in (the user, 2026-11-29: five tabs --
+// To check, With Purchase Head, With Accountant Head, Approved, All):
+//
+//   to_check --(bill check, with a file)--> with_purchase_head
 //   with_purchase_head --(Purchase Head approves)--> with_accounts_head
 //   with_accounts_head --(Accountant Head approves)--> approved
-//   with_purchase_head / with_accounts_head / approved --(a head sends back, with a reason)--> sent_back
+//   Purchase Head sends back (at their step or later) --> to_check
+//   Accountant Head sends back (at their step or later) --> with_purchase_head
 //   with_purchase_head --(recall: the checker takes it back)--> to_check
 //   with_accounts_head --(recall: the Purchase Head takes back their approval)--> with_purchase_head
 //
-// Sending back is the heads' "reject": the record returns to the bill check,
-// and once it is sent again it starts over at the Purchase Head. A head may
-// send back a line they already approved, even after the final approval (the
-// user, 2026-11-29). A recall undoes one's own step until the next person acts
-// on it; an approved line is not recalled but sent back. A change in ROMS
-// after the bill check also sends it back (refresh.js).
+// Sending back is the heads' "reject": the line goes to the queue before the
+// head who sent it, with the reason (sent_back_*, the red note) until the
+// person it went to sends it on. A head may send back a line they already
+// approved, even after the final approval. A recall undoes one's own step
+// until the next person acts on it; an approved line is not recalled but sent
+// back. A change in ROMS after the bill check puts the line back To check,
+// with a note of what changed (refresh.js). A line never goes on without a
+// file: the bill check and the approvals refuse one that has none.
 const { logAction } = require('../services/auditLog.service');
 const { snapshotOf, recordLabel } = require('./lines');
 const { currentLines } = require('./records');
@@ -28,7 +34,7 @@ const APPROVE_MAX = 500;
 
 // The statuses in which the checker has the record: a bill check can be saved
 // and files added or removed.
-const WITH_CHECKER = ['to_check', 'sent_back', 'changed'];
+const WITH_CHECKER = ['to_check'];
 
 const STEPS = {
   purchase: {
@@ -39,13 +45,18 @@ const STEPS = {
   },
 };
 
+// Where a head's send back puts the line: the queue before that head.
+const SEND_BACK_TO = { purchase: 'to_check', accounts: 'with_purchase_head' };
+const BACK_TO_WORDS = { to_check: 'the checker', with_purchase_head: 'the Purchase Head' };
+
+const NO_FILE_SEND = 'Attach the bill before sending it for approval';
+const NO_FILE_APPROVE = 'No bill attached — send it back to the checker to attach one';
+
 const STATUS_WORDS = {
   to_check: 'To check',
   with_purchase_head: 'With Purchase Head',
   with_accounts_head: 'With Accountant Head',
   approved: 'Approved',
-  sent_back: 'Sent back',
-  changed: 'Changed in ROMS',
   removed: 'Removed in ROMS',
 };
 
@@ -69,8 +80,9 @@ function notNow(status, step) {
   if (status === 'removed') return 'This record was removed in ROMS, so it can\'t be checked or approved';
   if (status === 'approved') return 'This record is already approved';
   if (WITH_CHECKER.includes(status)) return step ? 'This record needs its bill check saved first' : null;
-  if (!step) return `This record is ${STATUS_WORDS[status].toLowerCase()} — it can be changed again once a head sends it back`;
-  if (status !== STEPS[step].from) return `This record is ${STATUS_WORDS[status].toLowerCase()}, not waiting for the ${STEPS[step].head}`;
+  const words = (STATUS_WORDS[status] || status).toLowerCase();
+  if (!step) return `This record is ${words} — it can be changed again once a head sends it back`;
+  if (status !== STEPS[step].from) return `This record is ${words}, not waiting for the ${STEPS[step].head}`;
   return null;
 }
 
@@ -84,14 +96,21 @@ const SEND_BACK_FROM = {
 function cantSendBack(status, step) {
   if (SEND_BACK_FROM[step].includes(status)) return null;
   if (status === 'removed') return 'This record was removed in ROMS, so it can\'t be sent back';
-  if (WITH_CHECKER.includes(status)) return `This record is ${STATUS_WORDS[status].toLowerCase()}, so it is with the checker already`;
-  return `This record is ${STATUS_WORDS[status].toLowerCase()}, not yet with the ${STEPS[step].head}`;
+  const words = (STATUS_WORDS[status] || status).toLowerCase();
+  if (WITH_CHECKER.includes(status)) return 'This record is with the checker already';
+  return `This record is ${words}, not yet with the ${STEPS[step].head}`;
 }
 
 async function recordFor(tx, id) {
   const [r] = await rowsOf(tx, 'SELECT id, kind, status FROM purchase_records WHERE id = ?', [Number(id) || 0]);
   if (!r) throw fail(404, 'That purchase record isn’t in RAMS');
   return r;
+}
+
+// How many files a record has (a line never goes on without one).
+async function fileCount(tx, id) {
+  const [{ n }] = await rowsOf(tx, 'SELECT COUNT(*) AS n FROM purchase_files WHERE record_id = ?', [Number(id)]);
+  return Number(n);
 }
 
 const noteOf = (note) => {
@@ -108,6 +127,7 @@ async function checkOne(tx, id, user, text) {
   if (!WITH_CHECKER.includes(r.status)) return { status: 409, reason: notNow(r.status) };
   const lines = await currentLines(tx, r.id);
   if (!lines.length) return { status: 409, reason: 'This line was removed in ROMS' };
+  if (!(await fileCount(tx, r.id))) return { status: 409, reason: NO_FILE_SEND };
   const res = await tx.execute({
     sql: `UPDATE purchase_records
              SET status = 'with_purchase_head', checked_by = ?, checked_at = datetime('now'), check_note = ?, snapshot = ?,
@@ -181,8 +201,11 @@ async function approve(db, ids, step, user) {
       if (!r) { skipped.push({ id, reason: 'That purchase record isn’t in RAMS' }); continue; }
       const why = notNow(r.status, step);
       if (why) { skipped.push({ id, reason: why }); continue; }
+      if (!(await fileCount(tx, id))) { skipped.push({ id, reason: NO_FILE_APPROVE }); continue; }
+      // Approving sends it on, so a send back that brought it here is done with.
       const res = await tx.execute({
-        sql: `UPDATE purchase_records SET status = ?, ${s.by} = ?, ${s.at} = datetime('now'), updated_at = datetime('now')
+        sql: `UPDATE purchase_records SET status = ?, ${s.by} = ?, ${s.at} = datetime('now'),
+                     sent_back_by = NULL, sent_back_at = NULL, sent_back_step = NULL, sent_back_reason = NULL, updated_at = datetime('now')
                WHERE id = ? AND status = ?`,
         args: [s.to, user.id, id, s.from],
       });
@@ -203,7 +226,11 @@ async function approve(db, ids, step, user) {
   });
 }
 
-/** A head sends a record back to the bill check, with a reason. */
+/**
+ * A head sends a record back, with a reason, to the queue before them: the
+ * Purchase Head to the checker, the Accountant Head to the Purchase Head. Both
+ * approvals are cleared either way (the Purchase Head approves it again).
+ */
 async function sendBack(db, id, step, user, { reason } = {}) {
   const s = STEPS[step];
   const why = String(reason ?? '').trim();
@@ -213,13 +240,14 @@ async function sendBack(db, id, step, user, { reason } = {}) {
     const r = await recordFor(tx, id);
     const blocked = cantSendBack(r.status, step);
     if (blocked) throw fail(409, blocked);
+    const to = SEND_BACK_TO[step];
     const res = await tx.execute({
       sql: `UPDATE purchase_records
-               SET status = 'sent_back', sent_back_by = ?, sent_back_at = datetime('now'), sent_back_step = ?, sent_back_reason = ?,
+               SET status = ?, sent_back_by = ?, sent_back_at = datetime('now'), sent_back_step = ?, sent_back_reason = ?,
                    purchase_approved_by = NULL, purchase_approved_at = NULL, accounts_approved_by = NULL, accounts_approved_at = NULL,
                    updated_at = datetime('now')
              WHERE id = ? AND status = ?`,
-      args: [user.id, step, why, r.id, r.status],
+      args: [to, user.id, step, why, r.id, r.status],
     });
     if (!res.rowsAffected) throw fail(409, 'Someone changed this record just now — open it again');
     const label = recordLabel(r.kind, await currentLines(tx, r.id));
@@ -228,12 +256,12 @@ async function sendBack(db, id, step, user, { reason } = {}) {
       client: tx,
       userId: user.id,
       actionType: 'PURCHASE_SEND_BACK',
-      description: `Sent back by the ${s.head}${after} — ${label}. Reason: ${why}`,
+      description: `Sent back by the ${s.head}${after} to ${BACK_TO_WORDS[to]} — ${label}. Reason: ${why}`,
       entityType: 'purchase_records',
       entityId: r.id,
-      changes: [{ field: 'Status', old: STATUS_WORDS[r.status], new: STATUS_WORDS.sent_back }],
+      changes: [{ field: 'Status', old: STATUS_WORDS[r.status], new: STATUS_WORDS[to] }],
     });
-    return { id: Number(r.id), status: 'sent_back' };
+    return { id: Number(r.id), status: to };
   });
 }
 
@@ -283,6 +311,10 @@ function cantRecall(r, from, can) {
   const m = RECALL[r.status];
   if (!m) return `This line is ${(STATUS_WORDS[r.status] || r.status).toLowerCase()}`;
   if (from && r.status !== from) return 'Someone changed this line just now. Open it again';
+  // The Accountant Head sent it back to the Purchase Head: theirs to decide now.
+  if (r.status === 'with_purchase_head' && r.sent_back_step === 'accounts') {
+    return 'The Accountant Head sent it back to the Purchase Head. Ask the Purchase Head to send it back to you';
+  }
   if (!can[m.need]) return m.notAllowed;
   return null;
 }
@@ -308,7 +340,7 @@ async function recall(db, items, user, can) {
   if (list.length > APPROVE_MAX) throw fail(400, `Recall at most ${APPROVE_MAX} lines at a time`);
   return inTx(db, async (tx) => {
     const rows = await rowsOf(tx, `
-      SELECT r.id, r.kind, r.status, r.purchase_approved_at, r.accounts_approved_at,
+      SELECT r.id, r.kind, r.status, r.purchase_approved_at, r.accounts_approved_at, r.sent_back_step,
              pa.name AS purchase_name, aa.name AS accounts_name
         FROM purchase_records r
         LEFT JOIN users pa ON pa.id = r.purchase_approved_by
@@ -345,5 +377,5 @@ async function recall(db, items, user, can) {
 }
 
 module.exports = {
-  saveCheck, saveChecks, approve, sendBack, recall, WITH_CHECKER, STEPS, STATUS_WORDS, notNow, SEND_BACK_FROM,
+  saveCheck, saveChecks, approve, sendBack, recall, WITH_CHECKER, STEPS, STATUS_WORDS, notNow, SEND_BACK_FROM, SEND_BACK_TO,
 };

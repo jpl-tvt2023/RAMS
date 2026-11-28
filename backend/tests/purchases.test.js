@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const request = require('supertest');
 const bcrypt = require('bcryptjs');
 const app = require('../app');
@@ -89,6 +91,19 @@ const rowsOf = async (token, page = 'warehouse', query = {}) => {
 };
 const findBy = (body, pred) => body.rows.find(pred);
 const byIncoming = (body, inc) => body.rows.filter((r) => r.incoming === inc);
+// A bill on these lines, put straight into the database (no history row), for
+// the tests about the flow: a line never goes on without a file.
+let billSeq = 0;
+async function billOn(...ids) {
+  billSeq += 1;
+  const { rows } = await db.execute({
+    sql: "INSERT INTO file_blobs (sha256, mime, size, stored_size) VALUES (?, 'application/pdf', 10, 10) RETURNING id",
+    args: [`test-bill-${billSeq}-${Date.now()}`],
+  });
+  for (const id of ids) {
+    await db.execute({ sql: "INSERT INTO purchase_files (blob_id, record_id, file_name, kind) VALUES (?, ?, 'bill.pdf', 'pdf')", args: [rows[0].id, id] });
+  }
+}
 // A line's record, by its ROMS receipt row.
 const recordOfReceipt = async (romsId) => Number((await db.execute({ sql: 'SELECT record_id FROM roms_purchase_receipts WHERE id = ?', args: [romsId] })).rows[0].record_id);
 
@@ -241,7 +256,7 @@ describe('records from when a record was a whole delivery (before migration 023)
     const again = await load([lines[0], { ...lines[1], received_qty: 45 }]);
     expect(again.counts.records).toMatchObject({ changed: 1, split: 0 });
     const now = await rowsOf(accountant.token);
-    expect(findBy(now, (r) => r.lines[0].qty === 45)).toMatchObject({ status: 'changed', purchase_approval: null });
+    expect(findBy(now, (r) => r.lines[0].qty === 45)).toMatchObject({ status: 'to_check', purchase_approval: null, changed: { changes: [{ field: 'Socks, PO 002: Qty', old: '50', new: '45' }] } });
     expect(findBy(now, (r) => r.lines[0].qty === 100)).toMatchObject({ status: 'with_accounts_head' });
   });
 
@@ -263,6 +278,11 @@ describe('the bill check and the two approvals', () => {
     const [rec] = (await rowsOf(accountant.token)).rows;
 
     expect((await post(viewer.token, `records/${rec.id}/check`)).status).toBe(403);
+    // Never without a file.
+    const bare = await post(accountant.token, `records/${rec.id}/check`, { note: 'Bill matches the PO' });
+    expect(bare.status).toBe(409);
+    expect(bare.body.message).toBe('Attach the bill before sending it for approval');
+    await billOn(rec.id);
     const checked = await post(accountant.token, `records/${rec.id}/check`, { note: 'Bill matches the PO' });
     expect(checked.status).toBe(200);
     expect(checked.body).toMatchObject({ status: 'with_purchase_head', check: { name: 'Test Accountant', note: 'Bill matches the PO' } });
@@ -294,6 +314,7 @@ describe('the bill check and the two approvals', () => {
   test('one bill check on several lines of a delivery, each in its own history; what can\'t be checked is skipped', async () => {
     await load([receipt({ incoming_no: 'D', received_qty: 1 }), receipt({ incoming_no: 'D', received_qty: 2 }), receipt({ incoming_no: 'D', received_qty: 3 })]);
     const [a, b, c] = (await rowsOf(accountant.token)).rows;
+    await billOn(a.id, b.id, c.id);
     await post(accountant.token, `records/${c.id}/check`);
     await post(purchaseHead.token, 'purchase-head/approve', { ids: [c.id] });
 
@@ -326,6 +347,7 @@ describe('the bill check and the two approvals', () => {
     expect(early.status).toBe(409);
     expect(early.body.message).toBe('This record needs its bill check saved first');
 
+    await billOn(a.id, b.id);
     await post(accountant.token, `records/${a.id}/check`);
     await post(accountant.token, `records/${b.id}/check`);
     const bulk = await post(purchaseHead.token, 'purchase-head/approve', { ids: [a.id, b.id, c.id] });
@@ -336,9 +358,10 @@ describe('the bill check and the two approvals', () => {
     expect(body.counts).toMatchObject({ with_accounts_head: 2, to_check: 1, all: 3 });
   });
 
-  test('a head sends it back with a reason; once checked again it starts over at the Purchase Head', async () => {
+  test('a send back goes to the queue before the head: the Accountant Head\'s to the Purchase Head, the Purchase Head\'s to the checker', async () => {
     await load([receipt({ incoming_no: 'SB' })]);
     const [rec] = (await rowsOf(accountant.token)).rows;
+    await billOn(rec.id);
     await post(accountant.token, `records/${rec.id}/check`);
     await post(purchaseHead.token, 'purchase-head/approve', { ids: [rec.id] });
 
@@ -346,14 +369,73 @@ describe('the bill check and the two approvals', () => {
     const back = await post(accountsHead.token, `records/${rec.id}/accounts-head/send-back`, { reason: 'Rate on the bill is 20, not 19.75' });
     expect(back.status).toBe(200);
     expect(back.body).toMatchObject({
-      status: 'sent_back', purchase_approval: null, sent_back: { step: 'accounts', name: 'Asha Accounts', reason: 'Rate on the bill is 20, not 19.75' },
+      status: 'with_purchase_head', purchase_approval: null, check: { name: 'Test Accountant' },
+      sent_back: { step: 'accounts', name: 'Asha Accounts', reason: 'Rate on the bill is 20, not 19.75' },
     });
+    // With the Purchase Head now: the checker can't recall it from them.
+    const recall = await post(accountant.token, 'recall', { items: [{ id: rec.id, from: 'with_purchase_head' }] });
+    expect(recall.status).toBe(409);
+    expect(recall.body.message).toBe('The Accountant Head sent it back to the Purchase Head. Ask the Purchase Head to send it back to you');
 
+    // The Purchase Head sends it on to the checker, who fixes and sends it again.
+    const toChecker = await post(purchaseHead.token, `records/${rec.id}/purchase-head/send-back`, { reason: 'Get the corrected bill' });
+    expect(toChecker.body).toMatchObject({ status: 'to_check', sent_back: { step: 'purchase', name: 'Pia Purchase', reason: 'Get the corrected bill' } });
+    expect((await rowsOf(accountant.token, 'warehouse', { status: 'to_check' })).rows.map((r) => r.id)).toEqual([rec.id]);
     const rechecked = await post(accountant.token, `records/${rec.id}/check`, { note: 'Vendor sent a corrected bill' });
     expect(rechecked.body).toMatchObject({ status: 'with_purchase_head', sent_back: null, purchase_approval: null });
     const h = await history(accountant.token, rec.id);
-    expect(h.body.map((e) => e.action_type)).toEqual(['PURCHASE_CHECK', 'PURCHASE_SEND_BACK', 'PURCHASE_APPROVE', 'PURCHASE_CHECK']);
-    expect(h.body[1].description).toMatch(/Reason: Rate on the bill is 20, not 19.75$/);
+    expect(h.body.map((e) => e.action_type)).toEqual(['PURCHASE_CHECK', 'PURCHASE_SEND_BACK', 'PURCHASE_SEND_BACK', 'PURCHASE_APPROVE', 'PURCHASE_CHECK']);
+    expect(h.body[2].description).toMatch(/^Sent back by the Accountant Head to the Purchase Head — .*Reason: Rate on the bill is 20, not 19.75$/);
+    expect(h.body[1].description).toMatch(/^Sent back by the Purchase Head to the checker — /);
+  });
+
+  test('a Purchase Head\'s approval after a send back clears the red note; approving needs a file too', async () => {
+    await load([receipt({ incoming_no: 'RE' }), receipt({ incoming_no: 'NOFILE' })]);
+    const rows = (await rowsOf(accountant.token)).rows;
+    const rec = rows.find((r) => r.incoming === 'RE');
+    const bare = rows.find((r) => r.incoming === 'NOFILE');
+    await billOn(rec.id);
+    await post(accountant.token, `records/${rec.id}/check`);
+    await post(purchaseHead.token, 'purchase-head/approve', { ids: [rec.id] });
+    await post(accountsHead.token, `records/${rec.id}/accounts-head/send-back`, { reason: 'Check the rate' });
+    expect((await post(purchaseHead.token, 'purchase-head/approve', { ids: [rec.id] })).body.approved).toBe(1);
+    expect((await get(accountant.token, `records/${rec.id}`)).body).toMatchObject({ status: 'with_accounts_head', sent_back: null });
+
+    // A line that reached a head with no file (from before the rule) is not approved.
+    await db.execute({ sql: "UPDATE purchase_records SET status = 'with_purchase_head', checked_at = datetime('now') WHERE id = ?", args: [bare.id] });
+    const res = await post(purchaseHead.token, 'purchase-head/approve', { ids: [bare.id] });
+    expect(res.status).toBe(409);
+    expect(res.body.message).toBe('No bill attached — send it back to the checker to attach one');
+  });
+
+  test('migration 024 moves the old statuses into the queues, and sends back lines with a head that have no file', async () => {
+    await load([receipt({ incoming_no: 'Q1' }), receipt({ incoming_no: 'Q2' }), receipt({ incoming_no: 'Q3' }), receipt({ incoming_no: 'Q4' }), receipt({ incoming_no: 'Q5' })]);
+    const rows = (await rowsOf(accountant.token)).rows;
+    const id = (inc) => rows.find((r) => r.incoming === inc).id;
+    const set = (inc, sql) => db.execute({ sql: `UPDATE purchase_records SET ${sql} WHERE id = ?`, args: [id(inc)] });
+    await billOn(id('Q1'), id('Q2'), id('Q3'), id('Q4'));
+    await set('Q1', "status = 'sent_back', checked_at = datetime('now'), sent_back_step = 'accounts', sent_back_at = datetime('now'), sent_back_reason = 'Rate'");
+    await set('Q2', "status = 'sent_back', checked_at = datetime('now'), sent_back_step = 'purchase', sent_back_at = datetime('now'), sent_back_reason = 'Vendor'");
+    await set('Q3', "status = 'changed', checked_at = datetime('now'), changed_at = datetime('now'), changes = '[]'");
+    await set('Q4', "status = 'approved', checked_at = datetime('now'), purchase_approved_at = datetime('now'), accounts_approved_at = datetime('now')");
+    await set('Q5', "status = 'approved', checked_at = datetime('now'), purchase_approved_at = datetime('now'), accounts_approved_at = datetime('now')");
+
+    const sql = fs.readFileSync(path.join(__dirname, '../src/migrations/024_purchase_queues.sql'), 'utf8');
+    for (let run = 0; run < 2; run += 1) { // it can run again
+      for (const stmt of sql.split(';').map((s) => s.trim()).filter(Boolean)) await db.execute(stmt);
+    }
+    const now = (await rowsOf(accountant.token)).rows;
+    const of = (inc) => now.find((r) => r.incoming === inc);
+    expect(of('Q1')).toMatchObject({ status: 'with_purchase_head', sent_back: { step: 'accounts', reason: 'Rate' } });
+    expect(of('Q2')).toMatchObject({ status: 'to_check', sent_back: { step: 'purchase', reason: 'Vendor' } });
+    expect(of('Q3')).toMatchObject({ status: 'to_check', changed: { changes: [] } });
+    expect(of('Q4')).toMatchObject({ status: 'approved' });
+    expect(of('Q5')).toMatchObject({
+      status: 'to_check', purchase_approval: null, accounts_approval: null, sent_back: { step: null, name: null, reason: 'No bill attached — attach the bill and send it again' },
+    });
+    const h = (await history(accountant.token, of('Q5').id)).body;
+    expect(h).toHaveLength(1);
+    expect(h[0]).toMatchObject({ action_type: 'PURCHASE_SEND_BACK', user_id: null });
   });
 });
 
@@ -366,6 +448,7 @@ describe('taking a step back: recall, and a head changing their mind', () => {
     await load([receipt({ incoming_no: 'RC' }), receipt({ incoming_no: 'RC' })]);
     const [a, b] = (await rowsOf(accountant.token)).rows;
     expect((await upload(accountant.token, a.id, PDF)).status).toBe(201);
+    await billOn(b.id);
     expect((await post(accountant.token, 'check', { ids: [a.id, b.id], note: 'Matches the PO' })).body.checked).toBe(2);
     expect((await upload(accountant.token, a.id, PDF2)).status).toBe(409);
 
@@ -399,6 +482,7 @@ describe('taking a step back: recall, and a head changing their mind', () => {
   test('the Purchase Head takes back an approval before the Accountant Head acts; an approved line is not recalled', async () => {
     await load([receipt({ incoming_no: 'PH' })]);
     const [rec] = (await rowsOf(accountant.token)).rows;
+    await billOn(rec.id);
     await post(accountant.token, `records/${rec.id}/check`);
     await post(purchaseHead.token, 'purchase-head/approve', { ids: [rec.id] });
 
@@ -427,22 +511,23 @@ describe('taking a step back: recall, and a head changing their mind', () => {
   test('a head can send back a line they approved, even after the final approval; not one that hasn\'t reached them', async () => {
     await load([receipt({ incoming_no: 'MIND' }), receipt({ incoming_no: 'MIND' }), receipt({ incoming_no: 'MIND' })]);
     const [a, b, c] = (await rowsOf(accountant.token)).rows;
+    await billOn(a.id, b.id, c.id);
     await post(accountant.token, 'check', { ids: [a.id, b.id, c.id] });
     await post(purchaseHead.token, 'purchase-head/approve', { ids: [a.id, b.id] });
     await post(accountsHead.token, 'accounts-head/approve', { ids: [b.id] });
 
-    // The Purchase Head, after approving: with the Accountant Head.
+    // The Purchase Head, after approving (with the Accountant Head): to the checker.
     const pa = await post(purchaseHead.token, `records/${a.id}/purchase-head/send-back`, { reason: 'Wrong vendor on the bill' });
-    expect(pa.body).toMatchObject({ status: 'sent_back', sent_back: { step: 'purchase', reason: 'Wrong vendor on the bill' } });
+    expect(pa.body).toMatchObject({ status: 'to_check', sent_back: { step: 'purchase', reason: 'Wrong vendor on the bill' } });
 
-    // The Accountant Head, after the final approval.
+    // The Accountant Head, after the final approval: to the Purchase Head.
     const ab = await post(accountsHead.token, `records/${b.id}/accounts-head/send-back`, { reason: 'Paid twice' });
     expect(ab.body).toMatchObject({
-      status: 'sent_back', purchase_approval: null, accounts_approval: null, sent_back: { step: 'accounts', name: 'Asha Accounts' },
+      status: 'with_purchase_head', purchase_approval: null, accounts_approval: null, sent_back: { step: 'accounts', name: 'Asha Accounts' },
     });
     const h = await history(accountant.token, b.id);
-    expect(h.body[0].description).toMatch(/^Sent back by the Accountant Head after approving it — .*Reason: Paid twice$/);
-    expect(changesOf(h.body[0])).toEqual([{ field: 'Status', old: 'Approved', new: 'Sent back' }]);
+    expect(h.body[0].description).toMatch(/^Sent back by the Accountant Head after approving it to the Purchase Head — .*Reason: Paid twice$/);
+    expect(changesOf(h.body[0])).toEqual([{ field: 'Status', old: 'Approved', new: 'With Purchase Head' }]);
 
     // c is still with the Purchase Head: the Accountant Head can't send it back.
     const early = await post(accountsHead.token, `records/${c.id}/accounts-head/send-back`, { reason: 'x' });
@@ -450,17 +535,18 @@ describe('taking a step back: recall, and a head changing their mind', () => {
     expect(early.body.message).toBe('This record is with purchase head, not yet with the Accountant Head');
     // Nor anyone a line that is with the checker.
     const checker = await post(purchaseHead.token, `records/${a.id}/purchase-head/send-back`, { reason: 'x' });
-    expect(checker.body.message).toBe('This record is sent back, so it is with the checker already');
+    expect(checker.body.message).toBe('This record is with the checker already');
 
-    // The Purchase Head may also send back a fully approved line.
+    // The Purchase Head may also send back a fully approved line: to the checker.
     await post(purchaseHead.token, 'purchase-head/approve', { ids: [c.id] });
     await post(accountsHead.token, 'accounts-head/approve', { ids: [c.id] });
-    expect((await post(purchaseHead.token, `records/${c.id}/purchase-head/send-back`, { reason: 'Bill is for another PO' })).body.status).toBe('sent_back');
+    expect((await post(purchaseHead.token, `records/${c.id}/purchase-head/send-back`, { reason: 'Bill is for another PO' })).body.status).toBe('to_check');
   });
 
   test('a recalled line deleted in ROMS is marked removed, not dropped: it has a history', async () => {
     await load([receipt({ incoming_no: 'GONE' })]);
     const [rec] = (await rowsOf(accountant.token)).rows;
+    await billOn(rec.id);
     await post(accountant.token, `records/${rec.id}/check`);
     await recall(accountant.token, [{ id: rec.id, from: 'with_purchase_head' }]);
     expect(await one(rec.id)).toMatchObject({ status: 'to_check', check: null });
@@ -476,6 +562,7 @@ describe('when ROMS changes a line after its bill check', () => {
     const lines = [receipt({ incoming_no: 'CH-1', received_qty: 103 }), receipt({ incoming_no: 'CH-1', received_qty: 57 })];
     await load(lines);
     const ids = (await rowsOf(accountant.token)).rows.map((r) => r.id);
+    await billOn(...ids);
     await post(accountant.token, 'check', { ids });
     await post(purchaseHead.token, 'purchase-head/approve', { ids });
     await post(accountsHead.token, 'accounts-head/approve', { ids });
@@ -484,7 +571,9 @@ describe('when ROMS changes a line after its bill check', () => {
     expect(res.counts.records.changed).toBe(1);
     const body = await rowsOf(accountant.token);
     const now = findBy(body, (r) => r.lines[0].qty === 100);
-    expect(now).toMatchObject({ status: 'changed', purchase_approval: null, accounts_approval: null });
+    // Back at the start, the checker's queue, with the note of what changed.
+    expect(now).toMatchObject({ status: 'to_check', purchase_approval: null, accounts_approval: null });
+    expect(body.counts).toMatchObject({ to_check: 1, approved: 1 });
     expect(now.changed.changes).toEqual([{ field: 'Socks, PO 002: Qty', old: '103', new: '100' }]);
     expect(findBy(body, (r) => r.lines[0].qty === 57)).toMatchObject({ status: 'approved' });
     // A system change: "Last updated by" still names the person.
@@ -494,7 +583,11 @@ describe('when ROMS changes a line after its bill check', () => {
 
     // Reading ROMS again with nothing new changes nothing more.
     expect((await load([{ ...lines[0], received_qty: 100 }, lines[1]])).counts.records.changed).toBe(0);
-    expect((await post(accountant.token, `records/${now.id}/check`)).body.status).toBe('with_purchase_head');
+    // Changed again while To check: the note keeps up.
+    await load([{ ...lines[0], received_qty: 98 }, lines[1]]);
+    expect((await get(accountant.token, `records/${now.id}`)).body.changed.changes).toEqual([{ field: 'Socks, PO 002: Qty', old: '103', new: '98' }]);
+    const sent = (await post(accountant.token, `records/${now.id}/check`)).body;
+    expect(sent).toMatchObject({ status: 'with_purchase_head', changed: null });
   });
 
   test('an Incoming No corrected in ROMS keeps each line\'s record, files and history, and moves it to its new delivery', async () => {
@@ -517,6 +610,7 @@ describe('when ROMS changes a line after its bill check', () => {
     await load([receipt({ incoming_no: 'KEEP' }), receipt({ incoming_no: 'DROP' })]);
     const rows = (await rowsOf(accountant.token)).rows;
     const keep = rows.find((r) => r.incoming === 'KEEP');
+    await billOn(keep.id);
     await post(accountant.token, `records/${keep.id}/check`);
 
     const res = await load([receipt({ incoming_no: 'OTHER' })]);
@@ -544,7 +638,7 @@ describe('files on a purchase line', () => {
     await post(accountant.token, `records/${rec.id}/check`);
     const locked = await upload(accountant.token, rec.id, PDF2);
     expect(locked.status).toBe(409);
-    expect(locked.body.message).toMatch(/locked once the bill check is saved/);
+    expect(locked.body.message).toMatch(/locked once the line is sent for approval/);
     expect((await remove(accountant.token, added.body.id)).status).toBe(409);
 
     const down = await bearer(request(app).get(`/api/purchases/files/${added.body.id}`), viewer.token).buffer(true).parse((res, cb) => {
@@ -561,12 +655,13 @@ describe('files on a purchase line', () => {
   test('one upload goes on the ticked lines of a delivery (stored once); a line it can\'t go on is skipped; removing takes it off them too', async () => {
     await load([receipt({ incoming_no: 'T' }), receipt({ incoming_no: 'T' }), receipt({ incoming_no: 'T' })]);
     const [a, b, c] = (await rowsOf(accountant.token)).rows;
-    await post(accountant.token, `records/${c.id}/check`); // its files are locked now
+    // c is with the Purchase Head: its files are locked.
+    await db.execute({ sql: "UPDATE purchase_records SET status = 'with_purchase_head', checked_at = datetime('now') WHERE id = ?", args: [c.id] });
 
     const res = await upload(accountant.token, a.id, PDF, 'bill-121.pdf', [b.id, c.id]);
     expect(res.status).toBe(201);
     expect(res.body.also.added.map((x) => x.record_id)).toEqual([b.id]);
-    expect(res.body.also.skipped).toEqual([{ id: c.id, reason: 'The files are locked once the bill check is saved. A head can send the record back to change them' }]);
+    expect(res.body.also.skipped).toEqual([{ id: c.id, reason: 'The files are locked once the line is sent for approval. Recall it, or ask the Purchase Head to send it back, to change them' }]);
     const [{ n: blobs }] = (await db.execute('SELECT COUNT(DISTINCT blob_id) AS n FROM purchase_files')).rows;
     expect(Number(blobs)).toBe(1);
     expect((await history(accountant.token, b.id)).body.map((e) => e.description)).toEqual([`File added — bill-121.pdf on ${b.label}`]);
@@ -635,9 +730,12 @@ describe('the page', () => {
     expect((await get(viewer.token, 'warehouse/records', { fy: 2019 })).status).toBe(400);
     expect((await get(viewer.token, 'elsewhere/records')).status).toBe(404);
     expect((await get(viewer.token, 'warehouse/records', { status: 'nope' })).status).toBe(400);
+    // A filter saved before the five queues reads as To check.
+    expect((await get(viewer.token, 'warehouse/records', { fy: FY, status: 'sent_back' })).status).toBe(200);
 
     // Admin can act at any step, like every permission.
     const rec = all.rows[0];
+    await billOn(rec.id);
     await post(admin.token, `records/${rec.id}/check`);
     expect((await post(admin.token, 'purchase-head/approve', { ids: [rec.id] })).body.approved).toBe(1);
   });

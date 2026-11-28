@@ -8,7 +8,7 @@ import { LastUpdatedCell } from '../shared/LastUpdated';
 import { HistoryButton } from '../shared/HistoryDrawer';
 import { formatDate, formatDateTime } from '../../utils/formatters';
 import {
-  ROW_FILL, numText, deliveryRuns, notesOf, maySend, mayApprove, mayRecall, maySendBack,
+  rowFill, numText, deliveryRuns, notesOf, mayAttach, mayApprove, mayRecall, maySendBack,
 } from '../../utils/purchaseText';
 
 const TONE = { muted: 'text-gray-500', plain: 'text-gray-700', red: 'text-red-700 font-medium' };
@@ -23,7 +23,8 @@ const TONE = { muted: 'text-gray-500', plain: 'text-gray-700', red: 'text-red-70
  *
  * The tick column is there only when this person can act on a line on the
  * page -- send it for approval, approve it, or recall it; a delivery with
- * several such lines gets one tick for all.
+ * several such lines gets one tick for all. The checker may tick a line with
+ * no bill yet, but it isn't sent until it has one.
  *
  * can: { check, purchase, accounts } -- what this person may do.
  * selected / onSelect(id, on) / onSelectMany(ids, on): the ticked lines.
@@ -32,7 +33,7 @@ const TONE = { muted: 'text-gray-500', plain: 'text-gray-700', red: 'text-red-70
 export default function RecordsTable({
   rows, loading, can, selected, onSelect, onSelectMany, onCheck, onApprove, onSendBack, onRecall, empty,
 }) {
-  const tickable = (r) => maySend(r, can) || mayApprove(r, can) || mayRecall(r, can);
+  const tickable = (r) => mayAttach(r, can) || mayApprove(r, can) || mayRecall(r, can);
   const selectable = rows.some(tickable);
   const head = [
     ...(selectable ? [{ label: '', className: 'w-10' }] : []),
@@ -47,10 +48,10 @@ export default function RecordsTable({
         const allTicked = ticks.length > 0 && ticks.every((id) => selected.has(id));
         return run.rows.map((r, i) => {
           const l = r.lines[0] || { key: 'none', removed: true };
-          const lineFill = ROW_FILL[r.status] || '';
+          const lineFill = rowFill(r);
           const gone = l.removed ? 'line-through text-gray-400' : '';
           const last = i === run.rows.length - 1;
-          const attach = maySend(r, can);
+          const attach = mayAttach(r, can);
           const sendBackAs = (step) => (maySendBack(r, step, can) ? () => onSendBack(r, step) : undefined);
           return (
             <tr key={r.id} className={`${last ? 'border-b border-gray-200' : 'border-b border-gray-100'} ${lineFill} align-middle`}>
