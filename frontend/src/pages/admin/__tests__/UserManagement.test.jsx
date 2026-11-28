@@ -40,4 +40,26 @@ describe('Users', () => {
     expect(await screen.findByRole('dialog', { name: 'History — Asha' })).toBeInTheDocument();
     expect(audit.getEntityHistory).toHaveBeenCalledWith('user', 3);
   });
+
+  test('a person can hold several roles: the head is ticked beside their usual role', async () => {
+    usersApi.updateUser.mockResolvedValue({});
+    const u = userEvent.setup();
+    renderWithProviders(<UserManagement />, { user: ADMIN });
+    await u.click(await screen.findByRole('button', { name: 'Edit Asha' }));
+    const form = screen.getByRole('dialog', { name: 'Edit User' });
+    expect(within(form).getByRole('checkbox', { name: /^Accountant —/ })).toBeChecked();
+    await u.click(within(form).getByRole('checkbox', { name: /^Accountant Head —/ }));
+    await u.click(within(form).getByRole('button', { name: 'Save Changes' }));
+    expect(usersApi.updateUser).toHaveBeenCalledWith(3, { name: 'Asha', roles: ['Accountant', 'Accountant Head'] });
+  });
+
+  test('at least one role stays ticked', async () => {
+    const u = userEvent.setup();
+    renderWithProviders(<UserManagement />, { user: ADMIN });
+    await u.click(await screen.findByRole('button', { name: 'Edit Asha' }));
+    const form = screen.getByRole('dialog', { name: 'Edit User' });
+    await u.click(within(form).getByRole('checkbox', { name: /^Accountant —/ }));
+    await u.click(within(form).getByRole('button', { name: 'Save Changes' }));
+    expect(usersApi.updateUser).not.toHaveBeenCalled();
+  });
 });

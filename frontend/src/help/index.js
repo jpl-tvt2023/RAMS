@@ -15,6 +15,7 @@ import {
 } from './reports';
 import { partyStatementsHelp } from './statements';
 import { attachmentsHelp } from './attachments';
+import { purchasesWarehouseHelp, purchasesStitchingHelp } from './purchases';
 import { isReleased } from '../utils/releases';
 
 export const HELP_SECTIONS = [
@@ -28,6 +29,8 @@ export const HELP_SECTIONS = [
   billsReceivableHelp,
   partyStatementsHelp,
   attachmentsHelp,
+  purchasesWarehouseHelp,
+  purchasesStitchingHelp,
   invoicesHelp,
   notesHelp,
   transfersHelp,

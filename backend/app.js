@@ -68,6 +68,7 @@ app.use('/api/reports',    require('./src/routes/reports.routes'));
 app.use('/api/statements', require('./src/routes/statements.routes'));
 app.use('/api/files',      require('./src/routes/files.routes'));
 app.use('/api/attachments', require('./src/routes/attachments.routes'));
+app.use('/api/purchases',  require('./src/routes/purchases.routes'));
 app.use('/api/agent',      require('./src/routes/agent.routes'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));

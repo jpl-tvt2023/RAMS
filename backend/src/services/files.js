@@ -13,6 +13,8 @@
 // request to the database carries a whole file.
 const crypto = require('crypto');
 const zlib = require('zlib');
+const { linesFor: linesForRecords } = require('../purchases/records');
+const { recordLabel } = require('../purchases/lines');
 
 const CHUNK_BYTES = 512 * 1024;
 // What one upload may carry, after the browser's compression. Vercel refuses
@@ -23,6 +25,13 @@ const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_PER_ROW = 10;
 const LIST_CHUNK = 400;
+// Where files sit: on a Tally voucher, or on a Purchase Reports record (022).
+// Both point into the one blob store, so a blob is freed only when neither uses it.
+const FILE_TABLES = ['voucher_files', 'purchase_files'];
+const tableOf = (table = 'voucher_files') => {
+  if (!FILE_TABLES.includes(table)) throw new Error(`Unknown file table ${table}`);
+  return table;
+};
 
 const ALLOWED = 'PDFs, photos (JPG, PNG or WebP) and emails (.eml or .msg)';
 const MB = (bytes) => `${(bytes / 1048576).toFixed(bytes < 10485760 ? 1 : 0)} MB`;
@@ -135,9 +144,9 @@ async function storeBlob(tx, { bytes, gzip = false }, name) {
  * One file, ready to send: { id, name, kind, mime, size, encoding, body } --
  * body is the stored bytes (gzip when encoding is 'gzip'). null if it's gone.
  */
-async function readFile(client, id) {
+async function readFile(client, id, { table } = {}) {
   const [f] = await rowsOf(client, `SELECT f.id, f.file_name, f.kind, f.blob_id, b.mime, b.size, b.stored_size, b.encoding
-                                      FROM voucher_files f JOIN file_blobs b ON b.id = f.blob_id WHERE f.id = ?`, [Number(id) || 0]);
+                                      FROM ${tableOf(table)} f JOIN file_blobs b ON b.id = f.blob_id WHERE f.id = ?`, [Number(id) || 0]);
   if (!f) return null;
   const pieces = [];
   const count = Math.ceil(Number(f.stored_size) / CHUNK_BYTES);
@@ -183,8 +192,10 @@ async function filesFor(client, { vouchers = [] }) {
 
 // Deletes a blob no row uses any more. Returns whether it did.
 async function freeBlob(tx, blobId) {
-  const [{ n }] = await rowsOf(tx, 'SELECT COUNT(*) AS n FROM voucher_files WHERE blob_id = ?', [blobId]);
-  if (Number(n)) return false;
+  for (const table of FILE_TABLES) {
+    const [{ n }] = await rowsOf(tx, `SELECT COUNT(*) AS n FROM ${table} WHERE blob_id = ?`, [blobId]);
+    if (Number(n)) return false;
+  }
   await tx.execute({ sql: 'DELETE FROM file_chunks WHERE blob_id = ?', args: [blobId] });
   await tx.execute({ sql: 'DELETE FROM file_blobs WHERE id = ?', args: [blobId] });
   return true;
@@ -192,15 +203,20 @@ async function freeBlob(tx, blobId) {
 
 // Takes one file off its row (and frees its blob if nothing else uses it).
 // Returns the removed row, or null if it was already gone.
-async function unlink(tx, fileId) {
-  const [f] = await rowsOf(tx, 'SELECT * FROM voucher_files WHERE id = ?', [Number(fileId) || 0]);
+async function unlink(tx, fileId, { table } = {}) {
+  const t = tableOf(table);
+  const [f] = await rowsOf(tx, `SELECT * FROM ${t} WHERE id = ?`, [Number(fileId) || 0]);
   if (!f) return null;
-  await tx.execute({ sql: 'DELETE FROM voucher_files WHERE id = ?', args: [f.id] });
+  await tx.execute({ sql: `DELETE FROM ${t} WHERE id = ?`, args: [f.id] });
   await freeBlob(tx, Number(f.blob_id));
   return f;
 }
 
 // ------------------------------------------------------------ usage
+
+// Every file, wherever it sits, for the storage totals.
+const EVERY_FILE = `(SELECT blob_id, kind, original_size FROM voucher_files
+                     UNION ALL SELECT blob_id, kind, original_size FROM purchase_files)`;
 
 /**
  * For Admin -> File storage: how many files, the space they take, what was
@@ -208,14 +224,14 @@ async function unlink(tx, fileId) {
  * stored once), per kind, and the 20 biggest.
  */
 async function usage(client) {
-  const [[t], [b], picked, stored, biggest] = await Promise.all([
+  const [[t], [b], picked, stored, biggest, biggestPurchase] = await Promise.all([
     rowsOf(client, `SELECT COUNT(*) AS files, COALESCE(SUM(COALESCE(f.original_size, b.size)), 0) AS picked
-                      FROM voucher_files f JOIN file_blobs b ON b.id = f.blob_id`),
+                      FROM ${EVERY_FILE} f JOIN file_blobs b ON b.id = f.blob_id`),
     rowsOf(client, 'SELECT COUNT(*) AS blobs, COALESCE(SUM(size), 0) AS size, COALESCE(SUM(stored_size), 0) AS stored FROM file_blobs'),
     rowsOf(client, `SELECT f.kind, COUNT(*) AS files, COALESCE(SUM(COALESCE(f.original_size, b.size)), 0) AS picked
-                      FROM voucher_files f JOIN file_blobs b ON b.id = f.blob_id GROUP BY f.kind`),
+                      FROM ${EVERY_FILE} f JOIN file_blobs b ON b.id = f.blob_id GROUP BY f.kind`),
     rowsOf(client, `SELECT kind, COALESCE(SUM(stored_size), 0) AS stored
-                      FROM (SELECT DISTINCT f.kind, b.id, b.stored_size FROM voucher_files f JOIN file_blobs b ON b.id = f.blob_id)
+                      FROM (SELECT DISTINCT f.kind, b.id, b.stored_size FROM ${EVERY_FILE} f JOIN file_blobs b ON b.id = f.blob_id)
                      GROUP BY kind`),
     // Where each file is: the Tally voucher, its party, and the party's
     // marketplace (as Party Statements decides it: the mapping, else the suggestion),
@@ -232,7 +248,15 @@ async function usage(client) {
                       LEFT JOIN party_ledgers vp ON vp.company_id = v.company_id AND vp.ledger_guid = vl.guid
                      ORDER BY b.stored_size DESC, f.id DESC
                      LIMIT 20`),
+    // Files on Purchase Reports records: the page and the record they are on.
+    rowsOf(client, `SELECT f.id, f.record_id, f.file_name, f.kind, f.uploaded_at, b.size, b.stored_size, u.name AS uploaded_by_name, r.page
+                      FROM purchase_files f JOIN file_blobs b ON b.id = f.blob_id
+                      JOIN purchase_records r ON r.id = f.record_id
+                      LEFT JOIN users u ON u.id = f.uploaded_by
+                     ORDER BY b.stored_size DESC, f.id DESC
+                     LIMIT 20`),
   ]);
+  const purchaseLines = await linesForRecords(client, [...new Set(biggestPurchase.map((r) => Number(r.record_id)))]);
   const storedOf = new Map(stored.map((r) => [r.kind, Number(r.stored)]));
   const pickedBytes = Number(t.picked);
   const storedBytes = Number(b.stored);
@@ -248,7 +272,7 @@ async function usage(client) {
         kind, files: Number(p?.files || 0), picked_bytes: Number(p?.picked || 0), stored_bytes: storedOf.get(kind) || 0,
       };
     }),
-    biggest: biggest.map((r) => ({
+    biggest: [...biggest.map((r) => ({
       id: Number(r.id),
       name: r.file_name,
       kind: r.kind,
@@ -261,7 +285,25 @@ async function usage(client) {
       on: {
         type: 'voucher', voucher_type: r.voucher_type ?? null, base_type: r.voucher_base_type ?? null, number: r.voucher_number ?? null, date: r.voucher_date ?? null, party: r.voucher_party ?? null, party_guid: r.voucher_ledger ?? null, vendor: r.voucher_vendor ?? null,
       },
-    })),
+    })), ...biggestPurchase.map((r) => {
+      const lines = purchaseLines.get(Number(r.record_id)) || [];
+      const first = lines[0] || {};
+      return {
+        id: Number(r.id),
+        store: 'purchase',
+        name: r.file_name,
+        kind: r.kind,
+        size: Number(r.size),
+        stored_size: Number(r.stored_size),
+        uploaded_by_name: r.uploaded_by_name ?? null,
+        uploaded_at: r.uploaded_at,
+        company_id: null,
+        company: first.company ?? null,
+        on: {
+          type: 'purchase', page: r.page, record_id: Number(r.record_id), label: recordLabel(first.src === 'challan' ? 'challan' : 'receipts', lines), search: first.incoming || first.billing || null,
+        },
+      };
+    })].sort((x, y) => y.stored_size - x.stored_size).slice(0, 20),
   };
 }
 

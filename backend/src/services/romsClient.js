@@ -9,6 +9,9 @@
 // runs on the copy RAMS last read, and the pages say ROMS isn't connected.
 // The token is never logged or returned.
 const RESOURCES = ['vendors', 'products', 'vendor-codes', 'pos', 'lines', 'rtv'];
+// Purchase Reports reads these on its own (purchases/refresh.js), so a ROMS
+// build that doesn't serve them yet never fails a matching run.
+const PURCHASE_RESOURCES = ['purchase-receipts', 'purchase-challans'];
 const PAGE_SIZE = 1000;
 // ROMS's AUTOFILL_MAX_ITEMS (integration.controller.js) is 200.
 const AUTOFILL_MAX = 200;
@@ -65,7 +68,7 @@ function createRomsClient({
 
   // Every row of one resource, page by page.
   async function refs(resource) {
-    if (!RESOURCES.includes(resource)) throw new Error(`Unknown ROMS reference ${resource}`);
+    if (!RESOURCES.includes(resource) && !PURCHASE_RESOURCES.includes(resource)) throw new Error(`Unknown ROMS reference ${resource}`);
     const rows = [];
     for (let page = 1; ; page++) {
       const data = await request(`/refs/${resource}?page=${page}&page_size=${PAGE_SIZE}`);
@@ -99,5 +102,5 @@ function createRomsClient({
 }
 
 module.exports = {
-  createRomsClient, romsSettings, RomsError, RESOURCES, AUTOFILL_MAX,
+  createRomsClient, romsSettings, RomsError, RESOURCES, PURCHASE_RESOURCES, AUTOFILL_MAX,
 };

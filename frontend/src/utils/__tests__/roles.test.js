@@ -12,10 +12,10 @@ const catalogFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const haveBackend = fs.existsSync(catalogFile);
 
 // Pinned to the same values the backend's tests/roles.test.js asserts for
-// middleware/rbac.js and migration 002 -- change one side, change both.
+// middleware/rbac.js and the user_roles CHECK (migration 022) -- change one side, change both.
 describe('the RAMS role set', () => {
-  test('is Admin, Owner, Accountant and Viewer, with Admin and Owner as the admins', () => {
-    expect(ALL_ROLES).toEqual(['Admin', 'Owner', 'Accountant', 'Viewer']);
+  test('is Admin, Owner, Accountant, Viewer and the two heads, with Admin and Owner as the admins', () => {
+    expect(ALL_ROLES).toEqual(['Admin', 'Owner', 'Accountant', 'Viewer', 'Purchase Head', 'Accountant Head']);
     expect(ADMIN_ONLY).toEqual(['Admin', 'Owner']);
     expect(Object.values(ROLES)).toEqual(ALL_ROLES);
     expect(Object.keys(ROLE_INFO)).toEqual(ALL_ROLES);

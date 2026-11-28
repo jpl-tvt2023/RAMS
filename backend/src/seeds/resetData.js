@@ -10,6 +10,7 @@
 // Deleted:
 //   - Tally's books: vouchers and their lines, ledger balances, sync state and runs
 //   - the copy of ROMS, every match and auto-fill result
+//   - Purchase Reports' records (bill checks, approvals) and their files
 //   - Party Statements' loaded openings, and every file on its rows
 //   - every Connector token, the companies switched off, and the audit log
 // Kept:
@@ -26,7 +27,8 @@ const db = require('../config/db');
 // Children before parents, so foreign keys never block a delete.
 const CLEARED = [
   'tally_vch_ledger_lines', 'tally_vch_bill_allocations', 'tally_vch_inventory_lines', 'tally_vch_orders', 'tally_vouchers',
-  'tally_ledger_balances', 'sync_requests', 'voucher_files', 'file_chunks', 'file_blobs', 'statement_openings',
+  'tally_ledger_balances', 'sync_requests', 'purchase_files', 'voucher_files', 'file_chunks', 'file_blobs', 'statement_openings',
+  'roms_purchase_receipts', 'roms_purchase_challans', 'purchase_records',
   'match_results', 'doc_links', 'match_runs', 'autofill_events', 'autofill_items', 'autofill_runs',
   'roms_po_lines', 'roms_pos', 'roms_vendor_codes', 'roms_products', 'roms_vendors', 'roms_rtv', 'roms_refresh',
   'tally_sync_runs', 'tally_sync_state', 'agents', 'audit_logs',
@@ -68,6 +70,8 @@ async function resetData(client, { url, confirm = null }) {
     for (const t of CLEARED.filter((x) => tables.has(x))) await tx.execute(`DELETE FROM ${t}`);
     for (const t of OF_COMPANY) await tx.execute(`DELETE FROM ${t} WHERE ${off}`);
     await tx.execute('DELETE FROM tally_companies WHERE sync_enabled = 0');
+    // The one row that says when ROMS was last read starts again empty (migration 011).
+    await tx.execute('INSERT OR IGNORE INTO roms_refresh (id) VALUES (1)');
     await tx.execute("UPDATE autofill_settings SET bill_mode = 'off', cn_mode = 'off', updated_at = datetime('now'), updated_by = NULL WHERE id = 1");
     const total = Object.values(deleted).reduce((n, v) => n + v, 0);
     await tx.execute({

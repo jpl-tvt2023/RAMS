@@ -18,11 +18,16 @@ import { formatDate } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
 import { ALL_ROLES, ROLES, ROLE_INFO } from '../../utils/roles';
 
-// Admin/Owner only. Adapted from ROMS: one role per user (the four RAMS roles),
-// and users are DEACTIVATED rather than deleted, so the audit trail keeps
-// their name.
-const ROLE_COLORS = { Admin: 'red', Owner: 'purple', Accountant: 'blue', Viewer: 'gray' };
-const EMPTY_FORM = { name: '', username: '', role: ROLES.VIEWER, password: '' };
+// Admin/Owner only. Adapted from ROMS: a user may hold several roles (the two
+// heads are add-ons to Accountant or Viewer), and users are DEACTIVATED rather
+// than deleted, so the audit trail keeps their name.
+const ROLE_COLORS = {
+  Admin: 'red', Owner: 'purple', Accountant: 'blue', Viewer: 'gray', 'Purchase Head': 'amber', 'Accountant Head': 'green',
+};
+const EMPTY_FORM = { name: '', username: '', roles: [ROLES.VIEWER], password: '' };
+const sameRoles = (a, b) => [...a].sort().join(',') === [...b].sort().join(',');
+// In the order of ALL_ROLES, so the badges and the form read the same way.
+const inOrder = (roles) => ALL_ROLES.filter((r) => roles.includes(r));
 const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand';
 
 export default function UserManagement() {
@@ -46,21 +51,25 @@ export default function UserManagement() {
 
   const openAdd = () => { setForm(EMPTY_FORM); setModal('add'); };
   const openEdit = (u) => {
-    setForm({ name: u.name, username: u.username, role: u.roles[0] || ROLES.VIEWER, password: '' });
+    setForm({ name: u.name, username: u.username, roles: u.roles.length ? inOrder(u.roles) : [ROLES.VIEWER], password: '' });
     setModal({ id: u.id });
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!form.roles.length) {
+      toast.error('Tick at least one role');
+      return;
+    }
     setSaving(true);
     try {
       if (modal === 'add') {
-        await createUser({ name: form.name, username: form.username, password: form.password, roles: [form.role] });
+        await createUser({ name: form.name, username: form.username, password: form.password, roles: form.roles });
         toast.success('User created — they set their own password at first sign-in');
       } else {
         const before = users.find((u) => u.id === modal.id);
-        const roleChanged = before && (before.roles.length !== 1 || before.roles[0] !== form.role);
-        await updateUser(modal.id, { name: form.name, roles: [form.role] });
+        const roleChanged = before && !sameRoles(before.roles, form.roles);
+        await updateUser(modal.id, { name: form.name, roles: form.roles });
         toast.success(roleChanged ? 'User updated — they will need to sign in again' : 'User updated');
       }
       setModal(null);
@@ -122,7 +131,7 @@ export default function UserManagement() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                {['Name', 'User ID', 'Role', 'Status', 'Added', LAST_UPDATED, 'Actions'].map((h) => (
+                {['Name', 'User ID', 'Roles', 'Status', 'Added', LAST_UPDATED, 'Actions'].map((h) => (
                   <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -138,7 +147,7 @@ export default function UserManagement() {
                   <td className="px-4 py-3 text-gray-600">{u.username}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
-                      {u.roles.map((r) => <Badge key={r} color={ROLE_COLORS[r] || 'gray'}>{r}</Badge>)}
+                      {inOrder(u.roles).map((r) => <Badge key={r} color={ROLE_COLORS[r] || 'gray'}>{r}</Badge>)}
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -186,16 +195,26 @@ export default function UserManagement() {
             </div>
           )}
           <fieldset>
-            <legend className="block text-sm font-medium text-gray-700 mb-1">Role</legend>
+            <legend className="block text-sm font-medium text-gray-700 mb-1">Roles</legend>
             <div className="space-y-2 p-3 border border-gray-200 rounded-lg">
               {ALL_ROLES.map((r) => (
                 <label key={r} className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
-                  <input type="radio" name="role" checked={form.role === r} onChange={() => setForm((f) => ({ ...f, role: r }))} className="w-4 h-4 mt-0.5 accent-brand" />
+                  <input
+                    type="checkbox"
+                    name="roles"
+                    value={r}
+                    checked={form.roles.includes(r)}
+                    onChange={(e) => setForm((f) => ({ ...f, roles: inOrder(e.target.checked ? [...f.roles, r] : f.roles.filter((x) => x !== r)) }))}
+                    className="w-4 h-4 mt-0.5 accent-brand"
+                  />
                   <span><span className="font-medium">{r}</span> <span className="text-gray-400">— {ROLE_INFO[r]}</span></span>
                 </label>
               ))}
             </div>
-            {modal !== 'add' && <p className="text-xs text-gray-400 mt-1">Changing the role signs the user out of RAMS.</p>}
+            <p className="text-xs text-gray-400 mt-1">
+              Tick one or more. A person holds everything their roles allow, so give a head their usual role too (for example Accountant + Accountant Head).
+              {modal !== 'add' && ' Changing the roles signs the user out of RAMS.'}
+            </p>
           </fieldset>
           {modal === 'add' && (
             <div>

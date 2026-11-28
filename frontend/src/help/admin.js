@@ -6,14 +6,14 @@ export const users = {
   area: 'Admin',
   title: 'Users',
   who: 'Admin and Owner only.',
-  summary: 'Make an account for each person, choose their role, reset a forgotten password, or deactivate someone who left. Accounts are never deleted, so the history keeps their name.',
+  summary: 'Make an account for each person, choose their roles, reset a forgotten password, or deactivate someone who left. A person can hold several roles. Accounts are never deleted, so the history keeps their name.',
   flows: [
     {
       title: 'Add a user',
       steps: [
         'Admin → Users → Add User.',
         'Enter their full name and a User ID (small letters, digits, dot, dash or underscore).',
-        'Choose the role: Admin, Owner, Accountant or Viewer. What Accountants and Viewers may do is set on Roles & permissions.',
+        'Tick their roles: Admin, Owner, Accountant or Viewer, and if they approve purchases, Purchase Head or Accountant Head too. The two heads are add-ons: give the person their usual role as well, for example Accountant + Accountant Head. What each role other than Admin and Owner may do is set on Roles & permissions.',
         'Type a temporary password and save. Give it to the person; they set their own at the first sign-in.',
       ],
     },
@@ -26,9 +26,9 @@ export const users = {
       ],
     },
     {
-      title: 'Change a role, or deactivate',
+      title: 'Change roles, or deactivate',
       steps: [
-        'The pencil icon changes the name or the role. A role change signs the user out, so the new role applies at once.',
+        'The pencil icon changes the name or the roles. Tick or untick a role; at least one must stay ticked. A change of roles signs the user out, so it applies at once.',
         'The deactivate icon stops the account from signing in. Reactivate brings it back.',
         'You can’t deactivate yourself, and the last active Admin or Owner always stays.',
       ],
@@ -37,6 +37,7 @@ export const users = {
   faq: [
     { q: 'What does Last updated by show here?', a: 'Who last changed the account and when: added it, changed the name or role, deactivated or reactivated it, or reset the password. A user setting their own password counts too. Click it to see every change.' },
     { q: 'Why can’t I delete a user?', a: 'So the audit log keeps saying who did what. Deactivate them instead.' },
+    { q: 'Can one person have two roles?', a: 'Yes. They can do everything either role allows. That is how the Purchase Head and Accountant Head work: they are added to the person’s usual role and give them their approval step on Purchase Reports.' },
   ],
 };
 
@@ -217,19 +218,19 @@ export const rolesPermissions = {
   area: 'Admin',
   title: 'Roles & permissions',
   who: 'Admin and Owner only.',
-  summary: 'Admins and Owners can always do everything. Here they decide what Accountants and Viewers may do. A change applies at once, without anyone signing in again.',
+  summary: 'Admins and Owners can always do everything. Here they decide what Accountants, Viewers, Purchase Heads and Accountant Heads may do. A person with several roles can do what any of them allows. A change applies at once, without anyone signing in again.',
   flows: [
     {
       title: 'Give or take away a permission',
       steps: [
         'Admin → Roles & permissions.',
-        'Tick or untick the box for Accountant or Viewer on the permission’s row. Each row says what it allows.',
+        'Tick or untick the box for a role on the permission’s row. Each row says what it allows.',
         'Click Save changes. The change is recorded in the Audit Log; the History button shows it.',
       ],
     },
   ],
   faq: [
-    { q: 'What does Last updated by show here?', a: 'For each permission, who last ticked or unticked it, for Accountants or Viewers, and when. The line under the grid is the last change to any of them. A dash means it is still as RAMS set it at the start.' },
+    { q: 'What does Last updated by show here?', a: 'For each permission, who last ticked or unticked it, for any of the roles, and when. The line under the grid is the last change to any of them. A dash means it is still as RAMS set it at the start.' },
     { q: 'Why can’t I give an Accountant the Users page?', a: 'Users, the Audit Log and this page stay with Admins and Owners, so nobody can give themselves more rights.' },
     { q: 'Someone still sees a button they shouldn’t.', a: 'It disappears when their page reloads, but RAMS refuses the action itself from the moment you save.' },
   ],

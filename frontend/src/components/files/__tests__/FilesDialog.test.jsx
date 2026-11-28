@@ -56,7 +56,19 @@ describe('a row’s files', () => {
 
     await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Download mail.eml' }));
     await waitFor(() => expect(saveBlob).toHaveBeenCalledWith('mail.eml', expect.any(Blob)));
-    expect(filesApi.fetchFile).toHaveBeenCalledWith(3);
+    expect(filesApi.fetchFile).toHaveBeenCalledWith(3, undefined);
+  });
+
+  test('a Purchase Reports record’s files are fetched and removed from its own store', async () => {
+    filesApi.deleteFile.mockResolvedValue({ id: 8, removed: true });
+    const mine = [{ ...FILES[2], id: 8, store: 'purchase' }];
+    const { dialog } = open({ files: mine, target: { purchaseRecordId: 4 } });
+    const user = userEvent.setup();
+    await user.click(within(dialog).getByRole('button', { name: 'Download mail.eml' }));
+    await waitFor(() => expect(filesApi.fetchFile).toHaveBeenCalledWith(8, 'purchase'));
+    await user.click(within(dialog).getByRole('button', { name: 'Remove mail.eml' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Remove this file?' })).getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(filesApi.deleteFile).toHaveBeenCalledWith(8, 'purchase'));
   });
 
   test('View: a PDF’s pages are drawn; Next goes to the photo; an email only downloads; Esc closes', async () => {
@@ -135,7 +147,7 @@ describe('a row’s files', () => {
     expect(confirm).toHaveTextContent('dn.pdf comes off Credit Note 951');
     await user.click(within(confirm).getByRole('button', { name: 'Remove' }));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
-    expect(filesApi.deleteFile).toHaveBeenCalledWith(1);
+    expect(filesApi.deleteFile).toHaveBeenCalledWith(1, undefined);
   });
 
   test('without “Attach files” it only shows them: no adding, no removing, and Ctrl+V does nothing', () => {

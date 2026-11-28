@@ -1,20 +1,24 @@
 import {
   LayoutDashboard, Settings, Users, ScrollText, Building2, Link2, ListChecks, SlidersHorizontal, BookUser, ShieldCheck, LifeBuoy, PenLine,
   FileText, Receipt, ArrowLeftRight, Wallet, AlertTriangle, Activity, BarChart3, IndianRupee, BookOpen, CalendarClock, HardDrive, ShoppingCart, Paperclip,
+  Warehouse, Scissors,
 } from 'lucide-react';
 import { isReleased } from './releases';
 
-// The RAMS role set. MIRRORED in backend/src/middleware/rbac.js and in
-// migration 002's CHECK -- change all three together; utils/__tests__/roles.test.js
-// and the backend's tests/roles.test.js pin the same values.
+// The RAMS role set. MIRRORED in backend/src/middleware/rbac.js and in the
+// user_roles CHECK (migration 022) -- change all three together;
+// utils/__tests__/roles.test.js and the backend's tests/roles.test.js pin the
+// same values. A user may hold several roles: the two heads are add-ons.
 export const ROLES = {
   ADMIN: 'Admin',
   OWNER: 'Owner',
   ACCOUNTANT: 'Accountant',
   VIEWER: 'Viewer',
+  PURCHASE_HEAD: 'Purchase Head',
+  ACCOUNTANT_HEAD: 'Accountant Head',
 };
 
-export const ALL_ROLES = [ROLES.ADMIN, ROLES.OWNER, ROLES.ACCOUNTANT, ROLES.VIEWER];
+export const ALL_ROLES = [ROLES.ADMIN, ROLES.OWNER, ROLES.ACCOUNTANT, ROLES.VIEWER, ROLES.PURCHASE_HEAD, ROLES.ACCOUNTANT_HEAD];
 export const ADMIN_ONLY = [ROLES.ADMIN, ROLES.OWNER];
 
 // What each role means, as the Users page explains it.
@@ -23,6 +27,8 @@ export const ROLE_INFO = {
   [ROLES.OWNER]: 'Same as Admin',
   [ROLES.ACCOUNTANT]: 'Works the accounts — what exactly is set on Admin → Roles & permissions',
   [ROLES.VIEWER]: 'Reads — what exactly is set on Admin → Roles & permissions',
+  [ROLES.PURCHASE_HEAD]: 'First approval on Purchase Reports. Add it to the person’s other role',
+  [ROLES.ACCOUNTANT_HEAD]: 'Final approval on Purchase Reports. Add it to the person’s other role',
 };
 
 // The permission keys the UI asks about -- the catalog itself (labels, what
@@ -43,6 +49,10 @@ export const PERM = {
   STATEMENTS_FILES: 'statements.files',
   STATEMENTS_SETTINGS: 'statements.settings',
   ATTACHMENTS_VIEW: 'attachments.view',
+  PURCHASES_VIEW: 'purchases.view',
+  PURCHASES_CHECK: 'purchases.check',
+  PURCHASES_APPROVE_PURCHASE: 'purchases.approve_purchase',
+  PURCHASES_APPROVE_ACCOUNTS: 'purchases.approve_accounts',
   SYNC_COMPANIES: 'sync.companies',
   SYNC_SCHEDULE: 'sync.schedule',
   NARRATION_SETTINGS: 'narration.settings',
@@ -140,8 +150,14 @@ export const NAV = withoutHeld([
   {
     label: 'Purchase Reports',
     icon: ShoppingCart,
-    comingSoon: true,
-    roles: ALL_ROLES,
+    children: [
+      {
+        label: 'Warehouse', path: '/purchases/warehouse', icon: Warehouse, description: 'Receipts of packaging, barcodes and goods that skip Stitching', permission: PERM.PURCHASES_VIEW,
+      },
+      {
+        label: 'Stitching', path: '/purchases/stitching', icon: Scissors, description: 'Receipts of fabric and goods that go through Stitching, and every challan', permission: PERM.PURCHASES_VIEW,
+      },
+    ],
   },
   {
     label: 'Admin',

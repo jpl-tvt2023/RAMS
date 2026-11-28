@@ -25,6 +25,10 @@ export const PERM_SCREENS = {
   'statements.files': ['/reports/party-statements', '/reports/attachments'],
   'statements.settings': ['/reports/party-statements'],
   'attachments.view': ['/reports/attachments'],
+  'purchases.view': ['/purchases/warehouse', '/purchases/stitching'],
+  'purchases.check': ['/purchases/warehouse', '/purchases/stitching'],
+  'purchases.approve_purchase': ['/purchases/warehouse', '/purchases/stitching'],
+  'purchases.approve_accounts': ['/purchases/warehouse', '/purchases/stitching'],
 };
 
 export const permissionReleased = (key) => !PERM_SCREENS[key] || PERM_SCREENS[key].some(isReleased);

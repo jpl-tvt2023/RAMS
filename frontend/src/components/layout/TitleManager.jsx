@@ -27,6 +27,8 @@ const TITLES = [
   ['/reports/exceptions', 'Exceptions'],
   ['/reports/party-statements', 'Party Statements'],
   ['/reports/attachments', 'Attachments'],
+  ['/purchases/warehouse', 'Purchase Reports — Warehouse'],
+  ['/purchases/stitching', 'Purchase Reports — Stitching'],
   ['/sync', 'Sync health'],
   ['/help', 'Help & FAQ'],
 ];

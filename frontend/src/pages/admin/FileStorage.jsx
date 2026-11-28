@@ -12,6 +12,9 @@ import { KINDS, sizeText } from '../../utils/files';
 import { openStatementsAt } from '../../utils/statementLinks';
 import { openAttachmentsAt, TAB_OF } from '../../utils/attachmentLinks';
 import { formatDay, formatDateTime } from '../../utils/formatters';
+import { writeSessionState } from '../../hooks/useSessionState';
+import { purchasesKey } from '../../utils/purchaseText';
+import { useAuth } from '../../context/AuthContext';
 
 // Admin -> File storage (Admin and Owner): how much space the files on
 // Tally vouchers (added on Party Statements and Attachments) take in RAMS's
@@ -29,16 +32,20 @@ function Tile({ label, value, detail }) {
   );
 }
 
-// "MH · Credit Note 951 · ZEPTO (PUNE) · 20 Aug 2026" -- every file is on a
-// Tally voucher.
+// "MH · Credit Note 951 · ZEPTO (PUNE) · 20 Aug 2026" for a file on a Tally
+// voucher, "Purchase Reports · Warehouse · Incoming 01/july (Shree Socks)" for
+// one on a purchase record.
+const PURCHASE_PAGES = { warehouse: 'Warehouse', stitching: 'Stitching' };
 const whereOf = (f) => {
   const o = f.on || {};
+  if (o.type === 'purchase') return ['Purchase Reports', PURCHASE_PAGES[o.page], o.label].filter(Boolean).join(' · ');
   const row = `${o.voucher_type || 'Tally voucher'} ${o.number || ''}`;
   return [f.company, row.trim(), o.party, o.date ? formatDay(o.date) : null].filter(Boolean).join(' · ');
 };
 
 export default function FileStorage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [viewing, setViewing] = useState(null); // index into data.biggest
   useEffect(() => {
@@ -50,6 +57,13 @@ export default function FileStorage() {
       companyId: f.company_id, vendor: f.on.vendor, guid: f.on.party_guid, date: f.on.date, syncFrom: data.sync_from,
     });
     navigate('/reports/party-statements');
+  };
+  // The purchase page, searching for the record's Incoming No (or bill / challan).
+  const openOnPurchases = (f) => {
+    writeSessionState(purchasesKey(f.on.page, user), {
+      company_id: '', status: 'all', month: '', q: f.on.search || '',
+    });
+    navigate(`/purchases/${f.on.page}`);
   };
   const openOnAttachments = (f) => {
     if (openAttachmentsAt({ companyId: f.company_id, baseType: f.on.base_type, date: f.on.date })) navigate('/reports/attachments');
@@ -105,7 +119,7 @@ export default function FileStorage() {
               const canOpen = Boolean(f.on?.party_guid && f.on?.vendor);
               const onAttachments = Boolean(TAB_OF[f.on?.base_type] && f.on?.date);
               return (
-                <tr key={f.id} className="border-b border-gray-100 align-top">
+                <tr key={`${f.store || 'voucher'}-${f.id}`} className="border-b border-gray-100 align-top">
                   <td className={`${td} max-w-[18rem]`}>
                     <span className="inline-flex items-start gap-2 min-w-0">
                       <Icon size={14} className="text-gray-500 mt-0.5 shrink-0" aria-hidden="true" />
@@ -122,6 +136,9 @@ export default function FileStorage() {
                     <button type="button" onClick={() => setViewing(i)} aria-label={`View ${f.name}`} className="text-sm text-brand hover:underline">{f.kind === 'email' ? 'Download' : 'View'}</button>
                     {canOpen && (
                       <button type="button" onClick={() => openOnStatements(f)} aria-label={`Open ${f.name} on Party Statements`} className="ml-3 text-sm text-brand hover:underline">Open on Party Statements</button>
+                    )}
+                    {f.on?.type === 'purchase' && (
+                      <button type="button" onClick={() => openOnPurchases(f)} aria-label={`Open ${f.name} on Purchase Reports`} className="ml-3 text-sm text-brand hover:underline">Open on Purchase Reports</button>
                     )}
                     {onAttachments && (
                       <button type="button" onClick={() => openOnAttachments(f)} aria-label={`Open ${f.name} on Attachments`} className="ml-3 text-sm text-brand hover:underline">Open on Attachments</button>

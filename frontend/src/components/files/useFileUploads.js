@@ -7,8 +7,9 @@ export const reasonOf = (err) => err?.response?.data?.message || err?.message ||
 
 /**
  * Gets one picked file ready (a photo shrunk, a PDF or email compressed) and
- * sends it to its row. target: { companyId, voucherGuid } -- every row is a
- * Tally voucher. Resolves to the stored file; rejects with what to do.
+ * sends it to its row. target: { companyId, voucherGuid } for a Tally voucher,
+ * or { purchaseRecordId } for a Purchase Reports record. Resolves to the
+ * stored file; rejects with what to do.
  */
 async function sendFile(file, target, onProgress) {
   const ready = await prepareFile(file);

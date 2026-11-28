@@ -10,7 +10,7 @@ import { lastUpdatedText, LAST_UPDATED } from '../../utils/lastUpdated';
 import { getPermissions, updatePermissions } from '../../api/settings.api';
 import { permissionReleased } from '../../utils/releases';
 
-// Admin/Owner only: what Accountants and Viewers may do. Admin and Owner hold
+// Admin/Owner only: what Accountants, Viewers and the two heads may do. Admin and Owner hold
 // every permission, shown ticked and locked. Users, the Audit Log and this page
 // are not in the list -- they stay Admin/Owner only. A permission whose screens
 // are all still held (utils/releases.js) isn't shown; the draft keeps it as it
@@ -48,6 +48,8 @@ export default function Permissions() {
 
   const catalog = data ? data.catalog.filter((p) => permissionReleased(p.key)) : [];
   const areas = [...new Set(catalog.map((p) => p.area))];
+  // Permission, Admin, Owner, each role set here, Last updated by.
+  const cols = 4 + (data?.roles?.length || 2);
   const dirty = data && !sameMatrix(draft, data.matrix);
 
   return (
@@ -58,8 +60,8 @@ export default function Permissions() {
           <HelpLink section="roles-permissions" />
         </div>
         <p className="text-gray-500 text-sm mt-1">
-          Admins and Owners can always do everything. Choose what Accountants and Viewers may do; a change applies at once,
-          without anyone signing in again. Users, the Audit Log and this page always stay with Admins and Owners.
+          Admins and Owners can always do everything. Choose what each other role may do; a person with several roles can do
+          what any of them allows. A change applies at once, without anyone signing in again. Users, the Audit Log and this page always stay with Admins and Owners.
         </p>
       </div>
 
@@ -78,11 +80,11 @@ export default function Permissions() {
             <tbody>
               {!data ? (
                 [...Array(4)].map((_, i) => (
-                  <tr key={i}><td colSpan={6} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
+                  <tr key={i}><td colSpan={cols} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
                 ))
               ) : areas.map((area) => [
                 <tr key={area} className="bg-gray-50/60 border-b border-gray-100">
-                  <td colSpan={6} className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">{area}</td>
+                  <td colSpan={cols} className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">{area}</td>
                 </tr>,
                 ...catalog.filter((p) => p.area === area).map((p) => (
                   <tr key={p.key} className="border-b border-gray-100">
@@ -123,7 +125,7 @@ export default function Permissions() {
         </div>
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-gray-200">
           <p className="text-xs text-gray-400">
-            {lastUpdatedText(data?.updated_by_name, data?.updated_at) || 'The defaults: Accountants do the matching work, Viewers only look.'}
+            {lastUpdatedText(data?.updated_by_name, data?.updated_at) || 'The defaults: Accountants do the matching work, Viewers only look, and each head holds its own Purchase Reports approval.'}
           </p>
           <div className="flex items-center gap-2">
             <HistoryButton entityType="role_permissions" entityId={1} title="History — Roles & permissions" />

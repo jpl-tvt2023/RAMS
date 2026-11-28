@@ -20,9 +20,10 @@ import { formatDateTime } from '../../utils/formatters';
 
 /**
  * One row's files: view, download and -- for whoever may attach files --
- * add (choose, drop, or paste with Ctrl+V) and remove. `target` is the Tally
- * voucher new files go on: { companyId, voucherGuid }. `files` comes from the
- * page, which reloads it through onChanged.
+ * add (choose, drop, or paste with Ctrl+V) and remove. `target` is the row new
+ * files go on: a Tally voucher { companyId, voucherGuid }, or a Purchase Reports
+ * record { purchaseRecordId }. `files` comes from the page, which reloads it
+ * through onChanged (a purchase record's files carry store: 'purchase').
  */
 export default function FilesDialog({
   title, subtitle, files, target, canEdit = false, onClose, onChanged,
@@ -56,7 +57,7 @@ export default function FilesDialog({
   const download = async (f) => {
     setDownloading(f.id);
     try {
-      saveBlob(f.name, await fetchFile(f.id));
+      saveBlob(f.name, await fetchFile(f.id, f.store));
     } catch (err) {
       toast.error(reasonOf(err));
     } finally { setDownloading(null); }
@@ -65,7 +66,7 @@ export default function FilesDialog({
   const remove = async () => {
     setRemoveBusy(true);
     try {
-      await deleteFile(removing.id);
+      await deleteFile(removing.id, removing.store);
       toast.success(`Removed ${removing.name}`);
       setRemoving(null);
       if (onChanged) onChanged();

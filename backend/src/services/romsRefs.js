@@ -32,8 +32,9 @@ async function writeBatches(client, stmts) {
 }
 
 // Writes one resource's rows over the copy. Returns { rows, written, deleted }.
-async function storeResource(client, resource, rows) {
-  const spec = TABLES[resource];
+// `spec` defaults to the matching references above; Purchase Reports passes its
+// own (purchases/refresh.js). Columns not in spec.cols are left as they are.
+async function storeResource(client, resource, rows, spec = TABLES[resource]) {
   const { rows: stored } = await client.execute(`SELECT ${spec.cols.join(', ')} FROM ${spec.table}`);
   // ROMS answering with nothing where RAMS holds rows is far likelier a wrong
   // address or an empty database than every PO deleted: keep the copy.
