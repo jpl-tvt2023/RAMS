@@ -21,9 +21,7 @@ async function months(req, res, next) {
     const { fy, years } = pickYear(req.query.fy, today);
     const rule = await loadNarrationRule(db);
     const [{ tabs }, asOf] = await Promise.all([
-      loadMonths(db, {
-        companyId: company.id, fy, today, rule,
-      }),
+      loadMonths(db, { companyId: company.id, fy, rule }),
       asOfFor(db, company.id),
     ]);
     res.json({

@@ -1,5 +1,4 @@
 import { ReportTable, td, num } from '../reports/ReportFrame';
-import { balance } from '../../utils/statementText';
 import { formatDay, formatRupees } from '../../utils/formatters';
 
 // An amount as Tally's register shows it: blank when nothing moved.
@@ -7,9 +6,9 @@ const amount = (paise) => (paise ? formatRupees(paise) : '');
 
 /**
  * One tab's financial year, month by month, as Tally's register: how many
- * vouchers, how many need attention, the Debit or Credit and the running
- * Closing balance. A month opens its vouchers; its "needs attention" opens
- * only those. A month before RAMS's copy of Tally starts says so.
+ * vouchers, how many need attention, and the Debit or Credit. A month opens
+ * its vouchers; its "needs attention" opens only those. A month before RAMS's
+ * copy of Tally starts says so.
  */
 export default function MonthTable({
   tab, loading, syncFrom, onOpen,
@@ -19,7 +18,7 @@ export default function MonthTable({
   return (
     <ReportTable
       loading={loading}
-      head={['Month', { label: 'Vouchers', right: true }, { label: 'Needs attention', right: true }, { label: 'Debit', right: true }, { label: 'Credit', right: true }, { label: 'Closing balance', right: true }]}
+      head={['Month', { label: 'Vouchers', right: true }, { label: 'Needs attention', right: true }, { label: 'Debit', right: true }, { label: 'Credit', right: true }]}
       foot={t && (
         <tfoot>
           <tr className="bg-gray-50 font-semibold border-t border-gray-200">
@@ -28,7 +27,6 @@ export default function MonthTable({
             <td className={num}>{t.needs_attention.toLocaleString('en-IN')}</td>
             <td className={num}>{amount(t.debit_paise)}</td>
             <td className={num}>{amount(t.credit_paise)}</td>
-            <td className={num}>{t.closing_paise == null ? '' : balance(t.closing_paise)}</td>
           </tr>
         </tfoot>
       )}
@@ -55,7 +53,6 @@ export default function MonthTable({
           </td>
           <td className={num}>{amount(m.debit_paise)}</td>
           <td className={num}>{amount(m.credit_paise)}</td>
-          <td className={num}>{m.closing_paise == null ? '' : balance(m.closing_paise)}</td>
         </tr>
       ))}
     </ReportTable>

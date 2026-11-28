@@ -11,6 +11,8 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Pagination, { loadPersistedPageSize, persistPageSize } from '../../components/ui/Pagination';
 import { HistoryButton } from '../../components/shared/HistoryDrawer';
 import HelpLink from '../../components/shared/HelpLink';
+import { LastUpdatedCell, LastUpdatedLine } from '../../components/shared/LastUpdated';
+import { LAST_UPDATED } from '../../utils/lastUpdated';
 import Narration from '../../components/shared/Narration';
 import Legend from '../../components/shared/Legend';
 import {
@@ -226,6 +228,7 @@ export default function AutoFill() {
           linked PO, and the Credit Note No and CN Date of a linked RTV row. Nothing else in ROMS is touched. ROMS checks every write
           with its own rules, refuses one if a person changed the field meanwhile, and shows it in its history as &ldquo;Tally Sync&rdquo;.
         </p>
+        {summary && <LastUpdatedLine name={summary.settings.updated_by_name} at={summary.settings.updated_at} className="text-xs text-gray-400 mt-1" />}
       </div>
 
       {summary && !summary.roms.connected && (
@@ -322,13 +325,13 @@ export default function AutoFill() {
               <tr className="bg-gray-50 border-b border-gray-200">
                 {(tab === 'written'
                   ? ['When', field.row, 'Change in ROMS', 'By']
-                  : [field.row, 'Vendor', 'Tally', tab === 'differs' ? 'ROMS has → Tally says' : 'Change in ROMS', tab === 'refused' ? 'ROMS said' : 'Status', '']
+                  : [field.row, 'Vendor', 'Tally', tab === 'differs' ? 'ROMS has → Tally says' : 'Change in ROMS', tab === 'refused' ? 'ROMS said' : 'Status', LAST_UPDATED, '']
                 ).map((h) => <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>)}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                [...Array(4)].map((_, i) => <tr key={i}><td colSpan={6} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>)
+                [...Array(4)].map((_, i) => <tr key={i}><td colSpan={7} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>)
               ) : tab === 'written' ? data.rows.map((e) => (
                 <tr key={e.id} className="border-b border-gray-100">
                   <td className="px-4 py-3 whitespace-nowrap text-gray-600">{formatDateTime(e.at)}</td>
@@ -350,6 +353,12 @@ export default function AutoFill() {
                     {tab === 'refused'
                       ? <span className="text-danger">{r.reason}{r.dry ? ' (asked in Preview — nothing was written)' : ''}</span>
                       : <Badge color={itemStatus(r.state, f?.mode).color}>{itemStatus(r.state, f?.mode).label}</Badge>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <LastUpdatedCell
+                      name={r.approved_by} at={r.approved_at} description={r.approved_at ? `Approved by ${r.approved_by || 'someone'}` : ''}
+                      entityType={r.kind} entityId={r.id} what={`${field.row} ${rowLabel(r)}`}
+                    />
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-right">
                     {tab === 'todo' && canApprove && f?.mode === 'approve' && r.state !== 'to_write' && (

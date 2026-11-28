@@ -12,11 +12,19 @@ vi.mock('../../../api/audit.api', () => ({ getEntityHistory: vi.fn().mockResolve
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 const SETTINGS = {
-  settings: { default_credit_days: 30, exception_days: 15 },
+  settings: { default_credit_days: 30, exception_days: 15, updated_at: '2026-10-20 06:30:00', updated_by_name: 'Keshav' },
   terms: [
-    { vendor: 'Amazon', credit_days: null, transfer: true, updated_at: null, updated_by_name: null },
-    { vendor: 'Blinkit', credit_days: null, transfer: false, updated_at: null, updated_by_name: null },
-    { vendor: 'Zepto', credit_days: 15, transfer: false, updated_at: '2026-11-01 10:00:00', updated_by_name: 'Asha' },
+    { vendor: 'Amazon', credit_days: null, transfer: true, updated_at: null, updated_by_name: null, last_change: null },
+    // Put back to the default: the row is gone, the audit trail says who.
+    {
+      vendor: 'Blinkit', credit_days: null, transfer: false, updated_at: null, updated_by_name: null,
+      last_change: { user_name: 'Ravi', at: '2026-11-02 05:00:00', description: 'Blinkit: credit days 10 → default' },
+    },
+    {
+      vendor: 'Zepto', credit_days: 15, transfer: false, updated_at: '2026-11-01 10:00:00', updated_by_name: 'Asha',
+      last_change: { user_name: 'Asha', at: '2026-11-01 10:00:00', description: 'Zepto: credit days default → 15' },
+    },
+    { vendor: 'Minutes', credit_days: 15, transfer: false, updated_at: null, updated_by_name: null, last_change: null },
   ],
 };
 const PREVIEW = {
@@ -36,8 +44,13 @@ describe('Credit terms', () => {
     expect(await screen.findByText('Default: 30 days')).toBeInTheDocument();
     const zepto = screen.getByText('Zepto').closest('tr');
     expect(within(zepto).getByText('15 days')).toBeInTheDocument();
-    expect(within(zepto).getByText(/Asha/)).toBeInTheDocument();
-    expect(within(screen.getByText('Blinkit').closest('tr')).getByText('Default (30)')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Last updated by' })).toBeInTheDocument();
+    expect(within(zepto).getByRole('button', { name: /^History of Zepto: last updated by Asha/ })).toHaveTextContent('01 Nov 2026');
+    const blinkit = screen.getByText('Blinkit').closest('tr');
+    expect(within(blinkit).getByText('Default (30)')).toBeInTheDocument();
+    expect(within(blinkit).getByRole('button', { name: /last updated by Ravi/ })).toBeInTheDocument();
+    expect(within(screen.getByText('Minutes').closest('tr')).getByText('—')).toBeInTheDocument();
+    expect(screen.getByText(/^Last updated by Keshav · 20 Oct 2026/)).toBeInTheDocument();
     expect(screen.queryByRole('cell', { name: 'Amazon' })).not.toBeInTheDocument();
     expect(screen.getByText(/Amazon is left out/)).toBeInTheDocument();
   });

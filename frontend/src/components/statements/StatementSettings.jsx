@@ -4,7 +4,8 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { getStatementSettings, updateStatementSettings } from '../../api/statements.api';
 import { paiseFrom } from '../../utils/statementText';
-import { formatDateTime, formatDay } from '../../utils/formatters';
+import { formatDay } from '../../utils/formatters';
+import { LastUpdatedLine } from '../shared/LastUpdated';
 
 const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand tabular-nums';
 const rupeesText = (p) => (p / 100).toFixed(2);
@@ -64,7 +65,7 @@ export default function StatementSettings({ syncFrom, onClose, onSaved }) {
             <input aria-label="Placeholder opening" value={form.opening} onChange={(e) => set({ opening: e.target.value })} inputMode="decimal" className={`${inputCls} mt-1`} />
             <span className="text-xs text-gray-500">Used only when the last sync couldn’t read a party’s balance from Tally: the party then starts on this on {formatDay(syncFrom)}, and Tally’s vouchers since carry it forward.</span>
           </label>
-          {s?.updated_at && <p className="text-xs text-gray-400">Last changed by {s.updated_by_name || 'someone'} on {formatDateTime(s.updated_at)}</p>}
+          <LastUpdatedLine name={s?.updated_by_name} at={s?.updated_at} />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
             <Button type="submit" loading={saving}>Save</Button>

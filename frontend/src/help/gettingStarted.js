@@ -61,3 +61,27 @@ export const dashboard = {
     { q: 'What is Purchase Reports?', a: 'Reports on the purchase side are coming soon. Until then the entry in the top bar is greyed and can’t be clicked.' },
   ],
 };
+
+export const lastUpdated = {
+  id: 'last-updated-by',
+  area: 'Getting started',
+  title: 'Last updated by',
+  who: 'Everyone, on every screen where something can be changed.',
+  summary: 'Every list where people change things has a Last updated by column: the name of the person who last changed that row in RAMS, with the date and time (India time) under it. RAMS fills it in from the account that was signed in when the change was saved, so nobody types it.',
+  flows: [
+    {
+      title: 'See who changed a row, and what they changed',
+      steps: [
+        'Find the row. The name in Last updated by is who changed it last; the date and time under it is when.',
+        'Click the name. A window lists every change to that row, newest first, with the old and new values.',
+        'Close the window to go back to the list.',
+      ],
+    },
+  ],
+  faq: [
+    { q: 'The column shows a dash.', a: 'Nobody has changed that row in RAMS yet. Only people’s changes in RAMS count: what RAMS works out by itself, what the Connector copies from Tally and what is typed in Tally are not shown.' },
+    { q: 'Whose name is shown?', a: 'The RAMS account that was signed in when the change was saved. If that person’s name is changed later on Users, the new name shows.' },
+    { q: 'Which screens have it?', a: 'Users, Tally companies, Credit terms, Roles & permissions, Match review, Matching rules (the Vendors list), Party ledgers, Auto-fill, Party Statements (each Tally row of a party) and Attachments. A setting that is a single form (the sync schedule, the narration check, the matching rules, Statement settings, the auto-fill switches and the default credit days) shows the same as one line: “Last updated by …”.' },
+    { q: 'Can anyone change or clear it?', a: 'No. It comes from RAMS’s record of changes, which is never purged. Admins and Owners can see every change on Admin → Audit Log.' },
+  ],
+};

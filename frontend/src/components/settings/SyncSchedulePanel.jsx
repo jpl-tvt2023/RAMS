@@ -5,10 +5,10 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { HistoryButton } from '../shared/HistoryDrawer';
 import { getSyncSchedule, updateSyncSchedule } from '../../api/settings.api';
-import { formatDateTime } from '../../utils/formatters';
 import { DAYS, describeDays } from '../../utils/syncSchedule';
 import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
+import { lastUpdatedText } from '../../utils/lastUpdated';
 
 // When the Connector syncs, set here rather than on the office PC. It picks a
 // change up at its next heartbeat, within a minute. Editing needs the
@@ -59,7 +59,7 @@ export default function SyncSchedulePanel() {
                 {' '}· backfill <strong>{schedule.backfill_in_office_hours ? 'any time' : 'outside office hours'}</strong>
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                On the office PC&apos;s clock.{schedule.updated_at ? ` Last changed ${formatDateTime(schedule.updated_at)} by ${schedule.updated_by_name || '—'}.` : ''}
+                On the office PC&apos;s clock.{schedule.updated_at ? ` ${lastUpdatedText(schedule.updated_by_name, schedule.updated_at)}.` : ''}
               </p>
             </>
           ) : <div className="h-4 w-80 bg-gray-100 rounded animate-pulse mt-2" />}

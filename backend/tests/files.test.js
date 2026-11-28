@@ -252,6 +252,11 @@ describe('On the screens', () => {
     expect(byGuid['fl-cn4'].files).toEqual([]); // every upload there was refused
     expect(body.rows_without_file).toBe(bare(body).length);
     expect(body.rows_without_file).toBeGreaterThan(0);
+    // Each row's Last updated by: the last file a person added or removed.
+    expect(byGuid['fl-cn9']).toMatchObject({
+      id: expect.any(Number), last_change: { user_name: 'Test Accountant', action_type: 'FILE_ADD', description: expect.stringContaining('filed.pdf') },
+    });
+    expect(byGuid['fl-cn4'].last_change).toBeNull();
   });
 
   test('the statement counts every Tally row without a file', async () => {

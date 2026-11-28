@@ -5,9 +5,10 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { HistoryButton } from '../shared/HistoryDrawer';
 import { getNarrationRule, updateNarrationRule } from '../../api/settings.api';
-import { formatDateTime, formatDay } from '../../utils/formatters';
+import { formatDay } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
+import { LastUpdatedLine } from '../shared/LastUpdated';
 
 // The narration check: which Tally records need a narration, and from which
 // date. Every screen that lists Tally records highlights the ones without. It
@@ -64,7 +65,7 @@ export default function NarrationRulePanel() {
                 <strong>{rule.types ? rule.types.join(', ') : 'any voucher type'}</strong>, dated from <strong>{formatDay(rule.required_from)}</strong>.
                 {' '}Today that is <strong>{flagged.toLocaleString('en-IN')}</strong> record{flagged === 1 ? '' : 's'}.
               </p>
-              <p className="text-xs text-gray-400 mt-1">{rule.updated_at ? `Last changed ${formatDateTime(rule.updated_at)} by ${rule.updated_by_name || '—'}.` : 'Not changed yet.'}</p>
+              <LastUpdatedLine name={rule.updated_by_name} at={rule.updated_at} empty="Not changed yet." className="text-xs text-gray-400 mt-1" />
             </>
           ) : <div className="h-4 w-80 bg-gray-100 rounded animate-pulse mt-2" />}
         </div>

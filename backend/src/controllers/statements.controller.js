@@ -5,6 +5,7 @@ const { isValidDateString } = require('../utils/dateValidation');
 const { todayIst } = require('../matching/load');
 const { keyOf } = require('../utils/gstStates');
 const { filesFor } = require('../services/files');
+const { lastChanges } = require('../services/lastChange');
 const {
   loadSettings, loadParties, statementOf, partyDetailOf, attentionOf, monthStart,
 } = require('../statements/statement');
@@ -145,8 +146,14 @@ async function party(req, res, next) {
     const detail = await partyDetailOf(db, {
       party: p, from, to, today,
     });
-    const found = await filesFor(db, { vouchers: detail.vouchers.map((v) => [p.company_id, v.guid]) });
-    detail.vouchers = detail.vouchers.map((v) => ({ ...v, files: found.voucher(p.company_id, v.guid) }));
+    const [found, changes] = await Promise.all([
+      filesFor(db, { vouchers: detail.vouchers.map((v) => [p.company_id, v.guid]) }),
+      lastChanges(db, 'tally_vouchers', detail.vouchers.map((v) => v.id)),
+    ]);
+    // last_change: the last file a person added to or removed from the voucher.
+    detail.vouchers = detail.vouchers.map((v) => ({
+      ...v, files: found.voucher(p.company_id, v.guid), last_change: changes.get(String(v.id)) || null,
+    }));
     res.json(detail);
   } catch (err) { sendError(res, next, err); }
 }

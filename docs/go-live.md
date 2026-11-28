@@ -47,8 +47,8 @@ For the day itself, `go-live-cheatsheet.md` has the same steps as commands and c
    - **Between the deploy and that load,** Bills Receivable and Party Statements have only part of April and May, and Attachments says "Not read yet" for e-invoices. So run the load straight after the deploy.
    - **Check before:** `SELECT COUNT(*) FROM statement_openings` on the database. Rows there are openings loaded as at 8 June. They would now be applied at 1 April, so clear or reload them if there are any. Tally's own balances, read on every sync, don't need this.
    - **Check after:**
-     - Attachments → Invoice: each month's Credit equals Tally's Sales Register (July 2026: ₹2,41,89,073.30), and the Closing too once April and May are in.
-     - Payments, DN and CN against Tally's Payment, Debit Note and Credit Note Registers.
+     - Attachments → Invoice: each month's Credit equals Tally's Sales Register (July 2026: ₹2,41,89,073.30).
+     - The Payments, Debit Note and Credit Note tabs against Tally's Payment, Debit Note and Credit Note Registers.
      - Matching → Match review shows the same counts as before (no April or May invoice in it).
      - Bills Receivable's *No PO* doesn't list April or May invoices (they say "Before ROMS").
      - A Zepto party's Party Statements closing is unchanged.

@@ -4,31 +4,31 @@
 // read time from the Tally copy. Nothing is stored here and nothing is
 // written to Tally.
 //
-//   tabs       Invoice (Sales), Payments (Payment), DN (Debit Note) and CN
-//              (Credit Note) -- Tally's own types. A marketplace DN that Tally
-//              books as a Credit Note is under CN here.
+//   tabs       Invoice (Sales), Payments (Payment), Debit Note and Credit Note
+//              -- Tally's own types. A marketplace DN that Tally books as a
+//              Credit Note is on the Credit Note tab here.
 //   months     April to March. Each month: how many vouchers, how many need
 //              attention (no narration where the narration check asks for
-//              one, or no file), and the register's Debit, Credit and running
-//              Closing balance. A register's amounts sit on one side, the
-//              side opposite the party's line: Sales and Debit Notes credit,
-//              Payments and Credit Notes debit.
+//              one, or no file), and the register's Debit or Credit. A
+//              register's amounts sit on one side, the side opposite the
+//              party's line: Sales and Debit Notes credit, Payments and Credit
+//              Notes debit.
 //   vouchers   one month of one tab: number, ledger, city, amount, e-invoice,
 //              files, narration and the last change made in RAMS.
 //
 // A Payment's party in Tally is usually the bank or cash it was paid from, so
 // its Ledger is the ledger it debits -- who was paid.
 const { SYNC_FROM } = require('../config/env');
-const { todayIst } = require('../matching/load');
 const { fyOf } = require('../matching/engine');
 const { loadNarrationRule, narrationOf } = require('../services/narration');
 const { filesFor } = require('../services/files');
+const { lastChanges } = require('../services/lastChange');
 
 const TABS = [
   { key: 'invoice', label: 'Invoice', base_type: 'Sales', side: 'credit', number_label: 'Invoice no', einvoice: true },
   { key: 'payment', label: 'Payments', base_type: 'Payment', side: 'debit', number_label: 'Voucher no', einvoice: false },
-  { key: 'dn', label: 'DN', base_type: 'Debit Note', side: 'credit', number_label: 'DN no', einvoice: true },
-  { key: 'cn', label: 'CN', base_type: 'Credit Note', side: 'debit', number_label: 'CN no', einvoice: true },
+  { key: 'dn', label: 'Debit Note', base_type: 'Debit Note', side: 'credit', number_label: 'Debit Note no', einvoice: true },
+  { key: 'cn', label: 'Credit Note', base_type: 'Credit Note', side: 'debit', number_label: 'Credit Note no', einvoice: true },
 ];
 const TAB_BY_KEY = new Map(TABS.map((t) => [t.key, t]));
 const LIVE = 'v.deleted_at IS NULL AND v.is_cancelled = 0 AND v.is_optional = 0';
@@ -119,10 +119,9 @@ function noNarrationSql(rule) {
 /**
  * Every tab's months of one company's financial year, in one query:
  * { tabs: [{ key, label, base_type, side, einvoice, months, totals }] }.
- * A month's closing is the register's running total from April (positive is
- * Dr), blank for a month still to come or one before RAMS's copy starts.
+ * A month's amounts go in its Debit or its Credit: the tab's side.
  */
-async function loadMonths(client, { companyId, fy, today = todayIst(), rule = null }) {
+async function loadMonths(client, { companyId, fy, rule = null }) {
   const narr = noNarrationSql(rule || await loadNarrationRule(client));
   const months = monthsOf(fy);
   const rows = await rowsOf(client, `
@@ -140,16 +139,13 @@ async function loadMonths(client, { companyId, fy, today = todayIst(), rule = nu
   const found = new Map(rows.map((r) => [`${r.base_type}|${r.month}`, r]));
 
   const tabs = TABS.map((t) => {
-    let closing = 0;
     const totals = {
-      vouchers: 0, needs_attention: 0, no_narration: 0, no_file: 0, debit_paise: 0, credit_paise: 0, closing_paise: null,
+      vouchers: 0, needs_attention: 0, no_narration: 0, no_file: 0, debit_paise: 0, credit_paise: 0,
     };
     const list = months.map((m) => {
       const r = found.get(`${t.base_type}|${m.month}`);
       const inCopy = m.to >= SYNC_FROM;
-      const started = m.from <= today;
       const amount = n(r?.amount_paise);
-      closing += t.side === 'debit' ? amount : -amount;
       const out = {
         month: m.month,
         label: monthLabel(m.month),
@@ -161,10 +157,8 @@ async function loadMonths(client, { companyId, fy, today = todayIst(), rule = nu
         no_file: n(r?.no_file),
         debit_paise: t.side === 'debit' ? amount : 0,
         credit_paise: t.side === 'credit' ? amount : 0,
-        closing_paise: inCopy && started ? closing : null,
       };
-      for (const k of ['vouchers', 'needs_attention', 'no_narration', 'no_file', 'debit_paise', 'credit_paise']) totals[k] += out[k];
-      if (out.closing_paise != null) totals.closing_paise = out.closing_paise;
+      for (const k of Object.keys(totals)) totals[k] += out[k];
       return out;
     });
     return {
@@ -186,27 +180,6 @@ async function debitedLedgers(client, ids) {
       const k = Number(r.voucher_id);
       if (!out.has(k)) out.set(k, []);
       if (!out.get(k).includes(r.ledger)) out.get(k).push(r.ledger);
-    }
-  }
-  return out;
-}
-
-// The last change a person made in RAMS to each voucher (adding or removing a
-// file, today): voucher id -> { user_name, at, action_type, description }.
-async function lastChanges(client, ids) {
-  const out = new Map();
-  for (const part of chunks(ids)) {
-    const rows = await rowsOf(client, `
-      SELECT a.entity_id, a.timestamp, a.action_type, a.description, u.name AS user_name, u.username
-        FROM audit_logs a
-        JOIN (SELECT entity_id, MAX(id) AS id FROM audit_logs
-               WHERE entity_type = 'tally_vouchers' AND user_id IS NOT NULL AND entity_id IN (${marks(part.length)})
-               GROUP BY entity_id) m ON m.id = a.id
-        LEFT JOIN users u ON u.id = a.user_id`, part);
-    for (const r of rows) {
-      out.set(Number(r.entity_id), {
-        user_name: r.user_name || r.username || null, at: r.timestamp, action_type: r.action_type, description: r.description,
-      });
     }
   }
   return out;
@@ -324,7 +297,7 @@ async function loadVouchers(client, {
 
   const [found, changes, cityOf] = await Promise.all([
     filesFor(client, { vouchers: rows.map((v) => [companyId, v.guid]) }),
-    lastChanges(client, rows.map((v) => v.id)),
+    lastChanges(client, 'tally_vouchers', rows.map((v) => v.id)),
     citiesFor(client, companyId, rows),
   ]);
   return {
@@ -339,7 +312,7 @@ async function loadVouchers(client, {
     page: pageNo,
     page_size: size,
     rows: rows.map((v) => ({
-      ...v, ...cityOf(v), files: found.voucher(companyId, v.guid), last_change: changes.get(v.id) || null,
+      ...v, ...cityOf(v), files: found.voucher(companyId, v.guid), last_change: changes.get(String(v.id)) || null,
     })),
   };
 }

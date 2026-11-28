@@ -8,6 +8,8 @@ import Pagination, { loadPersistedPageSize, persistPageSize } from '../../compon
 import HelpLink from '../../components/shared/HelpLink';
 import Narration from '../../components/shared/Narration';
 import Legend from '../../components/shared/Legend';
+import { LastUpdatedCell } from '../../components/shared/LastUpdated';
+import { LAST_UPDATED } from '../../utils/lastUpdated';
 import MatchDetail, { OutcomeBadge } from '../../components/matching/MatchDetail';
 import { getMatchingSummary, listResults, runMatching } from '../../api/matching.api';
 import { getAutofillSummary } from '../../api/autofill.api';
@@ -214,15 +216,15 @@ export default function MatchReview() {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 {(kind === 'po'
-                  ? ['PO', 'Vendor', 'Vendor PO No', 'Bill No in ROMS', 'Tally invoice', 'Status', 'Auto-fill']
-                  : ['RTV', 'Vendor', 'CN No in ROMS', 'Tally credit note', 'Status', 'Auto-fill']
+                  ? ['PO', 'Vendor', 'Vendor PO No', 'Bill No in ROMS', 'Tally invoice', 'Status', 'Auto-fill', LAST_UPDATED]
+                  : ['RTV', 'Vendor', 'CN No in ROMS', 'Tally credit note', 'Status', 'Auto-fill', LAST_UPDATED]
                 ).map((h) => <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>)}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 [...Array(5)].map((_, i) => (
-                  <tr key={i}><td colSpan={7} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
+                  <tr key={i}><td colSpan={8} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
                 ))
               ) : data.rows.map((r) => (
                 <tr
@@ -260,6 +262,12 @@ export default function MatchReview() {
                   </td>
                   <td className="px-4 py-3 text-gray-700">
                     {r.outcome === 'linked' && <FillCell row={r} mode={canSeeFill ? fillModes?.[r.kind] ?? null : undefined} />}
+                  </td>
+                  <td className="px-4 py-3">
+                    <LastUpdatedCell
+                      name={r.last_change?.user_name} at={r.last_change?.at} description={r.last_change?.description}
+                      entityType={r.kind} entityId={r.id} what={r.kind === 'po' ? `PO ${r.po_id}` : `RTV ${r.rtv?.rtv_no || r.id}`}
+                    />
                   </td>
                 </tr>
               ))}

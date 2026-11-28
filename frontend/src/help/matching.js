@@ -44,6 +44,7 @@ export const matchReview = {
     },
   ],
   faq: [
+    { q: 'What does Last updated by show here?', a: 'The last thing a person did to that PO or RTV row in RAMS: used an invoice, confirmed, rejected or undid a link, or approved, retried or overwrote its auto-fill. Links RAMS made by itself don’t count. Click it to see every change.' },
     { q: 'What do the colours mean?', a: 'Green: Linked. Amber: Needs review. Grey: Waiting for Tally. Blue: Not matched, on purpose. The legend under the table says the same, and a yellow highlight is a Tally invoice with no narration.' },
     { q: 'Why is a narration highlighted in yellow?', a: 'Tally has no narration on that record, and the narration check (Admin → Tally companies) says it needs one. Ask the accountant to add it in Tally; it shows after the next sync.' },
     { q: 'Will RAMS change anything in ROMS?', a: 'Only through auto-fill, and only the Bill No + Bill Date of a linked PO and the CN No + CN Date of a linked RTV row. Each field is Off until an Admin switches it on, on Matching → Auto-fill.' },
@@ -92,6 +93,7 @@ export const matchingRules = {
     },
   ],
   faq: [
+    { q: 'What does Last updated by show on the Vendors list?', a: 'Who last changed how that marketplace is matched, and when. A dash means it is still as RAMS set it at the start. The line at the top is the last change to the rules themselves.' },
     { q: 'I changed a rule and a PO I confirmed didn’t move.', a: 'A person’s decision always wins over the rules. Use Undo on that PO to let the rules decide it again.' },
     { q: 'Who can see what I changed?', a: 'Every change is in the Audit Log, and the History button on this page lists them.' },
   ],
@@ -122,6 +124,7 @@ export const partyLedgers = {
     },
   ],
   faq: [
+    { q: 'Why does a ledger RAMS suggested show a dash?', a: 'Last updated by only shows people’s changes. A suggestion, or a ledger RAMS recognised as our own registration from its GSTIN, shows a name only once someone sets or accepts it.' },
     { q: 'What does “State differs” mean?', a: 'The ledger’s state in Tally and the state of its GSTIN disagree (the first two digits of a GSTIN are its state). The GSTIN’s state is shown under it. Correct the ledger’s state in Tally; RAMS picks it up after the next end-of-day check.' },
     { q: 'What does "From GSTIN" mean?', a: 'The ledger’s GSTIN carries Roymax’s own PAN, so RAMS knows it is one of our registrations. If that is wrong (a supplier saved with our GSTIN by mistake), fix the GSTIN in Tally, or map the ledger by hand.' },
     { q: 'What happens when a ledger is mapped to another marketplace?', a: 'An invoice billed to it can’t be linked to this marketplace’s PO without a person: the PO goes to Needs review.' },

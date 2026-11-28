@@ -21,7 +21,9 @@ export const getTransfers = getter('transfers');
 export const getReceivables = getter('receivables');
 // { categories: [{ code, count, rows }], exception_days, as_of, companies }
 export const getExceptions = getter('exceptions');
-// { settings, terms: [{ vendor, credit_days, transfer, updated_at, updated_by_name }] }
+// { settings, terms: [{ vendor, credit_days, transfer, updated_at, updated_by_name,
+//   last_change: { user_name, at, action_type, description } | null }] } -- last_change
+//   is from the audit trail, so it stays when a vendor goes back to the default.
 export const getReportSettings = getter('settings');
 
 export async function updateReportSettings(body) {

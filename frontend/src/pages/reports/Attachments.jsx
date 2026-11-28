@@ -4,7 +4,6 @@ import ReportFrame, { selectCls } from '../../components/reports/ReportFrame';
 import MonthTable from '../../components/attachments/MonthTable';
 import MonthVouchers from '../../components/attachments/MonthVouchers';
 import FilesDialog from '../../components/files/FilesDialog';
-import HistoryDrawer from '../../components/shared/HistoryDrawer';
 import { loadPersistedPageSize, persistPageSize } from '../../components/ui/Pagination';
 import { getAttachmentMonths, getAttachmentVouchers } from '../../api/attachments.api';
 import { useKeyedLoad } from '../../hooks/useKeyedLoad';
@@ -18,15 +17,15 @@ import { ATTACHMENTS_KEY as KEY, ATTACHMENTS_DEFAULTS as DEFAULTS } from '../../
 
 // Tally Reports -> Attachments (/reports/attachments): a company's invoices,
 // payments, debit and credit notes in a financial year, a tab each, the way
-// Tally's voucher registers show them -- month by month with Debit, Credit and
-// the running Closing balance, and how many need attention (no file, or no
-// narration where the narration check wants one). A month opens its vouchers:
+// Tally's voucher registers show them -- month by month with the Debit or
+// Credit, and how many need attention (no file, or no narration where the
+// narration check wants one). A month opens its vouchers:
 // number, ledger, city, amount, e-invoice, the invoice PDF and other files,
 // narration and the last change made in RAMS. It opens on the starred company
 // and this financial year. A month is loaded whole (a few hundred vouchers at
 // most), so "Needs attention only" and the search work without asking again.
 const STATIC_TABS = [
-  { key: 'invoice', label: 'Invoice' }, { key: 'payment', label: 'Payments' }, { key: 'dn', label: 'DN' }, { key: 'cn', label: 'CN' },
+  { key: 'invoice', label: 'Invoice' }, { key: 'payment', label: 'Payments' }, { key: 'dn', label: 'Debit Note' }, { key: 'cn', label: 'Credit Note' },
 ];
 const ALL = 10000;
 const matches = (q, r) => {
@@ -41,7 +40,6 @@ export default function Attachments() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(() => loadPersistedPageSize('attachments', 50));
   const [filesOf, setFilesOf] = useState(null); // a row's guid
-  const [historyOf, setHistoryOf] = useState(null); // { id, title }
   const set = (patch) => { setPick((p) => ({ ...p, ...patch })); setPage(1); };
 
   const months = useKeyedLoad(getAttachmentMonths, { company_id: pick.company_id, fy: pick.fy });
@@ -69,7 +67,7 @@ export default function Attachments() {
       ['City', (r) => r.city || ''], ['PIN', (r) => r.pincode || ''], ['Amount', (r) => rupeesForCsv(r.amount_paise)],
       ...(tab.einvoice ? [['Ack No', (r) => r.einvoice.ack_no || ''], ['Ack date', (r) => r.einvoice.ack_date || ''], ['IRN', (r) => r.einvoice.irn || '']] : []),
       ['Files', (r) => r.files.map((f) => f.name).join('; ')], ['Narration', narrationForCsv],
-      ['Last change by', (r) => r.last_change?.user_name || ''], ['Last change at', (r) => r.last_change?.at || ''],
+      ['Last updated by', (r) => r.last_change?.user_name || ''], ['Last updated at', (r) => r.last_change?.at || ''],
     ], list);
   };
 
@@ -119,7 +117,6 @@ export default function Attachments() {
           onBack={() => set({ month: '', only: false, q: '' })}
           canFiles={canFiles}
           onFiles={(r) => setFilesOf(r.guid)}
-          onHistory={(r) => setHistoryOf({ id: r.id, title: `History — ${r.number || ''} ${r.ledger || ''}`.trim() })}
           page={page}
           pageSize={pageSize}
           onPage={setPage}
@@ -144,7 +141,6 @@ export default function Attachments() {
           onChanged={reload}
         />
       )}
-      <HistoryDrawer open={!!historyOf} onClose={() => setHistoryOf(null)} entityType="tally_vouchers" entityId={historyOf?.id} title={historyOf?.title} />
     </ReportFrame>
   );
 }

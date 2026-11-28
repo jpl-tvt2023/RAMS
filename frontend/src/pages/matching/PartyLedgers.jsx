@@ -8,6 +8,8 @@ import { STATE_DIFFERS } from '../../utils/statementText';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Pagination, { loadPersistedPageSize, persistPageSize } from '../../components/ui/Pagination';
 import HelpLink from '../../components/shared/HelpLink';
+import { LastUpdatedCell } from '../../components/shared/LastUpdated';
+import { LAST_UPDATED } from '../../utils/lastUpdated';
 import {
   listPartyLedgers, updatePartyLedger, acceptSuggestions, listVendors, getMatchingSummary,
 } from '../../api/matching.api';
@@ -129,14 +131,14 @@ export default function PartyLedgers() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                {['Company', 'Ledger', 'GSTIN and state', 'Vouchers', 'Suggested', 'Maps to', ''].map((h) => (
+                {['Company', 'Ledger', 'GSTIN and state', 'Vouchers', 'Suggested', 'Maps to', '', LAST_UPDATED].map((h) => (
                   <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                [...Array(5)].map((_, i) => <tr key={i}><td colSpan={7} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>)
+                [...Array(5)].map((_, i) => <tr key={i}><td colSpan={8} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>)
               ) : data.rows.map((r) => (
                 <tr key={`${r.company_id}:${r.guid}`} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="px-4 py-3">{r.company}</td>
@@ -165,6 +167,12 @@ export default function PartyLedgers() {
                     </select>
                   </td>
                   <td className="px-4 py-3">{SOURCE[r.source] || (r.suggested_vendor && !r.kind ? <Badge color="amber">Suggested</Badge> : null)}</td>
+                  <td className="px-4 py-3">
+                    <LastUpdatedCell
+                      name={r.updated_by_name} at={r.updated_at}
+                      entityType="party_ledger" entityId={`${r.company_id}:${r.guid}`} what={r.name}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>

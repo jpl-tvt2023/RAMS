@@ -9,6 +9,8 @@ import Badge from '../../components/ui/Badge';
 import { HistoryButton } from '../../components/shared/HistoryDrawer';
 import PasswordCriteria from '../../components/shared/PasswordCriteria';
 import HelpLink from '../../components/shared/HelpLink';
+import { LastUpdatedCell } from '../../components/shared/LastUpdated';
+import { LAST_UPDATED } from '../../utils/lastUpdated';
 import {
   listUsers, createUser, updateUser, deactivateUser, reactivateUser, resetUserPassword,
 } from '../../api/users.api';
@@ -120,7 +122,7 @@ export default function UserManagement() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                {['Name', 'User ID', 'Role', 'Status', 'Added', 'Actions'].map((h) => (
+                {['Name', 'User ID', 'Role', 'Status', 'Added', LAST_UPDATED, 'Actions'].map((h) => (
                   <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -128,7 +130,7 @@ export default function UserManagement() {
             <tbody>
               {loading ? (
                 [...Array(4)].map((_, i) => (
-                  <tr key={i}><td colSpan={6} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
+                  <tr key={i}><td colSpan={7} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
                 ))
               ) : users.map((u) => (
                 <tr key={u.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${u.is_active ? '' : 'opacity-60'}`}>
@@ -147,6 +149,9 @@ export default function UserManagement() {
                         : <span className="text-green-600 text-xs">Active</span>}
                   </td>
                   <td className="px-4 py-3 text-gray-500">{formatDate(u.created_at)}</td>
+                  <td className="px-4 py-3">
+                    <LastUpdatedCell name={u.updated_by_name} at={u.updated_at} entityType="user" entityId={u.id} what={u.name} />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <button onClick={() => openEdit(u)} title="Edit" aria-label={`Edit ${u.name}`} className="p-1.5 rounded hover:bg-blue-50 text-blue-500 transition-colors"><Pencil size={14} /></button>

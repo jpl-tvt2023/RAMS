@@ -7,15 +7,15 @@ export const attachmentsHelp = {
   area: 'Tally Reports',
   title: 'Attachments',
   who: 'Seeing it, and viewing and downloading files: "See Attachments". Adding and removing files: "Attach files" (the same as on Party Statements). Admin and Owner always can. Accountants can see and attach files by default, and Viewers can see.',
-  summary: 'A company’s vouchers in a financial year, the way Tally’s registers show them: Invoice (Sales), Payments, DN (debit notes) and CN (credit notes), month by month. For each month: how many vouchers, how many need attention — no file, or no narration where one is needed — and the Debit, Credit and Closing balance. Click a month to see its vouchers, each with its ledger, city, amount, e-invoice number, files, narration, and who last changed it in RAMS. Every figure comes from Tally; RAMS never writes anything into Tally.',
+  summary: 'A company’s vouchers in a financial year, the way Tally’s registers show them: Invoice (Sales), Payments, Debit Note and Credit Note, month by month. For each month: how many vouchers, how many need attention — no file, or no narration where one is needed — and the Debit or Credit. Click a month to see its vouchers, each with its ledger, city, amount, e-invoice number, files, narration, and who last changed it in RAMS. Every figure comes from Tally; RAMS never writes anything into Tally.',
   flows: [
     {
       title: 'Read a month like Tally’s register',
       steps: [
         'Tally Reports → Attachments. It opens on the default company (the star on Admin → Tally companies) and this financial year, on the Invoice tab.',
-        'Pick a tab: Invoice (Tally’s Sales), Payments (money paid out), DN (Tally’s debit notes) or CN (Tally’s credit notes). The number next to each is its vouchers this year.',
-        'Each row is a month, April to March, as in Tally’s register: the vouchers, how many need attention, the Debit or Credit, and the Closing balance — the running total from April.',
-        'Invoices and debit notes are on the Credit side, payments and credit notes on the Debit side, as Tally shows them. The Closing says Cr or Dr the same way.',
+        'Pick a tab: Invoice (Tally’s Sales), Payments (money paid out), Debit Note (Tally’s debit notes) or Credit Note (Tally’s credit notes). The number next to each is its vouchers this year.',
+        'Each row is a month, April to March, as in Tally’s register: the vouchers, how many need attention, and the Debit or Credit.',
+        'Invoices and debit notes are on the Credit side, payments and credit notes on the Debit side, as Tally shows them.',
         'Grand Total at the bottom adds up the year.',
       ],
     },
@@ -60,7 +60,7 @@ export const attachmentsHelp = {
     {
       title: 'See who changed a voucher in RAMS',
       steps: [
-        'The Audit Log column shows who last changed the voucher in RAMS — added or removed a file — and when.',
+        'The Last updated by column shows who last changed the voucher in RAMS — added or removed a file — and when.',
         'Click it to see the voucher’s whole history, newest first.',
         'A dash means nobody has changed it in RAMS yet. Changes made in Tally itself are in Tally’s own Edit Log.',
       ],
@@ -75,11 +75,12 @@ export const attachmentsHelp = {
     },
   ],
   faq: [
+    { q: 'Where did the Audit Log column go?', a: 'It is now called Last updated by, the same as on every other screen. It still shows who last added or removed a file on the voucher, and when.' },
     { q: 'What does “needs attention” mean?', a: 'The voucher has no file attached, or it has no narration while the narration check asks for one. The narration check (which voucher types, and from which date) is set by an Admin on Admin → Tally companies.' },
     { q: 'Why aren’t April and May vouchers yellow when they have no narration?', a: 'The narration check starts on the date an Admin set on Admin → Tally companies (8 June 2026 to begin with). Vouchers before it are never flagged for a narration. Move the date to 1 April to check the whole year.' },
     { q: 'Why does Payments show a different ledger from Tally’s party?', a: 'In Tally a payment’s party is often the bank or cash it was paid from. Attachments shows who was paid — the ledger the payment debits — since that is whose bill or receipt belongs on it.' },
     { q: 'Where does the City come from?', a: 'From the ledger’s address in Tally when its City is filled in. Until then, from the ROMS PO the invoice is linked to, or the party’s latest ROMS PO (it then says “from ROMS”). Fill in City on the ledger’s address in Tally and it shows everywhere after the next sync. Hover over a city to see where it came from and the PIN code.' },
-    { q: 'Why is a marketplace’s DN under CN here, but in the DN column on Party Statements?', a: 'Attachments follows Tally’s own voucher types: a marketplace’s DN is booked in Tally as a Credit Note, so it is under CN. DN lists Tally’s Debit Notes (our returns to suppliers). Party Statements reads the DN number in the narration to put it in its DN column.' },
+    { q: 'Why is a marketplace’s DN on the Credit Note tab here, but in the DN column on Party Statements?', a: 'Attachments follows Tally’s own voucher types: a marketplace’s DN is booked in Tally as a Credit Note, so it is on the Credit Note tab. The Debit Note tab lists Tally’s Debit Notes (our returns to suppliers). Party Statements reads the DN number in the narration to put it in its DN column.' },
     { q: 'Are these the same files as on Party Statements and Bills Receivable?', a: 'Yes. A file sits on the Tally voucher, so one added here shows on Party Statements and Bills Receivable too, and the other way round.' },
     { q: 'Why are some vouchers missing?', a: 'Cancelled and optional vouchers aren’t listed, nor ones deleted in Tally. Receipts, journals, purchases and contras have no tab here.' },
     { q: 'Why does a month say “Not in RAMS”?', a: 'RAMS holds Tally from 1 April 2026. Months before that aren’t in its copy.' },

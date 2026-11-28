@@ -99,6 +99,16 @@ describe('PATCH /api/companies/:id', () => {
       });
       expect(audit.description).toBe(`${b.name} is now the default company for reports`);
       expect(JSON.parse(audit.changes)).toEqual([{ field: 'is_default', old: 0, new: 1 }]);
+      // The company that lost the star was changed too: stamped by the Owner and
+      // audited on its own record.
+      const { rows: [lost] } = await db.execute({
+        sql: "SELECT description, changes FROM audit_logs WHERE entity_type = 'tally_company' AND entity_id = ? AND action_type = 'TALLY_COMPANY_DEFAULT' ORDER BY id DESC LIMIT 1",
+        args: [a.id],
+      });
+      expect(lost.description).toBe(`${a.name} is no longer the default company for reports (${b.name} is)`);
+      expect(JSON.parse(lost.changes)).toEqual([{ field: 'is_default', old: 1, new: 0 }]);
+      expect(all.find((c) => c.id === a.id)).toMatchObject({ is_default: false, updated_by_name: 'Test Owner' });
+      expect(all.find((c) => c.id === b.id)).toMatchObject({ is_default: true, updated_by_name: 'Test Owner' });
 
       expect((await patch(admin.token, b.id, { is_default: false })).status).toBe(400);
       for (const who of ['accountant', 'viewer']) {

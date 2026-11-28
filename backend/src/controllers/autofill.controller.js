@@ -19,7 +19,6 @@ const RESULTS = ['applied', 'skipped', 'rejected'];
 const MODE_TEXT = {
   off: 'Off', preview: 'Preview', approve: 'Ask first', auto: 'Automatic',
 };
-const FIELD_TEXT = { po: 'Bill No', rtv: 'CN No' };
 const PAGE_SIZE = 50;
 const PAGE_SIZE_MAX = 200;
 
@@ -275,16 +274,8 @@ async function approve(req, res, next) {
     const { kind, ids } = req.body || {};
     if (!KINDS.includes(kind)) throw fail(400, 'Say which field: po (Bill No) or rtv (CN No)');
     if (ids != null && (!Array.isArray(ids) || ids.length > 1000)) throw fail(400, 'ids must be a list of rows');
-    const n = await approveItems(db, { kind, ids, userId: req.user.id });
-    if (n) {
-      await logAction({
-        userId: req.user.id,
-        actionType: 'AUTOFILL_APPROVE',
-        description: `Approved ${n} ${FIELD_TEXT[kind]} write${n === 1 ? '' : 's'} into ROMS${ids ? `: ${ids.slice(0, 10).join(', ')}${ids.length > 10 ? '…' : ''}` : ''}`,
-        entityType: 'autofill',
-        entityRef: kind,
-      });
-    }
+    // approveItems writes one audit row per approved row, in this transaction.
+    const n = await inTx((tx) => approveItems(tx, { kind, ids, userId: req.user.id }));
     res.json({ approved: n, summary: await summaryData() });
   } catch (err) { sendError(res, next, err); }
 }
@@ -294,6 +285,15 @@ async function approve(req, res, next) {
 async function run(req, res, next) {
   try {
     const out = await sendAutofill(db, { trigger: 'manual', userId: req.user.id });
+    if (out.run_id) {
+      const c = out.counts || {};
+      await logAction({
+        userId: req.user.id, actionType: 'AUTOFILL_RUN', entityType: 'autofill_run', entityId: out.run_id,
+        description: out.ok
+          ? `Write now (one round): ${c.written || 0} written, ${c.already || 0} already right, ${c.refused || 0} refused, ${c.checked || 0} checked`
+          : `Write now (one round) stopped — ${out.error}`,
+      });
+    }
     if (!out.ok) return res.status(502).json({ message: out.error, ...out });
     res.json({ ...out, summary: await summaryData() });
   } catch (err) { sendError(res, next, err); }

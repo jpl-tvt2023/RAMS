@@ -17,23 +17,21 @@ const IRN = '9f2c4e7a1b3d5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8';
 const MONTHS_OF_FY = ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12', '2027-01', '2027-02', '2027-03'];
 const NAMES = { '04': 'April', '05': 'May', '06': 'June', '07': 'July', '08': 'August', '09': 'September', 10: 'October', 11: 'November', 12: 'December', '01': 'January', '02': 'February', '03': 'March' };
 const empty = (month) => ({
-  month, label: `${NAMES[month.slice(5)]} ${month.slice(0, 4)}`, in_copy: true, from: null, vouchers: 0, needs_attention: 0, no_narration: 0, no_file: 0, debit_paise: 0, credit_paise: 0, closing_paise: month <= '2026-11' ? 0 : null,
+  month, label: `${NAMES[month.slice(5)]} ${month.slice(0, 4)}`, in_copy: true, from: null, vouchers: 0, needs_attention: 0, no_narration: 0, no_file: 0, debit_paise: 0, credit_paise: 0,
 });
 // One tab: `filled` gives the months that have vouchers.
 const tabOf = (key, label, base_type, side, filled) => {
-  let closing = 0;
   const months = MONTHS_OF_FY.map((m) => {
     const f = filled[m] || {};
-    closing += side === 'debit' ? (f.amount || 0) : -(f.amount || 0);
     return {
-      ...empty(m), ...f, debit_paise: side === 'debit' ? (f.amount || 0) : 0, credit_paise: side === 'credit' ? (f.amount || 0) : 0, closing_paise: m <= '2026-11' ? closing : null,
+      ...empty(m), ...f, debit_paise: side === 'debit' ? (f.amount || 0) : 0, credit_paise: side === 'credit' ? (f.amount || 0) : 0,
     };
   });
   const sum = (k) => months.reduce((a, m) => a + (m[k] || 0), 0);
   return {
-    key, label, base_type, side, einvoice: key !== 'payment', number_label: { invoice: 'Invoice no', payment: 'Voucher no', dn: 'DN no', cn: 'CN no' }[key], months,
+    key, label, base_type, side, einvoice: key !== 'payment', number_label: { invoice: 'Invoice no', payment: 'Voucher no', dn: 'Debit Note no', cn: 'Credit Note no' }[key], months,
     totals: {
-      vouchers: sum('vouchers'), needs_attention: sum('needs_attention'), no_narration: sum('no_narration'), no_file: sum('no_file'), debit_paise: sum('debit_paise'), credit_paise: sum('credit_paise'), closing_paise: closing,
+      vouchers: sum('vouchers'), needs_attention: sum('needs_attention'), no_narration: sum('no_narration'), no_file: sum('no_file'), debit_paise: sum('debit_paise'), credit_paise: sum('credit_paise'),
     },
   };
 };
@@ -55,8 +53,8 @@ const MONTHS = {
       },
     }),
     tabOf('payment', 'Payments', 'Payment', 'debit', { '2026-07': { vouchers: 1, amount: 35000, needs_attention: 1, no_file: 1 } }),
-    tabOf('dn', 'DN', 'Debit Note', 'credit', {}),
-    tabOf('cn', 'CN', 'Credit Note', 'debit', {}),
+    tabOf('dn', 'Debit Note', 'Debit Note', 'credit', {}),
+    tabOf('cn', 'Credit Note', 'Credit Note', 'debit', {}),
   ],
 };
 const row = (over) => ({
@@ -127,7 +125,9 @@ describe('Attachments', () => {
 
     const july = monthRow('July 2026');
     expect(within(july).getByText('₹2,41,89,073.30')).toBeInTheDocument(); // the Credit column
-    expect(within(july).getByText('₹2,41,90,073.30 Cr')).toBeInTheDocument(); // Closing, running from April
+    expect(screen.queryByText(/Closing/)).not.toBeInTheDocument(); // no Closing balance column
+    expect(screen.getByRole('tab', { name: /Debit Note/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Credit Note/ })).toBeInTheDocument();
     expect(within(july).getByRole('button', { name: '1 in July 2026 need attention' })).toHaveTextContent('1 no file · 1 no narration');
     expect(screen.getByText('Grand Total')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'June 2026' })).not.toBeInTheDocument(); // nothing to open
@@ -138,7 +138,7 @@ describe('Attachments', () => {
     const user = userEvent.setup();
     await screen.findByRole('button', { name: 'July 2026' });
     await user.click(screen.getByRole('tab', { name: /Payments/ }));
-    expect(within(monthRow('July 2026')).getByText('₹350.00 Dr')).toBeInTheDocument();
+    expect(within(monthRow('July 2026')).getByText('₹350.00')).toBeInTheDocument(); // the Debit column
     expect(attachments.getAttachmentMonths).toHaveBeenCalledTimes(1);
   });
 
@@ -151,7 +151,7 @@ describe('Attachments', () => {
     });
     expect(within(list).getByRole('heading', { name: 'Invoice · July 2026' })).toBeInTheDocument();
     const heads = within(list).getAllByRole('columnheader').map((h) => h.textContent);
-    expect(heads).toEqual(['Invoice no', 'Ledger', 'City', 'Amount', 'E-Invoice (Ack No)', 'Invoice PDF', 'Narration', 'Audit Log']);
+    expect(heads).toEqual(['Invoice no', 'Ledger', 'City', 'Amount', 'E-Invoice (Ack No)', 'Invoice PDF', 'Narration', 'Last updated by']);
 
     const [r1, r2] = within(list).getAllByRole('row').slice(1);
     expect(r1).toHaveClass(NO_FILE.row); // no file: orange
@@ -166,7 +166,7 @@ describe('Attachments', () => {
     expect(within(list).getByText(/e-invoice of 1 voucher here hasn’t been read yet/)).toBeInTheDocument();
 
     // The last change opens the voucher's history.
-    await user.click(within(r2).getByRole('button', { name: 'History of Invoice 608/RM/26-27' }));
+    await user.click(within(r2).getByRole('button', { name: /^History of Invoice 608\/RM\/26-27: last updated by Asha/ }));
     await waitFor(() => expect(audit.getEntityHistory).toHaveBeenCalledWith('tally_vouchers', 12));
   });
 
@@ -185,7 +185,7 @@ describe('Attachments', () => {
     await screen.findByRole('button', { name: 'July 2026' });
     await user.click(screen.getByRole('tab', { name: /Payments/ }));
     const list = await openJuly(user);
-    expect(within(list).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Voucher no', 'Ledger', 'City', 'Amount', 'Files', 'Narration', 'Audit Log']);
+    expect(within(list).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Voucher no', 'Ledger', 'City', 'Amount', 'Files', 'Narration', 'Last updated by']);
     expect(within(list).getByText('Tirupati Textiles')).toBeInTheDocument();
     expect(within(list).getByText('+1 more')).toHaveAttribute('title', 'Tirupati Textiles\nFreight Outward');
     expect(within(list).queryByText('HDFC BANK - 8412')).not.toBeInTheDocument();

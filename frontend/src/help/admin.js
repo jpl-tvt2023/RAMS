@@ -35,6 +35,7 @@ export const users = {
     },
   ],
   faq: [
+    { q: 'What does Last updated by show here?', a: 'Who last changed the account and when: added it, changed the name or role, deactivated or reactivated it, or reset the password. A user setting their own password counts too. Click it to see every change.' },
     { q: 'Why can’t I delete a user?', a: 'So the audit log keeps saying who did what. Deactivate them instead.' },
   ],
 };
@@ -57,7 +58,10 @@ export const auditLog = {
     },
     {
       title: 'See one record’s history',
-      steps: ['Click the clock icon next to a record (a company, the sync schedule, the matching rules, a PO in Match review). A drawer lists its changes, newest first.'],
+      steps: [
+        'Click a name in a Last updated by column, or the clock icon next to a record (a company, the sync schedule, the matching rules, a PO in Match review).',
+        'A window lists its changes, newest first.',
+      ],
     },
   ],
   faq: [
@@ -113,6 +117,7 @@ export const tallyCompanies = {
     },
   ],
   faq: [
+    { q: 'What does Last updated by show here?', a: 'Who last turned sync on or off, changed the code, or moved the default star, and when. Moving the star is a change on both companies: the one that gets it and the one that loses it. What the Connector reports (the name, state, Last seen) doesn’t count.' },
     { q: 'A company appears twice.', a: 'It was re-created in Tally, which gives it a new identity. Turn the new one on and the old one off.' },
     { q: 'Does the narration check change Tally?', a: 'No. It only decides which records RAMS highlights. Records outside it still show their narration.' },
     { q: 'What is the short code?', a: 'How lists show the company (MH, HR, WB). Click the pencil icon to change it.' },
@@ -154,12 +159,13 @@ export const creditTerms = {
     {
       title: 'See who changed what',
       steps: [
-        'Each row says who last changed it and when.',
-        'The clock next to the default shows its full history; every change is also in the Audit Log.',
+        'Each row’s Last updated by says who last changed its days and when. Click it to see every change.',
+        'The line under the default says who last changed it; the clock next to it shows its full history. Every change is also in the Audit Log.',
       ],
     },
   ],
   faq: [
+    { q: 'A marketplace is back on the default. Why does it still show a name?', a: 'Last updated by is who made the last change, and putting a marketplace back to the default is a change. Click it to see every change to its days.' },
     { q: 'What do the credit days decide?', a: 'When an invoice is overdue: its date plus the days. Bills Receivable shows the due date and how many days overdue.' },
     { q: 'What does “Default (30)” mean?', a: 'The marketplace has no days of its own, so it uses the default, 30 days to begin with.' },
     { q: 'Why aren’t Flipkart and Amazon listed?', a: 'They are set to stock transfer on Matching rules: sales between our own registrations, so nothing is owed and nothing is overdue.' },
@@ -223,6 +229,7 @@ export const rolesPermissions = {
     },
   ],
   faq: [
+    { q: 'What does Last updated by show here?', a: 'For each permission, who last ticked or unticked it, for Accountants or Viewers, and when. The line under the grid is the last change to any of them. A dash means it is still as RAMS set it at the start.' },
     { q: 'Why can’t I give an Accountant the Users page?', a: 'Users, the Audit Log and this page stay with Admins and Owners, so nobody can give themselves more rights.' },
     { q: 'Someone still sees a button they shouldn’t.', a: 'It disappears when their page reloads, but RAMS refuses the action itself from the moment you save.' },
   ],

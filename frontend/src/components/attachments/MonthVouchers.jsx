@@ -1,12 +1,14 @@
-import { ArrowLeft, History } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Legend from '../shared/Legend';
 import Narration from '../shared/Narration';
 import Pagination from '../ui/Pagination';
 import FilesCell from '../files/FilesCell';
+import { LastUpdatedCell } from '../shared/LastUpdated';
+import { LAST_UPDATED } from '../../utils/lastUpdated';
 import EInvoiceCell, { NOT_READ_HELP } from './EInvoiceCell';
 import { ReportTable, td, num } from '../reports/ReportFrame';
 import { NO_FILE } from '../../utils/highlights';
-import { formatDay, formatDateTime, formatRupees } from '../../utils/formatters';
+import { formatDay, formatRupees } from '../../utils/formatters';
 
 const CITY_FROM = {
   tally: 'From the ledger’s address in Tally',
@@ -29,13 +31,13 @@ function NarrationCell({ r }) {
  * "needs attention only" and search filters).
  */
 export default function MonthVouchers({
-  tab, data, loading, rows, total, only, onOnly, onBack, canFiles, onFiles, onHistory, page, pageSize, onPage, onPageSize,
+  tab, data, loading, rows, total, only, onOnly, onBack, canFiles, onFiles, page, pageSize, onPage, onPageSize,
 }) {
   const what = (r) => `${tab.label === 'Invoice' ? 'Invoice' : r.voucher_type} ${r.number || ''}`.trim();
   const head = [
     tab.number_label, 'Ledger', 'City', { label: 'Amount', right: true },
     ...(tab.einvoice ? ['E-Invoice (Ack No)'] : []),
-    tab.key === 'invoice' ? 'Invoice PDF' : 'Files', 'Narration', 'Audit Log',
+    tab.key === 'invoice' ? 'Invoice PDF' : 'Files', 'Narration', LAST_UPDATED,
   ];
   return (
     <section aria-label={`${tab.label} · ${data?.label || ''}`}>
@@ -97,12 +99,10 @@ export default function MonthVouchers({
             </td>
             <td className={td}><NarrationCell r={r} /></td>
             <td className={td}>
-              {r.last_change ? (
-                <button type="button" onClick={() => onHistory(r)} aria-label={`History of ${what(r)}`} title={r.last_change.description || ''} className="text-left text-brand hover:underline">
-                  <span className="inline-flex items-center gap-1 whitespace-nowrap"><History size={12} aria-hidden="true" />{r.last_change.user_name || 'Someone'}</span>
-                  <span className="block text-xs text-gray-500 whitespace-nowrap">{formatDateTime(r.last_change.at)}</span>
-                </button>
-              ) : <span className="text-gray-400">—</span>}
+              <LastUpdatedCell
+                name={r.last_change?.user_name} at={r.last_change?.at} description={r.last_change?.description}
+                entityType="tally_vouchers" entityId={r.id} what={what(r)} title={`History — ${r.number || ''} ${r.ledger || ''}`.trim()}
+              />
             </td>
           </tr>
         ))}

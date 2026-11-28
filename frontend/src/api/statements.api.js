@@ -31,7 +31,8 @@ export async function getStatement({
 }
 
 // One party over a range: the statement row, and Tally's vouchers with
-// narration, files and running balance.
+// narration, files, running balance, and last_change (the last file a person
+// added or removed: { user_name, at, action_type, description } | null).
 export async function getStatementParty(params) {
   const { data } = await api.get('/statements/party', { params });
   return data;

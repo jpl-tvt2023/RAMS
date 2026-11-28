@@ -12,6 +12,8 @@ import { HistoryButton } from '../../components/shared/HistoryDrawer';
 import SyncSchedulePanel from '../../components/settings/SyncSchedulePanel';
 import NarrationRulePanel from '../../components/settings/NarrationRulePanel';
 import HelpLink from '../../components/shared/HelpLink';
+import { LastUpdatedCell } from '../../components/shared/LastUpdated';
+import { LAST_UPDATED } from '../../utils/lastUpdated';
 import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
 import { listCompanies, updateCompany } from '../../api/companies.api';
@@ -79,7 +81,7 @@ export default function Companies() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                {['Company', 'Code', 'State', 'GSTIN', 'In Tally', 'Vouchers', 'Sync', 'Last seen', 'Actions'].map((h) => (
+                {['Company', 'Code', 'State', 'GSTIN', 'In Tally', 'Vouchers', 'Sync', 'Last seen', LAST_UPDATED, 'Actions'].map((h) => (
                   <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -87,7 +89,7 @@ export default function Companies() {
             <tbody>
               {loading ? (
                 [...Array(3)].map((_, i) => (
-                  <tr key={i}><td colSpan={9} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
+                  <tr key={i}><td colSpan={10} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
                 ))
               ) : companies.map((c) => (
                 <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
@@ -109,6 +111,9 @@ export default function Companies() {
                   <td className="px-4 py-3 tabular-nums text-gray-600">{c.vouchers.toLocaleString('en-IN')}</td>
                   <td className="px-4 py-3">{c.sync_enabled ? <Badge color="green">On</Badge> : <Badge>Off</Badge>}</td>
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDateTime(c.last_seen_at)}</td>
+                  <td className="px-4 py-3">
+                    <LastUpdatedCell name={c.updated_by_name} at={c.updated_at} entityType="tally_company" entityId={c.id} what={c.name} />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       {canSync && (c.sync_enabled ? (
