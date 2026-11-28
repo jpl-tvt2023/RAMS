@@ -1,9 +1,15 @@
-// Purchase Reports: the records on one page (Warehouse or Stitching), with
-// their lines from RAMS's copy of ROMS, their files, the bill check and the
-// approvals -- filtered, counted per status and paged in the database.
+// Purchase Reports: the records on one page (Warehouse or Stitching) -- one
+// per ROMS line, listed by delivery -- with the line from RAMS's copy of ROMS,
+// its files, the bill check and the approvals: filtered by financial year,
+// month, company, status and search, counted per status and paged in the
+// database.
 const { lastChanges } = require('../services/lastChange');
 const {
-  PAGES, receiptLine, challanLine, recordLabel, linesOf,
+  fyOf, pickYear, monthsOf, fyLabel, begunMonths,
+} = require('../services/financialYear');
+const { todayIst } = require('../matching/load');
+const {
+  PAGES, receiptLine, challanLine, recordLabel, deliveryLabel, linesOf,
 } = require('./lines');
 
 const STATUSES = ['to_check', 'with_purchase_head', 'with_accounts_head', 'sent_back', 'changed', 'approved', 'removed'];
@@ -52,22 +58,27 @@ function lineFilter({ companyId, q }) {
   };
 }
 
-// A YYYY-MM month in IST, on the record's date (its first line's ROMS entry).
+// A YYYY-MM month in IST, on the record's date (its line's ROMS entry).
 const MONTH_SQL = "strftime('%Y-%m', r.first_at, '+330 minutes')";
 
-function readQuery(page, query = {}) {
+// The financial year asked for (else the current one) and a month of it.
+function readQuery(page, query = {}, today = todayIst()) {
   if (!PAGES.includes(page)) throw fail(404, 'Purchase Reports has a Warehouse page and a Stitching page');
   const companyId = query.company_id ? Number(query.company_id) : null;
   if (query.company_id && !(Number.isInteger(companyId) && companyId > 0)) throw fail(400, 'Choose the company');
   const month = query.month ? String(query.month) : null;
-  if (month && !/^\d{4}-\d{2}$/.test(month)) throw fail(400, 'month must be YYYY-MM');
+  // A month without a year is in its own year (a page left open over 1 April).
+  const noYear = query.fy == null || query.fy === '';
+  const { fy, years } = pickYear(noYear && month && /^\d{4}-\d{2}$/.test(month) ? fyOf(`${month}-01`) : query.fy, today);
+  const fyMonths = monthsOf(fy).map((m) => m.month);
+  if (month && !fyMonths.includes(month)) throw fail(400, `Choose a month of FY ${fyLabel(fy)} (YYYY-MM)`);
   const status = query.status && query.status !== 'all' ? String(query.status) : null;
   if (status && !STATUSES.includes(status)) throw fail(400, `status must be one of ${STATUSES.join(', ')} or all`);
   const q = String(query.q || '').trim().slice(0, 100) || null;
   const pageNo = Math.max(1, Number.parseInt(query.page, 10) || 1);
   const pageSize = Math.min(PAGE_SIZE_MAX, Math.max(1, Number.parseInt(query.page_size, 10) || PAGE_SIZE));
   return {
-    page, companyId, month, status, q, pageNo, pageSize,
+    page, companyId, fy, years, from: fyMonths[0], to: fyMonths[11], month, status, q, pageNo, pageSize, today,
   };
 }
 
@@ -115,7 +126,8 @@ const SELECT_RECORD = `
 const stamp = (by, name, at) => (at ? { by: by == null ? null : Number(by), name: name ?? null, at } : null);
 const uniq = (list) => [...new Set(list.filter((v) => v != null && v !== ''))];
 
-// One record for the page. A removed record shows the lines it had when checked.
+// One record (one line) for the page. A removed record shows its line as it
+// was when checked.
 function shape(r, lines, files, last) {
   const id = Number(r.id);
   const snapshot = parse(r.snapshot);
@@ -128,9 +140,13 @@ function shape(r, lines, files, last) {
     status: r.status,
     label: recordLabel(r.kind, shown),
     date: r.first_at,
+    // The delivery the line is listed with: its Incoming No (or challan).
+    delivery: {
+      key: r.delivery_key || r.group_key, at: r.delivery_at || r.first_at, label: deliveryLabel(r.kind, shown),
+    },
     incoming: uniq(shown.map((l) => l.incoming))[0] || null,
-    // A lone receipt with no Incoming No, which ROMS should have (not one sold straight on).
-    no_incoming: r.kind === 'receipts' && String(r.group_key).startsWith('rcpt:') && first.stage !== 'Third Party',
+    // A receipt with no Incoming No, which ROMS should have (not one sold straight on).
+    no_incoming: r.kind === 'receipts' && !first.removed && !first.incoming && first.stage !== 'Third Party',
     billing: uniq(shown.map((l) => l.billing)),
     vendor: first.vendor ?? null,
     party: first.party ?? null,
@@ -154,30 +170,36 @@ async function shapeAll(client, rows) {
   return rows.map((r) => shape(r, lines.get(Number(r.id)) || [], files.get(Number(r.id)) || [], last.get(String(r.id))));
 }
 
+// Deliveries newest first, each one's lines together in ROMS's order. (A
+// record not yet given its delivery -- ROMS unread since migration 023 -- sorts
+// by its own date and key.)
+const ORDER = 'ORDER BY COALESCE(r.delivery_at, r.first_at) DESC, COALESCE(r.delivery_key, r.group_key), r.first_at, r.id';
+
 /**
  * One page's records: { rows, total, page, page_size, counts: { status: n, all },
- * companies: [{ id, name }], months: [YYYY-MM] }.
+ * companies: [{ id, name }], fy, fy_label, years: [{ fy, label }],
+ * months: [YYYY-MM, the year's begun months, newest first], today }.
  */
-async function listRecords(client, pageName, query) {
-  const f = readQuery(pageName, query);
+async function listRecords(client, pageName, query, today = todayIst()) {
+  const f = readQuery(pageName, query, today);
   const lines = lineFilter(f);
-  const base = `FROM purchase_records r WHERE r.page = ? ${f.month ? `AND ${MONTH_SQL} = ?` : ''} ${lines.sql}`;
-  const baseArgs = [f.page, ...(f.month ? [f.month] : []), ...lines.args];
+  const base = `FROM purchase_records r WHERE r.page = ? AND ${MONTH_SQL} BETWEEN ? AND ?
+                ${f.month ? `AND ${MONTH_SQL} = ?` : ''} ${lines.sql}`;
+  const baseArgs = [f.page, f.from, f.to, ...(f.month ? [f.month] : []), ...lines.args];
   const statusSql = f.status ? 'AND r.status = ?' : '';
   const statusArgs = f.status ? [f.status] : [];
 
-  const [countRows, [{ total }], rows, companies, months] = await Promise.all([
+  const [countRows, [{ total }], rows, companies] = await Promise.all([
     rowsOf(client, `SELECT r.status, COUNT(*) AS n ${base} GROUP BY r.status`, baseArgs),
     rowsOf(client, `SELECT COUNT(*) AS total ${base} ${statusSql}`, [...baseArgs, ...statusArgs]),
     rowsOf(client, `${SELECT_RECORD} WHERE r.id IN (SELECT r.id ${base} ${statusSql})
-                    ORDER BY r.first_at DESC, r.id DESC LIMIT ? OFFSET ?`,
+                    ${ORDER} LIMIT ? OFFSET ?`,
     [...baseArgs, ...statusArgs, f.pageSize, (f.pageNo - 1) * f.pageSize]),
     rowsOf(client, `SELECT DISTINCT l.company_id AS id, l.company_name AS name FROM (
                       SELECT company_id, company_name, record_id FROM roms_purchase_receipts
                       UNION ALL SELECT company_id, company_name, record_id FROM roms_purchase_challans) l
                       JOIN purchase_records r ON r.id = l.record_id
                      WHERE r.page = ? AND l.company_id IS NOT NULL ORDER BY l.company_name`, [f.page]),
-    rowsOf(client, `SELECT DISTINCT ${MONTH_SQL} AS m FROM purchase_records r WHERE r.page = ? AND r.first_at IS NOT NULL ORDER BY m DESC`, [f.page]),
   ]);
   const counts = Object.fromEntries(STATUSES.map((s) => [s, 0]));
   for (const c of countRows) counts[c.status] = Number(c.n);
@@ -189,15 +211,41 @@ async function listRecords(client, pageName, query) {
     page_size: f.pageSize,
     counts,
     companies: companies.map((c) => ({ id: Number(c.id), name: c.name || `Company ${c.id}` })),
-    months: months.map((m) => m.m).filter(Boolean),
+    fy: f.fy,
+    fy_label: fyLabel(f.fy),
+    years: f.years,
+    months: begunMonths(f.fy, today),
+    today,
   };
 }
 
-// One record, shaped like a list row, or null.
-async function readRecord(client, id) {
+// The lines of a record's delivery, for the bill check's ticks: each one's
+// record id, status, figures and file count, in ROMS's order.
+async function deliveryLines(client, rec) {
+  const others = await rowsOf(client, `SELECT r.id, r.status, r.kind FROM purchase_records r
+                                        WHERE r.id = ? OR (r.page = ? AND r.delivery_key = ?) ORDER BY r.first_at, r.id`, [rec.id, rec.page, rec.delivery.key]);
+  const ids = others.map((o) => Number(o.id));
+  const [lines, fileCounts] = await Promise.all([
+    linesFor(client, ids),
+    rowsOf(client, `SELECT record_id, COUNT(*) AS n FROM purchase_files WHERE record_id IN (${marks(ids.length)}) GROUP BY record_id`, ids),
+  ]);
+  const files = new Map(fileCounts.map((f) => [Number(f.record_id), Number(f.n)]));
+  return others.map((o) => {
+    const id = Number(o.id);
+    const l = (lines.get(id) || [])[0] || {};
+    return {
+      id, status: o.status, article: l.article ?? null, billing: l.billing ?? null, po: l.po ?? null, qty: l.qty ?? null, uom: l.uom ?? null, rate: l.rate ?? null, files: files.get(id) || 0,
+    };
+  });
+}
+
+// One record, shaped like a list row (plus its delivery's lines), or null.
+async function readRecord(client, id, { delivery = false } = {}) {
   const rows = await rowsOf(client, `${SELECT_RECORD} WHERE r.id = ?`, [Number(id) || 0]);
   if (!rows.length) return null;
-  return (await shapeAll(client, rows))[0];
+  const rec = (await shapeAll(client, rows))[0];
+  if (delivery) rec.delivery_lines = await deliveryLines(client, rec);
+  return rec;
 }
 
 // A record's current lines (for a bill check's snapshot and its label).

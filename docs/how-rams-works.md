@@ -1,6 +1,6 @@
 # How RAMS works
 
-*Royal Mart Accounts (RAMS), explained without the technical words. Last updated 27 November 2026.*
+*Royal Mart Accounts (RAMS), explained without the technical words. Last updated 28 November 2026.*
 
 ---
 
@@ -8,7 +8,7 @@
 
 Royal Mart keeps its **accounts in Tally** and its **marketplace orders in ROMS** (the Royal Mart portal). Until now, the two never spoke to each other. Someone had to read an invoice number in Tally and type it into ROMS, and nobody could easily see which order had been invoiced, paid or credited.
 
-**RAMS is the bridge between them.** It reads the books from Tally, matches each ROMS order to the Tally invoice that billed it, and each return to the credit note that settled it. With your permission, it then writes Tally's invoice and credit-note numbers into ROMS. Report screens, such as what every marketplace owes, follow one at a time. On **Party Statements**, each bill-to-bill party's statement comes straight from Tally, and your team attaches each row's document. On **Attachments**, every invoice, payment, debit note and credit note of the year is listed month by month, as in Tally's registers, with its document, e-invoice number and narration.
+**RAMS is the bridge between them.** It reads the books from Tally, matches each ROMS order to the Tally invoice that billed it, and each return to the credit note that settled it. With your permission, it then writes Tally's invoice and credit-note numbers into ROMS. Report screens, such as what every marketplace owes, follow one at a time. On **Party Statements**, each bill-to-bill party's statement comes straight from Tally, and your team attaches each row's document. On **Attachments**, every invoice, payment, debit note and credit note of the year is listed month by month, as in Tally's registers, with its document, e-invoice number and narration. On **Purchase Reports**, every delivery booked in on ROMS and every stitching challan gets its bill checked and is approved by the Purchase Head and then the Accountant Head.
 
 ```
    TALLY                      RAMS                         ROMS
@@ -121,6 +121,8 @@ ROMS gives RAMS a read-only view. Nothing here is changed by reading it.
 | **PO lines:** item code, quantity, SKU | The product and quantity checks |
 | **RTV rows:** RTV no, status, DN no, **CN No and CN Date** | To find the Tally credit note for each return |
 | Products and marketplace item codes | To turn a marketplace item code into a Royal Mart SKU |
+| **Receipts** (goods booked in against our purchase orders): Incoming No, Bill No, PO, article, billed rate, quantity, unit, warehouse, the day it was entered | Purchase Reports (section 13) |
+| **Challans** (goods handed from one stitching stage to the next): Challan No, the party that sent them, the stages, the Incoming No, rate, quantity | Purchase Reports (section 13) |
 
 ## 7. How matching works
 
@@ -188,7 +190,9 @@ Checked on the real books (MH, HR, WB) and the ROMS test copy, October 2026:
 
 The report screens (what has been invoiced, what has been paid, and what is still owed) are delivered **one at a time**. We go through each one with you, adjust it to what you need, and only then switch it on in RAMS.
 
-In the top bar they are under **Tally Reports**: *Bills Receivable*, *Party Statements* (section 11) and *Attachments* (section 12). **Purchase Reports** is there too, greyed and marked *Coming soon*: it can't be clicked yet.
+In the top bar they are under **Tally Reports**: *Bills Receivable*, *Party Statements* (section 11) and *Attachments* (section 12). **Purchase Reports** has its own menu (section 13).
+
+**On every report (28 November):** *Download CSV* has a neighbour, **Download Excel**. It gives the same rows as an Excel file, with a bold header that stays in view, a filter on each column, and amounts as real numbers you can add up. And on every table in RAMS, the **header row stays in view** while you scroll: a long table scrolls inside its own box, with its sideways scrollbar on screen too.
 
 **New names (18 November):** *Debtors* is now **Bills Receivable**, Tally's own name for the bill-wise list of what is owed. *Ledgers* is now **Party Statements**, since it shows each party's statement from opening to closing. They are the same pages with the same permissions. Their addresses moved to */reports/bills-receivable* and */reports/party-statements*, and the old ones still lead there.
 
@@ -313,9 +317,67 @@ A voucher **without a document is orange**, across the row, until one is added. 
 - **Sales narrations.** None of Tally's 1,175 MH sales invoices since 8 June has a narration, so every invoice counts as needing attention. Either the accountants add one, or an Admin takes Sales out of the *Narration check*. The check starts on 8 June today; move it to 1 April to cover the whole year.
 - **E-invoice numbers** show once the new Connector (0.8.0) has loaded all of Tally into RAMS again. Until then the column says *Not read yet*.
 
-## 13. Who can do what
+## 13. Purchase Reports: checking every bill
 
-There are four roles. **Admin and Owner can always do everything**, and they decide what the other two may do, on *Admin → Roles & permissions*.
+**Purchase Reports** is in the top bar, with two pages. Both list what ROMS records on the buying side, so that someone checks each bill and two heads approve it.
+
+| Page | What it lists |
+|---|---|
+| **Warehouse** | Each line ROMS books in for goods that don't go through Stitching: packaging, barcodes, socks and the like |
+| **Stitching** | Each line of fabric and other goods that go through Stitching, and **every challan line** that hands goods from one stage to the next (for example Stitching → Warehouse) |
+
+**One row per line, listed by delivery** (changed on 28 November, after your first look). Every line ROMS books in is its own row, with its own files, its own bill check and its own two approvals.
+- **Deliveries:** lines that share an **Incoming No** from the same vendor came in together, so they are listed together under it, with how many lines there are.
+  - For example, Incoming **PNL349** from Nirvan Textiles is bill 5019/26-27 with four handkerchief lines. Each is checked and approved by itself.
+  - The same Incoming No from another vendor is another delivery. A challan's lines are listed together the same way.
+- **Opening view:** the pages open on **this financial year and this month**. The *Financial year* and *Month* boxes, next to *Company*, change that, and *All months* shows the whole year.
+
+**The columns** come straight from ROMS: Incoming, Date (the day it was entered in ROMS, since ROMS keeps no other date for it), Billing/Challan, PO, Article, Rate, Qty and UOM. On a challan the rate and quantity are in the same unit: metres out of Processing, dozens after it. RAMS adds columns of its own:
+
+| Column | What it is |
+|---|---|
+| Files | The bill or challan copy: PDFs, photos or emails, kept the same way as on Attachments. Click the count to view them |
+| Bill check by | Who saved the bill check, and when. Click it for the line's full history |
+| Purchase Head | *Not approved*, *Pending approval* (waiting for the Purchase Head now), or **Approved by** the name and time, in green |
+| Accountant Head | The same, for the Accountant Head |
+| Status | Where the line is: To check → With Purchase Head → With Accountant Head → **Approved** |
+
+**The steps:**
+1. **Bill check** (an Accountant): click **Upload bill & check** on the line. One window does it all:
+   - It shows the delivery's lines.
+   - It takes the bill: drop a PDF, photo or email, or paste a screenshot.
+   - It saves the check, with a note if useful.
+   - When one bill covers several lines, tick them, and the file and the check go on every ticked line at once.
+   - The files are then locked, so the heads approve exactly what was checked.
+2. **The Purchase Head** approves each line, or **sends it back** with a reason. To approve several together, tick them; one tick under the Incoming No takes a whole delivery.
+3. **The Accountant Head** gives the final approval, or sends it back.
+
+**Send-backs:** a line sent back returns to the bill check. Once it is checked again, it starts over at the Purchase Head.
+
+**Colours:** only two are used.
+- **Green** means approved: the whole row once both heads approved, and each head's own column once that head approved.
+- **Red** means sent back, with the reason.
+- Everything else is plain words.
+
+**If ROMS changes a line after its bill check** (its quantity, rate, bill number, article or Incoming No), RAMS clears that line's approvals and shows *Changed in ROMS*, with what changed. It needs a bill check again, and the history keeps both. The delivery's other lines are not touched. A line deleted in ROMS is kept as *Removed in ROMS*, with its files.
+
+**Downloads:** *Download CSV* and *Download Excel* give the rows the filters show, one per line, with both heads' columns.
+
+**How fresh:** RAMS reads ROMS when the page is opened (if it hasn't for five minutes), when someone clicks *Refresh from ROMS*, and after each matching run. Nothing on these pages changes ROMS.
+
+**On the production data (28 November):**
+- **Lines:** 708 receipt lines on Warehouse, and on Stitching 198 receipt lines and 58 challan lines.
+- **Deliveries:** 191 deliveries have more than one line, and in 178 of them one bill covers every line, which is why the window lets you tick several.
+- **No Incoming No:** 43 receipts have none in ROMS, so each is listed alone until it is added there.
+
+**To decide together:**
+- **Where to start.** Every line since 29 July is *To check* today. Should the bill check start from a date, with older lines marked as before it?
+- **Receipts sold straight on** (Third Party) are on Stitching as ordinary bills. Is that right?
+- **The bill's own date.** The Date is the day of entry in ROMS. Showing the bill's date would need a new field in ROMS.
+
+## 14. Who can do what
+
+There are six roles. **Admin and Owner can always do everything**, and they decide what the others may do, on *Admin → Roles & permissions*. A person can hold **more than one role**, and then they can do whatever any of their roles allows. The two newest, **Purchase Head** and **Accountant Head**, are added to a person's usual role and give them their approval step on Purchase Reports (for example Accountant + Accountant Head).
 
 | | Accountant (starting setup) | Viewer (starting setup) |
 |---|---|---|
@@ -331,13 +393,21 @@ There are four roles. **Admin and Owner can always do everything**, and they dec
 | Run matching, confirm or reject links, map ledgers, change matching rules | ✓ | – |
 | Approve auto-fill writes | ✓ | – |
 | Switch auto-fill modes, write over a different value in ROMS | – (Admin/Owner) | – |
+| See Purchase Reports | ✓ | ✓ |
+| Bill check on Purchase Reports (attach the bill, save the check) | ✓ | – |
 | Users, Audit Log, Roles & permissions, File storage | Never: Admin/Owner only | Never |
+
+| | Purchase Head (starting setup) | Accountant Head (starting setup) |
+|---|---|---|
+| See Purchase Reports | ✓ | ✓ |
+| Approve or send back at the Purchase Head step | ✓ | – |
+| Approve or send back at the Accountant Head step (the final approval) | – | ✓ |
 
 Every change anyone makes in RAMS is recorded in the **Audit Log**, with who made it and when.
 
-**Last updated by, on every screen.** Wherever something can be changed, each row has a *Last updated by* column: the name of the person who last changed it, with the date and time under it. RAMS fills it in from the account that was signed in, so nobody types it. Click the name to see every change to that row, with the old and new values. A dash means nobody has changed the row in RAMS yet. What RAMS works out by itself, what the Connector copies from Tally, and what is typed in Tally don't count. It is on Users, Tally companies, Credit terms, Roles & permissions (per permission), Match review, Matching rules (the Vendors list), Party ledgers, Auto-fill (who approved each write), Party Statements (each Tally row, for files) and Attachments. A setting that is a single form, such as the office hours or the narration check, shows the same as one line: "Last updated by Asha · 27 Nov 2026, 10:15 am".
+**Last updated by, on every screen.** Wherever something can be changed, each row has a *Last updated by* column: the name of the person who last changed it, with the date and time under it. RAMS fills it in from the account that was signed in, so nobody types it. Click the name to see every change to that row, with the old and new values. A dash means nobody has changed the row in RAMS yet. What RAMS works out by itself, what the Connector copies from Tally, and what is typed in Tally don't count. It is on Users, Tally companies, Credit terms, Roles & permissions (per permission), Match review, Matching rules (the Vendors list), Party ledgers, Auto-fill (who approved each write), Party Statements (each Tally row, for files) and Attachments. On Purchase Reports the same column is called *Bill check by*. A setting that is a single form, such as the office hours or the narration check, shows the same as one line: "Last updated by Asha · 27 Nov 2026, 10:15 am".
 
-## 14. What you can change yourselves (no programmer needed)
+## 15. What you can change yourselves (no programmer needed)
 
 - **Which Tally companies sync, and the office hours**
 - **Which company the reports open on** (the star on *Admin → Tally companies*; MH for now)
@@ -348,9 +418,9 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 - **Party Statements:** which marketplaces it covers and the placeholder opening
 - **Credit terms:** each marketplace's credit days and the default, on *Admin → Credit terms*, with a preview of what a change does before it is saved
 - **The narration check:** which voucher types need a narration, and from which date
-- **What Accountants and Viewers may do**
+- **What Accountants, Viewers, Purchase Heads and Accountant Heads may do**, and which roles each person holds
 
-## 15. Safety and privacy
+## 16. Safety and privacy
 
 - **Tally:** read only.
 - **ROMS:** read, plus four fields that can only be written when switched on. Each write is checked by ROMS's own rules and recorded in its history.
@@ -358,10 +428,10 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 - **Sessions** expire, and a password reset or role change signs that person out.
 - **The Connector and ROMS** each use a private key. The key can be withdrawn at any time, which stops the connection.
 - **The data** is held in a database in **Mumbai**. The website is set to run in Mumbai too, which also makes it faster.
-- **Files** on Party Statements and Attachments are kept in that same database, never on a public link: only people signed in to RAMS who can see Party Statements, Attachments or Bills Receivable can open them. RAMS checks each file is really a PDF, photo or email before keeping it.
+- **Files** on Party Statements, Attachments and Purchase Reports are kept in that same database, never on a public link: only people signed in to RAMS who can see Party Statements, Attachments or Bills Receivable can open them. RAMS checks each file is really a PDF, photo or email before keeping it.
 - **Every change** in RAMS is in the Audit Log; every change in ROMS is in ROMS's history.
 
-## 16. Progress and next steps
+## 17. Progress and next steps
 
 | Step | What | State |
 |---|---|---|
@@ -377,12 +447,13 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 | – | Party Statements from Tally only: debit and credit notes no longer typed in RAMS (559 of 559 entries checked against Tally first); every row without its document is orange | Built and tested; goes on the test setup after your review |
 | – | *Tally Reports* menu (Debtors and Ledgers renamed *Bills Receivable* and *Party Statements*) and *Purchase Reports* coming soon; Party Statements opens on every party, with *Needs attention* as a button and a scrolling list; Bills Receivable shows an invoice orange while a DN or CN against it has no file | Built and tested; goes on the test setup after your review |
 | – | *Attachments*: every invoice, payment, debit and credit note of the year, month by month as Tally's registers, with documents, e-invoice numbers, city, narration and who changed it; RAMS's copy of Tally from 1 April (matching still from 8 June); Connector 0.8.0 | Built and tested (Tally's July–September sales figures match to the paisa); goes on the test setup after your review |
+| – | *Purchase Reports* (Warehouse and Stitching): every ROMS receipt and challan, with its bill, a bill check and the Purchase Head → Accountant Head approval; the two head roles, and several roles per person | Built and tested on a copy of the ROMS test data; goes on the test setup after your review |
 | Later | A NAS folder RAMS checks every few minutes, attaching files by their DN, CN or invoice number | Designed; waits for the NAS |
 | 8 | Go-live: production database, Connector installed on the office PC, the trial weeks | Prepared (see *go-live.md*); needs the office PC and your go-ahead |
 
 **Still to be decided:** how to link Flipkart and Amazon stock transfers to their ROMS rows.
 
-## 17. Words used
+## 18. Words used
 
 | Word | Meaning |
 |---|---|
@@ -399,4 +470,7 @@ Every change anyone makes in RAMS is recorded in the **Audit Log**, with who mad
 | **Connector** | The small RAMS program on the office PC that reads Tally |
 | **Sync** | The Connector bringing RAMS's copy of Tally up to date |
 | **Auto-fill** | RAMS writing Tally's numbers into ROMS |
+| **Incoming No** | The gate number ROMS gives goods as they come in. Lines with the same Incoming No from the same vendor are one delivery |
+| **Challan** | The document that goes with goods handed from one stitching stage to the next |
+| **Bill check** | Checking a purchase record against its bill before the heads approve it |
 | **Test setup** | A copy of RAMS and ROMS used for trying things, separate from the real ones |

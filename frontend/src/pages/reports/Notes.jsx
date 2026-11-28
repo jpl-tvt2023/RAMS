@@ -8,7 +8,7 @@ import { getNotes } from '../../api/reports.api';
 import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
 import { formatDay, formatDateTime, formatRupees } from '../../utils/formatters';
-import { downloadCsv, rupeesForCsv } from '../../utils/csv';
+import { downloadTable } from '../../utils/download';
 import Narration from '../../components/shared/Narration';
 import { narrationForCsv } from '../../utils/highlights';
 
@@ -35,13 +35,13 @@ export default function Notes() {
   const set = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
   const view = data || { rows: [], total: last?.total || 0 };
 
-  const csv = async () => {
+  const download = async (format) => {
     try {
       const all = await getNotes({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page_size: 10000 });
-      downloadCsv('rams-credit-debit-notes.csv', [
+      downloadTable(format, 'rams-credit-debit-notes', [
         ['Company', (r) => r.company], ['Type', (r) => (r.type === 'cn' ? 'Credit note' : 'Debit note')], ['Number', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForCsv],
         ['Party', (r) => r.party], ['Against', (r) => r.against.join(' ')], ['PO', (r) => r.pos.join(' ')], ['RTV', (r) => r.rtv?.rtv_no || ''],
-        ['Amount', (r) => rupeesForCsv(r.amount_paise)],
+        ['Amount', (r) => r.amount_paise, 'money'],
       ], all.rows);
     } catch { toast.error('The download failed'); }
   };
@@ -57,7 +57,7 @@ export default function Notes() {
       search={filters.q}
       onSearch={(v) => set({ q: v })}
       searchHint="Number, party, invoice, PO or RTV"
-      onCsv={csv}
+      onDownload={download}
       filters={(
         <div role="tablist" className="flex gap-1">
           {TABS.map(([k, label]) => (

@@ -1,16 +1,22 @@
 // Purchase Reports: read ROMS's receipts and challans into RAMS's copy
 // (migration 022), then bring the purchase records in line with it.
 //
-// After the copy is written, every line is put in its record (lines.js
-// groupLines). Then:
-//   - a record whose lines all moved to a new key together (an Incoming No
-//     corrected in ROMS) is moved to that key, keeping its files and history
-//   - a record waiting on a head, or approved, whose lines ROMS changed since
+// Every ROMS line is its own record (the user, 2026-11-28 evening), listed
+// with the rest of its delivery (lines.js groupLines). After the copy is
+// written:
+//   - a record from before that, one per delivery, stays with one of its
+//     lines and keeps its files and history. If anyone had worked on it, each
+//     of its other lines gets a record of its own carrying the same work
+//     (status, bill check, approvals, files), with a line in its history
+//   - a line with no record gets one, and each record follows its line's page,
+//     date and delivery (an Incoming No corrected in ROMS moves the line to
+//     its new delivery and keeps its record)
+//   - a record waiting on a head, or approved, whose line ROMS changed since
 //     the bill check becomes "Changed in ROMS": its approvals are cleared, the
 //     change is audited, and it goes back to the bill check (the user's rule)
-//   - a record left with no lines is "Removed in ROMS" if anyone worked on it
+//   - a record whose line is gone is "Removed in ROMS" if anyone worked on it
 //     (a bill check or a file), else it is dropped
-//   - a removed record whose lines come back returns to the bill check
+//   - a removed record whose line comes back returns to the bill check
 //
 // It reads ROMS when a page is opened and the copy is older than FRESH_MINUTES,
 // when someone presses Refresh, and after each matching run. A short lease
@@ -19,7 +25,7 @@
 const { createRomsClient, romsSettings } = require('../services/romsClient');
 const { storeResource } = require('../services/romsRefs');
 const {
-  groupLines, linesOf, snapshotOf, diffSnapshot, recordLabel,
+  groupLines, linesOf, diffSnapshot, recordLabel, deliveryLabel,
 } = require('./lines');
 
 const FRESH_MINUTES = 5;
@@ -63,60 +69,124 @@ const parse = (s) => {
   try { return JSON.parse(s); } catch { return null; }
 };
 
+// The columns a record's work is kept in, copied to each line's own record
+// when a record from before per-line records is split.
+const WORK_COLS = ['status', 'checked_by', 'checked_at', 'check_note', 'purchase_approved_by', 'purchase_approved_at',
+  'accounts_approved_by', 'accounts_approved_at', 'sent_back_by', 'sent_back_at', 'sent_back_step', 'sent_back_reason',
+  'changed_at', 'changes'];
+
+// The one line a group holds, and its key in a bill check's snapshot (r12 / c7).
+const lineOf = (g) => g.receipts[0] || g.challans[0];
+const snapKeyOf = (g) => linesOf(g)[0].key;
+
+// The part of a bill check's snapshot that is this one line.
+function snapshotFor(snapshot, snapKey) {
+  const s = parse(snapshot);
+  return s ? JSON.stringify({ lines: (s.lines || []).filter((l) => l.key === snapKey) }) : null;
+}
+
+// A system audit row on the record that holds this key (its id isn't known
+// yet, in the batch that creates it).
+const auditByKey = ({ actionType, description, key }) => ({
+  sql: `INSERT INTO audit_logs (user_id, action_type, description, entity_type, entity_id, entity_ref, changes)
+        SELECT NULL, ?, ?, 'purchase_records', id, NULL, NULL FROM purchase_records WHERE group_key = ?`,
+  args: [actionType, description, key],
+});
+
 // Bring purchase_records in line with the copy. Returns what it did.
 async function regroup(client) {
   const [receipts, challans, records, fileCounts] = await Promise.all([
     rowsOf(client, 'SELECT * FROM roms_purchase_receipts'),
     rowsOf(client, 'SELECT * FROM roms_purchase_challans'),
-    rowsOf(client, 'SELECT id, group_key, page, kind, status, checked_at, snapshot, first_at FROM purchase_records'),
+    rowsOf(client, 'SELECT * FROM purchase_records'),
     rowsOf(client, 'SELECT record_id, COUNT(*) AS n FROM purchase_files GROUP BY record_id'),
   ]);
   const groups = groupLines(receipts, challans);
   const files = new Map(fileCounts.map((r) => [Number(r.record_id), Number(r.n)]));
   const byKey = new Map(records.map((r) => [r.group_key, r]));
   const byId = new Map(records.map((r) => [Number(r.id), r]));
+  const worked = (rec) => rec.status !== 'to_check' || Boolean(rec.checked_at) || Boolean(files.get(Number(rec.id)));
   const out = {
-    created: 0, moved: 0, changed: 0, removed: 0, dropped: 0, back: 0,
+    created: 0, split: 0, changed: 0, removed: 0, dropped: 0, back: 0,
   };
   const stmts = [];
 
-  // 1. Lines that all moved together to a key nobody holds: move their record.
-  for (const [key, g] of groups) {
-    if (byKey.has(key)) continue;
-    const owners = new Set([...g.receipts, ...g.challans].map((l) => (l.record_id == null ? null : Number(l.record_id))));
-    if (owners.size !== 1) continue;
-    const [ownerId] = owners;
-    const owner = ownerId != null ? byId.get(ownerId) : null;
-    if (!owner || groups.has(owner.group_key) || owner.moved) continue;
-    owner.moved = true;
-    byKey.delete(owner.group_key);
-    owner.group_key = key;
-    byKey.set(key, owner);
+  // 1. A record from when a record was a whole delivery: it stays with the
+  //    line whose key it already has, else its first line, keeping its id,
+  //    files and history. If anyone worked on it, each of its other lines
+  //    gets a record carrying the same work. Untouched lines get theirs in 2.
+  const heldBy = new Map(); // record id -> [group]
+  for (const g of groups.values()) {
+    const owner = lineOf(g).record_id;
+    if (owner == null || !byId.has(Number(owner))) continue;
+    if (!heldBy.has(Number(owner))) heldBy.set(Number(owner), []);
+    heldBy.get(Number(owner)).push(g);
+  }
+  const copied = new Set();
+  for (const [id, gs] of heldBy) {
+    const rec = byId.get(id);
+    if (gs.length === 1 && gs[0].key === rec.group_key) continue;
+    gs.sort((a, b) => Number(lineOf(a).id) - Number(lineOf(b).id) || a.kind.localeCompare(b.kind));
+    const keeper = gs.find((g) => g.key === rec.group_key) || gs.find((g) => !byKey.has(g.key));
+    if (!keeper) continue; // each of its lines already has a record
+    const wasWorked = worked(rec);
+    const oldLabel = deliveryLabel(rec.kind, gs.flatMap((g) => linesOf(g)));
+    const oldSnapshot = rec.snapshot;
+    byKey.delete(rec.group_key);
+    rec.group_key = keeper.key;
+    byKey.set(keeper.key, rec);
+    rec.snapshot = wasWorked ? snapshotFor(oldSnapshot, snapKeyOf(keeper)) : rec.snapshot;
     stmts.push({
-      sql: "UPDATE purchase_records SET group_key = ?, page = ?, kind = ?, updated_at = datetime('now') WHERE id = ?",
-      args: [key, g.page, g.kind, owner.id],
+      sql: "UPDATE purchase_records SET group_key = ?, snapshot = ?, updated_at = datetime('now') WHERE id = ?",
+      args: [rec.group_key, rec.snapshot ?? null, id],
     });
-    out.moved += 1;
+    out.split += 1;
+    if (!wasWorked) continue;
+    const others = gs.filter((g) => g !== keeper && !byKey.has(g.key));
+    for (const g of others) {
+      const cols = ['page', 'kind', 'group_key', 'first_at', 'delivery_key', 'delivery_at', 'snapshot', ...WORK_COLS];
+      stmts.push({
+        sql: `INSERT INTO purchase_records (${cols.join(', ')}) VALUES (${marks(cols.length)})`,
+        args: [g.page, g.kind, g.key, g.first_at, g.delivery_key, g.delivery_at, snapshotFor(oldSnapshot, snapKeyOf(g)), ...WORK_COLS.map((c) => rec[c] ?? null)],
+      });
+      stmts.push({
+        sql: `INSERT INTO purchase_files (blob_id, record_id, file_name, kind, original_size, uploaded_by, uploaded_at)
+              SELECT f.blob_id, r.id, f.file_name, f.kind, f.original_size, f.uploaded_by, f.uploaded_at
+                FROM purchase_files f JOIN purchase_records r ON r.group_key = ?
+               WHERE f.record_id = ? ORDER BY f.id`,
+        args: [g.key, id],
+      });
+      stmts.push(auditByKey({
+        actionType: 'PURCHASE_SPLIT',
+        description: `Split from ${oldLabel}: each line now has its own record. This line kept that record's files, bill check and approvals`,
+        key: g.key,
+      }));
+      copied.add(g.key);
+    }
+    stmts.push(auditStmt({
+      actionType: 'PURCHASE_SPLIT',
+      description: `Split from ${oldLabel}: each line now has its own record, and this one is ${recordLabel(keeper.kind, linesOf(keeper))}`,
+      entityId: id,
+    }));
   }
   await writeBatches(client, stmts.splice(0));
 
-  // 2. A record for every group that has none.
+  // 2. A record for every line that has none.
   const missing = [...groups.values()].filter((g) => !byKey.has(g.key));
-  await writeBatches(client, missing.map((g) => ({
-    sql: 'INSERT OR IGNORE INTO purchase_records (page, kind, group_key, first_at) VALUES (?, ?, ?, ?)',
-    args: [g.page, g.kind, g.key, g.first_at],
+  const fresh = missing.filter((g) => !copied.has(g.key));
+  await writeBatches(client, fresh.map((g) => ({
+    sql: 'INSERT OR IGNORE INTO purchase_records (page, kind, group_key, first_at, delivery_key, delivery_at) VALUES (?, ?, ?, ?, ?, ?)',
+    args: [g.page, g.kind, g.key, g.first_at, g.delivery_key, g.delivery_at],
   })));
-  out.created = missing.length;
-  if (missing.length) {
-    for (let i = 0; i < missing.length; i += BATCH) {
-      const part = missing.slice(i, i + BATCH).map((g) => g.key);
-      const rows = await rowsOf(client, `SELECT id, group_key, page, kind, status, checked_at, snapshot, first_at
-                                           FROM purchase_records WHERE group_key IN (${marks(part.length)})`, part);
-      for (const r of rows) { byKey.set(r.group_key, r); byId.set(Number(r.id), r); }
-    }
+  out.created = fresh.length;
+  for (let i = 0; i < missing.length; i += BATCH) {
+    const part = missing.slice(i, i + BATCH).map((g) => g.key);
+    const rows = await rowsOf(client, `SELECT * FROM purchase_records WHERE group_key IN (${marks(part.length)})`, part);
+    for (const r of rows) { byKey.set(r.group_key, r); byId.set(Number(r.id), r); }
   }
 
-  // 3. Each line points at its record, and each record's page, kind and date follow its lines.
+  // 3. Each line points at its record, and each record follows its line's
+  //    page, kind, date and delivery.
   const held = new Set();
   for (const [key, g] of groups) {
     const rec = byKey.get(key);
@@ -130,8 +200,12 @@ async function regroup(client) {
         stmts.push({ sql: `UPDATE ${table} SET record_id = ? WHERE id IN (${marks(part.length)})`, args: [id, ...part] });
       }
     }
-    if (rec.page !== g.page || rec.kind !== g.kind || rec.first_at !== g.first_at) {
-      stmts.push({ sql: 'UPDATE purchase_records SET page = ?, kind = ?, first_at = ? WHERE id = ?', args: [g.page, g.kind, g.first_at, id] });
+    if (rec.page !== g.page || rec.kind !== g.kind || rec.first_at !== g.first_at
+        || rec.delivery_key !== g.delivery_key || rec.delivery_at !== g.delivery_at) {
+      stmts.push({
+        sql: 'UPDATE purchase_records SET page = ?, kind = ?, first_at = ?, delivery_key = ?, delivery_at = ? WHERE id = ?',
+        args: [g.page, g.kind, g.first_at, g.delivery_key, g.delivery_at, id],
+      });
     }
 
     const lines = linesOf(g);
@@ -142,7 +216,7 @@ async function regroup(client) {
       stmts.push({
         sql: `UPDATE purchase_records SET status = ?, changed_at = datetime('now'), changes = ?, updated_at = datetime('now')
                WHERE id = ? AND status = 'removed'`,
-        args: [to, JSON.stringify([{ field: 'Lines', old: 'removed in ROMS', new: 'back in ROMS' }]), id],
+        args: [to, JSON.stringify([{ field: 'Line', old: 'removed in ROMS', new: 'back in ROMS' }]), id],
       });
       stmts.push(auditStmt({ actionType: 'PURCHASE_ROMS_CHANGED', description: `Back in ROMS — ${label}`, entityId: id }));
       out.back += 1;
@@ -174,19 +248,17 @@ async function regroup(client) {
     }
   }
 
-  // 4. Records left with no lines.
+  // 4. Records whose line is gone.
   for (const rec of byId.values()) {
     const id = Number(rec.id);
     if (held.has(id) || rec.status === 'removed') continue;
-    const worked = rec.status !== 'to_check' || rec.checked_at || files.get(id);
-    if (worked) {
-      const before = parse(rec.snapshot);
+    if (worked(rec)) {
       stmts.push({
         sql: `UPDATE purchase_records SET status = 'removed', changed_at = datetime('now'), changes = ?, updated_at = datetime('now')
                WHERE id = ? AND status = ?`,
-        args: [JSON.stringify([{ field: 'Lines', old: before ? `${before.lines.length} line(s)` : null, new: 'removed in ROMS' }]), id, rec.status],
+        args: [JSON.stringify([{ field: 'Line', old: 'in ROMS', new: 'removed in ROMS' }]), id, rec.status],
       });
-      stmts.push(auditStmt({ actionType: 'PURCHASE_ROMS_REMOVED', description: 'Removed in ROMS — every line of this record was deleted there', entityId: id }));
+      stmts.push(auditStmt({ actionType: 'PURCHASE_ROMS_REMOVED', description: 'Removed in ROMS — this line was deleted there', entityId: id }));
       out.removed += 1;
     } else {
       stmts.push({

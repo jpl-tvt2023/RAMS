@@ -15,6 +15,7 @@ const crypto = require('crypto');
 const zlib = require('zlib');
 const { linesFor: linesForRecords } = require('../purchases/records');
 const { recordLabel } = require('../purchases/lines');
+const { fyOf } = require('../matching/engine');
 
 const CHUNK_BYTES = 512 * 1024;
 // What one upload may carry, after the browser's compression. Vercel refuses
@@ -248,8 +249,10 @@ async function usage(client) {
                       LEFT JOIN party_ledgers vp ON vp.company_id = v.company_id AND vp.ledger_guid = vl.guid
                      ORDER BY b.stored_size DESC, f.id DESC
                      LIMIT 20`),
-    // Files on Purchase Reports records: the page and the record they are on.
-    rowsOf(client, `SELECT f.id, f.record_id, f.file_name, f.kind, f.uploaded_at, b.size, b.stored_size, u.name AS uploaded_by_name, r.page
+    // Files on Purchase Reports records: the page and the record they are on
+    // (and the record's IST day, for its financial year).
+    rowsOf(client, `SELECT f.id, f.record_id, f.file_name, f.kind, f.uploaded_at, b.size, b.stored_size, u.name AS uploaded_by_name, r.page,
+                           date(r.first_at, '+330 minutes') AS day
                       FROM purchase_files f JOIN file_blobs b ON b.id = f.blob_id
                       JOIN purchase_records r ON r.id = f.record_id
                       LEFT JOIN users u ON u.id = f.uploaded_by
@@ -300,7 +303,7 @@ async function usage(client) {
         company_id: null,
         company: first.company ?? null,
         on: {
-          type: 'purchase', page: r.page, record_id: Number(r.record_id), label: recordLabel(first.src === 'challan' ? 'challan' : 'receipts', lines), search: first.incoming || first.billing || null,
+          type: 'purchase', page: r.page, record_id: Number(r.record_id), label: recordLabel(first.src === 'challan' ? 'challan' : 'receipts', lines), search: first.incoming || first.billing || null, fy: fyOf(r.day),
         },
       };
     })].sort((x, y) => y.stored_size - x.stored_size).slice(0, 20),

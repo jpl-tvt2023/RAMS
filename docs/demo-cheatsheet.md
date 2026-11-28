@@ -96,7 +96,7 @@ A running order for showing the client what RAMS does today, on production (http
   2. Click a marketplace tab, then the statuses **Open** and **Overdue**. The line above the table adds up invoiced, credit notes, outstanding and overdue.
   3. In the **CN** column, click an amount. The pop-up lists each credit note, with its ROMS RTV row and its narration.
   4. Choose the status **No PO**: invoices not linked to any ROMS PO.
-  5. Show **Download** (CSV).
+  5. Show **Download CSV** and **Download Excel** (the Excel file keeps its header in view, with a filter).
 - **Say:**
   - "Overdue comes from each marketplace's credit days, which you set. That's the next flow."
 

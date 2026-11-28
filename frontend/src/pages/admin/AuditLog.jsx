@@ -9,6 +9,7 @@ import HelpLink from '../../components/shared/HelpLink';
 import { listAuditLogs, getAuditFacets } from '../../api/audit.api';
 import { useSessionState } from '../../hooks/useSessionState';
 import { formatDateTime } from '../../utils/formatters';
+import { TABLE_BOX, FIT_SCREEN, STICKY_HEAD, HEAD_CELL } from '../../components/ui/tableBox';
 
 // The whole audit trail (Admin/Owner). The house "standard list page": filters
 // are not live -- they apply on Search / Enter / Clear, a page or page-size
@@ -111,12 +112,12 @@ export default function AuditLog() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className={`${TABLE_BOX} ${FIT_SCREEN}`}>
           <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+            <thead className={STICKY_HEAD}>
+              <tr>
                 {['When', 'Who', 'Action', 'What happened', 'Changes'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>
+                  <th key={h} className={`px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap ${HEAD_CELL}`}>{h}</th>
                 ))}
               </tr>
             </thead>

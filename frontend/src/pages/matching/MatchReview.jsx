@@ -21,6 +21,7 @@ import {
   OUTCOMES, reasonText, reasonLabel, METHOD_TEXT, CHECK_TEXT, fillText,
 } from '../../utils/matchReasons';
 import { formatDay, formatDateTime } from '../../utils/formatters';
+import { TABLE_BOX, FIT_SCREEN, STICKY_HEAD, HEAD_CELL } from '../../components/ui/tableBox';
 
 // Matching -> Match review: every ROMS PO with the Tally invoice RAMS linked it
 // to, and every RTV row with its credit note. Opens on "Needs review", oldest
@@ -211,14 +212,14 @@ export default function MatchReview() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className={`${TABLE_BOX} ${FIT_SCREEN}`}>
           <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+            <thead className={STICKY_HEAD}>
+              <tr>
                 {(kind === 'po'
                   ? ['PO', 'Vendor', 'Vendor PO No', 'Bill No in ROMS', 'Tally invoice', 'Status', 'Auto-fill', LAST_UPDATED]
                   : ['RTV', 'Vendor', 'CN No in ROMS', 'Tally credit note', 'Status', 'Auto-fill', LAST_UPDATED]
-                ).map((h) => <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>)}
+                ).map((h) => <th key={h} className={`px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap ${HEAD_CELL}`}>{h}</th>)}
               </tr>
             </thead>
             <tbody>

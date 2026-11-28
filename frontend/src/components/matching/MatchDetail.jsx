@@ -14,6 +14,7 @@ import {
   OUTCOMES, reasonText, howText, METHOD_TEXT, CHECK_TEXT, fillText,
 } from '../../utils/matchReasons';
 import { formatDay, formatDateTime } from '../../utils/formatters';
+import { TABLE_BOX, IN_POPUP, STICKY_HEAD, HEAD_CELL } from '../ui/tableBox';
 
 const rupees = (paise) => (paise == null ? '—' : `₹${(Number(paise) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 
@@ -177,10 +178,10 @@ export default function MatchDetail({
             <div>
               <h3 className="font-semibold text-gray-900">{detail.candidates?.length ? `Tally ${noun}s RAMS considered` : `No Tally ${noun} found`}</h3>
               {detail.candidates?.length > 0 && (
-                <div className="overflow-x-auto mt-1 border border-gray-200 rounded-lg">
+                <div className={`${TABLE_BOX} ${IN_POPUP} mt-1 border border-gray-200 rounded-lg`}>
                   <table className="w-full text-sm">
-                    <thead><tr className="bg-gray-50 text-left text-gray-600">
-                      {['Company', 'Number', 'Date', 'Party', 'Narration', 'Amount', 'Found by', ''].map((h) => <th key={h} className="px-3 py-2 font-semibold whitespace-nowrap">{h}</th>)}
+                    <thead className={STICKY_HEAD}><tr className="text-left text-gray-600">
+                      {['Company', 'Number', 'Date', 'Party', 'Narration', 'Amount', 'Found by', ''].map((h) => <th key={h} className={`px-3 py-2 font-semibold whitespace-nowrap ${HEAD_CELL}`}>{h}</th>)}
                     </tr></thead>
                     <tbody>
                       {detail.candidates.map((c) => {

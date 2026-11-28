@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
 import { OUTCOMES, reasonLabel } from '../../utils/matchReasons';
+import { TABLE_BOX, FIT_SCREEN, STICKY_HEAD, HEAD_PLAIN } from '../../components/ui/tableBox';
 
 // Matching -> Matching rules. Every rule is a setting (backend migration 012),
 // shown in plain words with an example and how many POs it decides now.
@@ -214,8 +215,8 @@ export default function MatchingRules() {
         <section aria-label="Preview" className="bg-white rounded-xl border border-brand/30 p-4 mb-4 max-w-4xl">
           <h2 className="font-semibold text-brand">If you save: {preview.changed} row{preview.changed === 1 ? '' : 's'} would change status</h2>
           <p className="text-xs text-gray-500">Nothing has been saved yet.</p>
-          <table className="text-sm mt-2">
-            <thead><tr className="text-gray-500"><th className="pr-4 text-left font-medium" />{Object.values(OUTCOMES).map((o) => <th key={o.label} className="px-3 text-right font-medium">{o.label}</th>)}</tr></thead>
+          <div className={`${TABLE_BOX} ${FIT_SCREEN}`}><table className="text-sm mt-2">
+            <thead className={STICKY_HEAD}><tr className="text-gray-500"><th className={`pr-4 text-left font-medium ${HEAD_PLAIN}`} />{Object.values(OUTCOMES).map((o) => <th key={o.label} className={`px-3 text-right font-medium ${HEAD_PLAIN}`}>{o.label}</th>)}</tr></thead>
             <tbody>
               {['po', 'rtv'].map((k) => (
                 <tr key={k}>
@@ -228,7 +229,7 @@ export default function MatchingRules() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           {preview.examples.length > 0 && (
             <ul className="mt-3 space-y-1 text-sm text-gray-700">
               {preview.examples.map((e) => (
@@ -294,8 +295,8 @@ export default function MatchingRules() {
           <section className="bg-white rounded-xl border border-gray-200 p-4">
             <h2 className="font-semibold text-brand">Vendors</h2>
             <p className="text-xs text-gray-500 mt-0.5">How each ROMS marketplace is matched. A change saves at once and re-matches.</p>
-            <table className="w-full text-sm mt-2">
-              <thead><tr className="text-left text-gray-500"><th className="py-1 font-medium">Vendor</th><th className="py-1 font-medium">POs</th><th className="py-1 font-medium">Linked</th><th className="py-1 font-medium">Matched as</th><th className="py-1 pl-4 font-medium">{LAST_UPDATED}</th></tr></thead>
+            <div className={`${TABLE_BOX} ${FIT_SCREEN}`}><table className="w-full text-sm mt-2">
+              <thead className={STICKY_HEAD}><tr className="text-left text-gray-500"><th className={`py-1 font-medium ${HEAD_PLAIN}`}>Vendor</th><th className={`py-1 font-medium ${HEAD_PLAIN}`}>POs</th><th className={`py-1 font-medium ${HEAD_PLAIN}`}>Linked</th><th className={`py-1 font-medium ${HEAD_PLAIN}`}>Matched as</th><th className={`py-1 pl-4 font-medium ${HEAD_PLAIN}`}>{LAST_UPDATED}</th></tr></thead>
               <tbody>
                 {vendors.map((v) => (
                   <tr key={v.vendor} className="border-t border-gray-100">
@@ -313,7 +314,7 @@ export default function MatchingRules() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </section>
         </div>
       )}

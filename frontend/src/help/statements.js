@@ -54,7 +54,7 @@ export const partyStatementsHelp = {
       title: 'Attach the DN’s email or PDF, or any row’s document',
       steps: [
         'Open the party. A row without a file is orange, and its Files column says “No file”.',
-        'Click Add in the Files column of that row — the invoice, the credit note, the receipt or the journal. A window opens for it.',
+        'Click Upload in the Files column of that row — the invoice, the credit note, the receipt or the journal. A window opens for it.',
         'Drag the files onto the window, or click Choose files. You can pick several at once: PDFs, photos (JPG, PNG or WebP) and emails (.eml or .msg).',
         'To keep an email: in Gmail, open it, click ⋮ and choose Download message (an .eml file). In Outlook, drag the email onto the desktop or use File → Save As (an .msg file). Then add that file.',
         'Each file shows “Sending…” and then appears in the list. The row stops being orange.',

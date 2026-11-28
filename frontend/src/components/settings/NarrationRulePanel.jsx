@@ -9,6 +9,7 @@ import { formatDay } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
 import { LastUpdatedLine } from '../shared/LastUpdated';
+import { TABLE_BOX, FIT_SCREEN, STICKY_HEAD, HEAD_PLAIN } from '../ui/tableBox';
 
 // The narration check: which Tally records need a narration, and from which
 // date. Every screen that lists Tally records highlights the ones without. It
@@ -82,9 +83,9 @@ export default function NarrationRulePanel() {
           <form onSubmit={save} className="space-y-4">
             <fieldset>
               <legend className="text-sm font-medium text-gray-700 mb-1">Highlight a missing narration on</legend>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-gray-500"><th className="py-1" /><th className="py-1">Voucher type</th><th className="py-1 text-right">Records</th><th className="py-1 text-right">Without a narration</th></tr>
+              <div className={`${TABLE_BOX} ${FIT_SCREEN}`}><table className="w-full text-sm">
+                <thead className={STICKY_HEAD}>
+                  <tr className="text-left text-xs text-gray-500"><th className={`py-1 ${HEAD_PLAIN}`} /><th className={`py-1 ${HEAD_PLAIN}`}>Voucher type</th><th className={`py-1 text-right ${HEAD_PLAIN}`}>Records</th><th className={`py-1 text-right ${HEAD_PLAIN}`}>Without a narration</th></tr>
                 </thead>
                 <tbody>
                   {rule.base_types.map((t) => (
@@ -96,7 +97,7 @@ export default function NarrationRulePanel() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </fieldset>
             <label className="block text-sm">
               <span className="font-medium text-gray-700">From</span>

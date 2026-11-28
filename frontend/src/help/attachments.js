@@ -25,7 +25,7 @@ export const attachmentsHelp = {
         'Click a month’s name. Its vouchers are listed in Tally’s order, by date.',
         'Each row shows the number and date, the ledger, the city, the amount, the e-invoice’s Ack No, the files, whether there is a narration, and the last change made in RAMS.',
         'On Payments, Ledger is who was paid (the ledger the payment debits), not the bank or cash it was paid from. “+1 more” means it paid several; hover over it to see them all.',
-        'Type in the search box to find a number, ledger, city or Ack No. Download CSV saves what is listed.',
+        'Type in the search box to find a number, ledger, city or Ack No. Download CSV or Download Excel saves what is listed.',
         'Click “All months” to go back.',
       ],
     },
@@ -42,7 +42,7 @@ export const attachmentsHelp = {
       title: 'Attach an invoice PDF or any voucher’s document',
       steps: [
         'Open the month. A row without a file is orange, and its Invoice PDF (or Files) column says “No file”.',
-        'Click Add on that row. A window opens for it.',
+        'Click Upload on that row. A window opens for it.',
         'Drag the files onto the window, click Choose files, or copy a screenshot or file and press Ctrl+V. PDFs, photos (JPG, PNG or WebP) and emails (.eml or .msg) can be added, several at once.',
         'Each file shows “Sending…”, then appears in the list. The row stops being orange.',
         'Click a row’s file count to view a PDF or photo in RAMS, download a file, or remove one (the bin, then Remove).',

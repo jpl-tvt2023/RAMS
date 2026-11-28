@@ -17,6 +17,7 @@ import {
 import { formatDate } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
 import { ALL_ROLES, ROLES, ROLE_INFO } from '../../utils/roles';
+import { TABLE_BOX, FIT_SCREEN, STICKY_HEAD, HEAD_CELL } from '../../components/ui/tableBox';
 
 // Admin/Owner only. Adapted from ROMS: a user may hold several roles (the two
 // heads are add-ons to Accountant or Viewer), and users are DEACTIVATED rather
@@ -127,12 +128,12 @@ export default function UserManagement() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className={`${TABLE_BOX} ${FIT_SCREEN}`}>
           <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+            <thead className={STICKY_HEAD}>
+              <tr>
                 {['Name', 'User ID', 'Roles', 'Status', 'Added', LAST_UPDATED, 'Actions'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>
+                  <th key={h} className={`px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap ${HEAD_CELL}`}>{h}</th>
                 ))}
               </tr>
             </thead>

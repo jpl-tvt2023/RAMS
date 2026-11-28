@@ -1,6 +1,9 @@
 // Purchase Reports: the bill check and the two approvals (the user's flow,
-// 2026-11-28). Every move is one transaction with its audit row on the record
-// (entity purchase_records), so its history shows who did what and when.
+// 2026-11-28), on each line's own record. Every move is one transaction with
+// its audit row on the record (entity purchase_records), so its history shows
+// who did what and when. The checker may save one check on several lines of
+// a delivery at once, and a head may approve several lines at once -- each
+// line still gets its own history row.
 //
 //   to_check / sent_back / changed --(bill check)--> with_purchase_head
 //   with_purchase_head --(Purchase Head approves)--> with_accounts_head
@@ -72,36 +75,71 @@ async function recordFor(tx, id) {
   return r;
 }
 
-/** Saves the bill check: the record goes to the Purchase Head. */
-async function saveCheck(db, id, user, { note } = {}) {
+const noteOf = (note) => {
   const text = String(note ?? '').trim();
   if (text.length > NOTE_MAX) throw fail(400, `Keep the note to ${NOTE_MAX} characters`);
+  return text;
+};
+
+// The bill check on one record, inside the caller's transaction: null when
+// saved, else why it couldn't be (in words for the page).
+async function checkOne(tx, id, user, text) {
+  const [r] = await rowsOf(tx, 'SELECT id, kind, status FROM purchase_records WHERE id = ?', [Number(id) || 0]);
+  if (!r) return { status: 404, reason: 'That purchase record isn’t in RAMS' };
+  if (!WITH_CHECKER.includes(r.status)) return { status: 409, reason: notNow(r.status) };
+  const lines = await currentLines(tx, r.id);
+  if (!lines.length) return { status: 409, reason: 'This line was removed in ROMS' };
+  const res = await tx.execute({
+    sql: `UPDATE purchase_records
+             SET status = 'with_purchase_head', checked_by = ?, checked_at = datetime('now'), check_note = ?, snapshot = ?,
+                 purchase_approved_by = NULL, purchase_approved_at = NULL, accounts_approved_by = NULL, accounts_approved_at = NULL,
+                 sent_back_by = NULL, sent_back_at = NULL, sent_back_step = NULL, sent_back_reason = NULL,
+                 changed_at = NULL, changes = NULL, updated_at = datetime('now')
+           WHERE id = ? AND status = ?`,
+    args: [user.id, text || null, JSON.stringify(snapshotOf(lines)), r.id, r.status],
+  });
+  if (!res.rowsAffected) return { status: 409, reason: 'Someone changed this record just now — open it again' };
+  await logAction({
+    client: tx,
+    userId: user.id,
+    actionType: 'PURCHASE_CHECK',
+    description: `Bill check saved — ${recordLabel(r.kind, lines)}${text ? `. Note: ${text}` : ''}`,
+    entityType: 'purchase_records',
+    entityId: r.id,
+    changes: [{ field: 'Status', old: STATUS_WORDS[r.status], new: STATUS_WORDS.with_purchase_head }],
+  });
+  return null;
+}
+
+/** Saves the bill check on one record: it goes to the Purchase Head. */
+async function saveCheck(db, id, user, { note } = {}) {
+  const text = noteOf(note);
   return inTx(db, async (tx) => {
-    const r = await recordFor(tx, id);
-    if (!WITH_CHECKER.includes(r.status)) throw fail(409, notNow(r.status));
-    const lines = await currentLines(tx, r.id);
-    if (!lines.length) throw fail(409, 'Every line of this record was removed in ROMS');
-    const label = recordLabel(r.kind, lines);
-    const res = await tx.execute({
-      sql: `UPDATE purchase_records
-               SET status = 'with_purchase_head', checked_by = ?, checked_at = datetime('now'), check_note = ?, snapshot = ?,
-                   purchase_approved_by = NULL, purchase_approved_at = NULL, accounts_approved_by = NULL, accounts_approved_at = NULL,
-                   sent_back_by = NULL, sent_back_at = NULL, sent_back_step = NULL, sent_back_reason = NULL,
-                   changed_at = NULL, changes = NULL, updated_at = datetime('now')
-             WHERE id = ? AND status = ?`,
-      args: [user.id, text || null, JSON.stringify(snapshotOf(lines)), r.id, r.status],
-    });
-    if (!res.rowsAffected) throw fail(409, 'Someone changed this record just now — open it again');
-    await logAction({
-      client: tx,
-      userId: user.id,
-      actionType: 'PURCHASE_CHECK',
-      description: `Bill check saved — ${label}${text ? `. Note: ${text}` : ''}`,
-      entityType: 'purchase_records',
-      entityId: r.id,
-      changes: [{ field: 'Status', old: STATUS_WORDS[r.status], new: STATUS_WORDS.with_purchase_head }],
-    });
-    return { id: Number(r.id), status: 'with_purchase_head' };
+    const why = await checkOne(tx, id, user, text);
+    if (why) throw fail(why.status, why.reason);
+    return { id: Number(id), status: 'with_purchase_head' };
+  });
+}
+
+/**
+ * Saves the bill check on several records at once (the lines of one delivery
+ * the checker ticked), with the same note -- each its own history row. Those
+ * the checker doesn't have are skipped with the reason. { checked, skipped }
+ */
+async function saveChecks(db, ids, user, { note } = {}) {
+  const text = noteOf(note);
+  const list = [...new Set((Array.isArray(ids) ? ids : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  if (!list.length) throw fail(400, 'Choose the lines to check');
+  if (list.length > APPROVE_MAX) throw fail(400, `Check at most ${APPROVE_MAX} lines at a time`);
+  return inTx(db, async (tx) => {
+    const skipped = [];
+    let checked = 0;
+    for (const id of list) {
+      const why = await checkOne(tx, id, user, text);
+      if (why) skipped.push({ id, reason: why.reason });
+      else checked += 1;
+    }
+    return { checked, skipped };
   });
 }
 
@@ -180,5 +218,5 @@ async function sendBack(db, id, step, user, { reason } = {}) {
 }
 
 module.exports = {
-  saveCheck, approve, sendBack, WITH_CHECKER, STEPS, STATUS_WORDS, notNow,
+  saveCheck, saveChecks, approve, sendBack, WITH_CHECKER, STEPS, STATUS_WORDS, notNow,
 };

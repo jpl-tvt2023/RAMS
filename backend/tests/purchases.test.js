@@ -9,14 +9,15 @@ const { createRomsClient } = require('../src/services/romsClient');
 const { refreshPurchases, NOT_SERVED } = require('../src/purchases/refresh');
 const { groupLines, diffSnapshot, snapshotOf, linesOf } = require('../src/purchases/lines');
 
-// Purchase Reports (migration 022): ROMS's receipts and challans in RAMS,
-// grouped into records -- one per Incoming No (+ vendor) on receipts, one per
-// challan -- with files, a bill check, and the Purchase Head -> Accountant Head
-// approval the user agreed on 2026-11-28.
+// Purchase Reports (migrations 022, 023): ROMS's receipts and challans in
+// RAMS, one record per ROMS line -- listed by delivery (an Incoming No from one
+// vendor, or a challan) -- with files, a bill check, and the Purchase Head ->
+// Accountant Head approval the user agreed on 2026-11-28.
 
 const quick = (roms) => createRomsClient({ ...roms.settings, retries: 0, sleep: async () => {} });
 const PDF = Buffer.from(`%PDF-1.4\n${'1 0 obj << /Type /Page >> endobj\n'.repeat(50)}%%EOF\n`);
 const PDF2 = Buffer.from(`%PDF-1.4\n${'2 0 obj << /Type /Page >> endobj\n'.repeat(50)}%%EOF\n`);
+const FY = 2026; // every date below is in FY 2026-27; asked for, so the tests don't age
 
 let receiptSeq = 0;
 let challanSeq = 0;
@@ -43,8 +44,10 @@ const challan = (o = {}) => {
 
 const get = (token, path, query = {}) => bearer(request(app).get(`/api/purchases/${path}`), token).query(query);
 const post = (token, path, body = {}) => bearer(request(app).post(`/api/purchases/${path}`), token).send(body);
-const upload = (token, id, bytes, name = 'bill.pdf') => bearer(request(app).post(`/api/purchases/records/${id}/files?name=${encodeURIComponent(name)}`), token)
+const upload = (token, id, bytes, name = 'bill.pdf', also = []) => bearer(request(app)
+  .post(`/api/purchases/records/${id}/files?name=${encodeURIComponent(name)}${also.length ? `&also=${also.join(',')}` : ''}`), token)
   .set('Content-Type', 'application/octet-stream').send(bytes);
+const remove = (token, fileId, also = []) => bearer(request(app).delete(`/api/purchases/files/${fileId}${also.length ? `?also=${also.join(',')}` : ''}`), token);
 const history = (token, id) => bearer(request(app).get('/api/audit-logs/entity'), token).query({ entity_type: 'purchase_records', entity_id: id });
 
 let roms;
@@ -78,12 +81,14 @@ async function load(receipts, challans = []) {
 }
 
 const rowsOf = async (token, page = 'warehouse', query = {}) => {
-  const res = await get(token, `${page}/records`, { page_size: 1000, ...query });
+  const res = await get(token, `${page}/records`, { page_size: 1000, fy: FY, ...query });
   expect(res.status).toBe(200);
   return res.body;
 };
 const findBy = (body, pred) => body.rows.find(pred);
 const byIncoming = (body, inc) => body.rows.filter((r) => r.incoming === inc);
+// A line's record, by its ROMS receipt row.
+const recordOfReceipt = async (romsId) => Number((await db.execute({ sql: 'SELECT record_id FROM roms_purchase_receipts WHERE id = ?', args: [romsId] })).rows[0].record_id);
 
 beforeAll(async () => {
   admin = await signIn('admin');
@@ -103,8 +108,8 @@ afterAll(async () => {
   await roms.close();
 });
 
-describe('grouping ROMS lines into records', () => {
-  test('receipts sharing an Incoming No from one vendor are one record; another vendor\'s same number is another', async () => {
+describe('one record per ROMS line, listed by delivery', () => {
+  test('lines sharing an Incoming No from one vendor are one delivery; another vendor\'s same number is another', async () => {
     await load([
       receipt({ incoming_no: '01/july', received_qty: 103 }),
       receipt({ incoming_no: '01/July ', received_qty: 57 }), // same number, typed with a capital and a space
@@ -114,49 +119,75 @@ describe('grouping ROMS lines into records', () => {
       receipt({ incoming_no: null, bill_no: '888', stage: 'Third Party', goes_to_stitching: 1 }),
     ]);
     const body = await rowsOf(accountant.token);
-    const july = findBy(body, (r) => r.incoming && r.incoming.toLowerCase() === '01/july');
-    expect(july.lines.map((l) => l.qty)).toEqual([103, 57]);
-    expect(july).toMatchObject({ status: 'to_check', billing: ['121'], vendor: 'Shree Socks', no_incoming: false });
-    expect(july.lines[0]).toMatchObject({ po: '002', article: 'Socks', rate: 19.75, uom: 'pcs' });
-    expect(byIncoming(body, '112')).toHaveLength(2);
+    const july = body.rows.filter((r) => r.incoming && r.incoming.toLowerCase() === '01/july');
+    expect(july.map((r) => r.lines[0].qty)).toEqual([103, 57]);
+    expect(new Set(july.map((r) => r.delivery.key)).size).toBe(1);
+    expect(july[0]).toMatchObject({
+      status: 'to_check', billing: ['121'], vendor: 'Shree Socks', no_incoming: false, label: 'Incoming 01/july (Shree Socks) — Socks',
+      delivery: { label: 'Incoming 01/july (Shree Socks)' },
+    });
+    expect(july[0].lines).toHaveLength(1);
+    expect(july[0].lines[0]).toMatchObject({ po: '002', article: 'Socks', rate: 19.75, uom: 'pcs' });
+    const twelve = byIncoming(body, '112');
+    expect(twelve).toHaveLength(2);
+    expect(new Set(twelve.map((r) => r.delivery.key)).size).toBe(2);
     const lone = findBy(body, (r) => r.billing[0] === '777');
     expect(lone).toMatchObject({ incoming: null, no_incoming: true });
-    expect(body.counts).toMatchObject({ to_check: 4, all: 4 });
+    expect(body.counts).toMatchObject({ to_check: 5, all: 5 });
 
     // Third Party (sold straight on) is a stitching article: on Stitching, and ROMS never gives it an Incoming No.
     const stitching = await rowsOf(accountant.token, 'stitching');
     expect(findBy(stitching, (r) => r.billing[0] === '888')).toMatchObject({ no_incoming: false });
   });
 
-  test('each challan is its own record, its lines together; rate and qty in one unit', async () => {
+  test('each challan line is a record, the challan its delivery; rate and qty in one unit', async () => {
     await load([], [
       challan({ challan_no: '003', created_at: '2026-09-30 06:00:00' }),
       challan({ challan_no: '001', created_at: '2026-10-07 06:00:00', sent_dozens: 1200 }),
-      challan({ challan_no: 'P-9', parent_id: 20, challan_line_no: 1, from_stage: 'Processing', to_stage: 'Stitching', rate_unit: 'metre', sent_qty: 60, sent_dozens: null, received_dozens: 58, process_rate: 7 }),
-      challan({ challan_no: 'P-9', parent_id: 20, challan_line_no: 2, from_stage: 'Processing', to_stage: 'Stitching', rate_unit: 'metre', sent_qty: 40, sent_dozens: null, received_dozens: 39, process_rate: 7 }),
+      challan({
+        challan_no: 'P-9', parent_id: 20, challan_line_no: 1, from_stage: 'Processing', to_stage: 'Stitching', rate_unit: 'metre', sent_qty: 60, sent_dozens: null, received_dozens: 58, process_rate: 7, created_at: '2026-10-01 06:00:00',
+      }),
+      challan({
+        challan_no: 'P-9', parent_id: 20, challan_line_no: 2, from_stage: 'Processing', to_stage: 'Stitching', rate_unit: 'metre', sent_qty: 40, sent_dozens: null, received_dozens: 39, process_rate: 7, created_at: '2026-10-01 06:00:00',
+      }),
     ]);
     const body = await rowsOf(accountant.token, 'stitching');
-    expect(byIncoming(body, 'PCL151 (MKC-12)')).toHaveLength(3);
-    const p9 = findBy(body, (r) => r.billing[0] === 'P-9');
-    expect(p9.lines.map((l) => [l.qty, l.uom, l.rate])).toEqual([[60, 'm', 7], [40, 'm', 7]]);
-    expect(p9).toMatchObject({ kind: 'challan', party: 'Mahakali creation', label: 'Challan P-9 from Mahakali creation' });
+    expect(byIncoming(body, 'PCL151 (MKC-12)')).toHaveLength(4);
+    const p9 = body.rows.filter((r) => r.billing[0] === 'P-9');
+    expect(p9.map((r) => [r.lines[0].qty, r.lines[0].uom, r.lines[0].rate])).toEqual([[60, 'm', 7], [40, 'm', 7]]);
+    expect(p9[0]).toMatchObject({
+      kind: 'challan', party: 'Mahakali creation', label: 'Challan P-9 from Mahakali creation — Handkerchief - Bundle Fabric', delivery: { label: 'Challan P-9 from Mahakali creation' },
+    });
+    expect(p9[0].delivery.key).toBe(p9[1].delivery.key);
     expect(findBy(body, (r) => r.billing[0] === '001').lines[0]).toMatchObject({ qty: 1200, uom: 'dz', from_stage: 'Stitching', to_stage: 'Warehouse' });
-    // Newest first.
-    expect(body.rows[body.rows.length - 1].billing).toEqual(['003']);
+    // Newest delivery first.
+    expect(body.rows.map((r) => r.billing[0])).toEqual(['001', 'P-9', 'P-9', '003']);
+  });
+
+  test('a delivery\'s lines stay together, sorted by its earliest line, even across days', async () => {
+    await load([
+      receipt({ incoming_no: 'X', created_at: '2026-09-01 06:00:00', received_qty: 1 }),
+      receipt({ incoming_no: 'Y', created_at: '2026-09-05 06:00:00', received_qty: 2 }),
+      receipt({ incoming_no: 'X', created_at: '2026-09-10 06:00:00', received_qty: 3 }),
+    ]);
+    const body = await rowsOf(viewer.token);
+    expect(body.rows.map((r) => [r.incoming, r.lines[0].qty])).toEqual([['Y', 2], ['X', 1], ['X', 3]]);
+    expect(body.rows[1].delivery.at).toBe('2026-09-01 06:00:00');
+    expect(body.rows[2].delivery.at).toBe('2026-09-01 06:00:00');
   });
 
   test('groupLines and the snapshot diff, without a database', () => {
-    const a = receipt({ id: 900, received_qty: 5 });
-    const b = receipt({ id: 901, received_qty: 6 });
+    const a = receipt({ id: 900, received_qty: 5, created_at: '2026-09-08 07:00:00' });
+    const b = receipt({ id: 901, received_qty: 6, created_at: '2026-09-08 06:30:00' });
     const groups = groupLines([a, b], []);
-    expect(groups.size).toBe(1);
-    const [g] = groups.values();
-    const snap = snapshotOf(linesOf(g));
-    const changed = linesOf(groupLines([{ ...a, received_qty: 4 }], []).values().next().value);
-    expect(diffSnapshot(snap, changed)).toEqual([
-      { field: 'Socks, PO 002: Qty', old: '5', new: '4' },
-      { field: 'Socks, PO 002', old: '121 6 pcs @ 19.75', new: 'removed in ROMS' },
+    expect([...groups.keys()]).toEqual(['rcpt:900', 'rcpt:901']);
+    expect([...groups.values()].map((g) => [g.delivery_key, g.delivery_at])).toEqual([
+      ['inc:warehouse:6:01/july', '2026-09-08 06:30:00'], ['inc:warehouse:6:01/july', '2026-09-08 06:30:00'],
     ]);
+    const snap = snapshotOf(linesOf(groups.get('rcpt:900')));
+    const changed = linesOf(groupLines([{ ...a, received_qty: 4 }], []).get('rcpt:900'));
+    expect(diffSnapshot(snap, changed)).toEqual([{ field: 'Socks, PO 002: Qty', old: '5', new: '4' }]);
+    expect(diffSnapshot(snap, [])).toEqual([{ field: 'Socks, PO 002', old: '121 5 pcs @ 19.75', new: 'removed in ROMS' }]);
   });
 
   test('an older ROMS that doesn\'t send purchases is reported, not an error', async () => {
@@ -166,6 +197,61 @@ describe('grouping ROMS lines into records', () => {
     expect(res).toMatchObject({ ok: false, error: NOT_SERVED });
     const body = await rowsOf(viewer.token);
     expect(body.roms.error).toBe(NOT_SERVED);
+  });
+});
+
+describe('records from when a record was a whole delivery (before migration 023)', () => {
+  // Puts both lines on the first line's record under an old delivery key, as
+  // the code before per-line records left them.
+  async function asOldRecord(lines) {
+    const first = await recordOfReceipt(lines[0].id);
+    for (const l of lines.slice(1)) await db.execute({ sql: 'DELETE FROM purchase_records WHERE id = ?', args: [await recordOfReceipt(l.id)] });
+    await db.execute({ sql: 'UPDATE roms_purchase_receipts SET record_id = ? WHERE id IN (?, ?)', args: [first, lines[0].id, lines[1].id] });
+    await db.execute({ sql: "UPDATE purchase_records SET group_key = 'inc:warehouse:6:old', delivery_key = NULL, delivery_at = NULL WHERE id = ?", args: [first] });
+    return first;
+  }
+
+  test('a worked one is split: each line gets a record carrying its files, bill check and approvals', async () => {
+    const lines = [receipt({ incoming_no: 'OLD', received_qty: 100 }), receipt({ incoming_no: 'OLD', received_qty: 50 })];
+    await load(lines);
+    const old = await asOldRecord(lines);
+    expect((await upload(accountant.token, old, PDF)).status).toBe(201);
+    expect((await post(accountant.token, `records/${old}/check`, { note: 'Both lines on bill 121' })).status).toBe(200);
+    expect((await post(purchaseHead.token, 'purchase-head/approve', { ids: [old] })).body.approved).toBe(1);
+
+    const res = await load(lines);
+    expect(res.counts.records).toMatchObject({ split: 1, created: 0, removed: 0, dropped: 0 });
+    const body = await rowsOf(accountant.token);
+    expect(body.rows).toHaveLength(2);
+    expect(body.rows.map((r) => r.id)).toContain(old);
+    for (const r of body.rows) {
+      expect(r).toMatchObject({
+        status: 'with_accounts_head', check: { name: 'Test Accountant', note: 'Both lines on bill 121' }, purchase_approval: { name: 'Pia Purchase' }, delivery: { label: 'Incoming OLD (Shree Socks)' },
+      });
+      expect(r.files.map((f) => f.name)).toEqual(['bill.pdf']);
+    }
+    const copy = body.rows.find((r) => r.id !== old);
+    expect((await history(accountant.token, copy.id)).body.map((e) => e.action_type)).toEqual(['PURCHASE_SPLIT']);
+    expect((await history(accountant.token, old)).body.map((e) => e.action_type)).toEqual(['PURCHASE_SPLIT', 'PURCHASE_APPROVE', 'PURCHASE_CHECK', 'FILE_ADD']);
+
+    // Each kept the part of the bill check that is its own line: ROMS changing
+    // the second line sends only that one back.
+    const again = await load([lines[0], { ...lines[1], received_qty: 45 }]);
+    expect(again.counts.records).toMatchObject({ changed: 1, split: 0 });
+    const now = await rowsOf(accountant.token);
+    expect(findBy(now, (r) => r.lines[0].qty === 45)).toMatchObject({ status: 'changed', purchase_approval: null });
+    expect(findBy(now, (r) => r.lines[0].qty === 100)).toMatchObject({ status: 'with_accounts_head' });
+  });
+
+  test('an untouched one just stays with its first line; the others get fresh records, no history', async () => {
+    const lines = [receipt({ incoming_no: 'OLD2' }), receipt({ incoming_no: 'OLD2' })];
+    await load(lines);
+    const old = await asOldRecord(lines);
+    const res = await load(lines);
+    expect(res.counts.records).toMatchObject({ split: 1, created: 1, dropped: 0 });
+    expect(await recordOfReceipt(lines[0].id)).toBe(old);
+    expect(await recordOfReceipt(lines[1].id)).not.toBe(old);
+    expect((await history(accountant.token, old)).body).toEqual([]);
   });
 });
 
@@ -196,11 +282,38 @@ describe('the bill check and the two approvals', () => {
     });
     const h = await history(accountant.token, rec.id);
     expect(h.body.map((e) => e.action_type)).toEqual(['PURCHASE_APPROVE', 'PURCHASE_APPROVE', 'PURCHASE_CHECK']);
-    expect(h.body[0].description).toMatch(/^Approved as Accountant Head — Incoming IN-1 \(Shree Socks\)/);
+    expect(h.body[0].description).toBe('Approved as Accountant Head — Incoming IN-1 (Shree Socks) — Socks');
 
     // Approved is final: no second check.
     const again = await post(accountant.token, `records/${rec.id}/check`);
     expect(again.status).toBe(409);
+  });
+
+  test('one bill check on several lines of a delivery, each in its own history; what can\'t be checked is skipped', async () => {
+    await load([receipt({ incoming_no: 'D', received_qty: 1 }), receipt({ incoming_no: 'D', received_qty: 2 }), receipt({ incoming_no: 'D', received_qty: 3 })]);
+    const [a, b, c] = (await rowsOf(accountant.token)).rows;
+    await post(accountant.token, `records/${c.id}/check`);
+    await post(purchaseHead.token, 'purchase-head/approve', { ids: [c.id] });
+
+    expect((await post(viewer.token, 'check', { ids: [a.id] })).status).toBe(403);
+    expect((await post(accountant.token, 'check', { ids: [] })).status).toBe(400);
+    const res = await post(accountant.token, 'check', { ids: [a.id, b.id, c.id], note: 'One bill for the delivery' });
+    expect(res.status).toBe(200);
+    expect(res.body.checked).toBe(2);
+    expect(res.body.skipped).toEqual([{ id: c.id, reason: 'This record is with accountant head — it can be changed again once a head sends it back' }]);
+    for (const id of [a.id, b.id]) {
+      const h = (await history(accountant.token, id)).body;
+      expect(h.map((e) => e.action_type)).toEqual(['PURCHASE_CHECK']);
+      expect(h[0].description).toMatch(/Note: One bill for the delivery$/);
+    }
+    // One line that can't be checked is an error, as on a single check.
+    expect((await post(accountant.token, 'check', { ids: [c.id] })).status).toBe(409);
+
+    // The record with its delivery's lines, for the popup's ticks.
+    const one = await get(accountant.token, `records/${a.id}`);
+    expect(one.body.delivery_lines.map((l) => [l.id, l.status, l.qty])).toEqual([
+      [a.id, 'with_purchase_head', 1], [b.id, 'with_purchase_head', 2], [c.id, 'with_accounts_head', 3],
+    ]);
   });
 
   test('approving before the bill check, and a bulk approve that skips what isn\'t waiting', async () => {
@@ -243,45 +356,49 @@ describe('the bill check and the two approvals', () => {
   });
 });
 
-describe('when ROMS changes a record after its bill check', () => {
-  test('an approved record goes back to the check, its approvals cleared, the change in its history', async () => {
+describe('when ROMS changes a line after its bill check', () => {
+  test('an approved line goes back to the check, its approvals cleared, the change in its history; its delivery\'s other line stays', async () => {
     const lines = [receipt({ incoming_no: 'CH-1', received_qty: 103 }), receipt({ incoming_no: 'CH-1', received_qty: 57 })];
     await load(lines);
-    const [rec] = (await rowsOf(accountant.token)).rows;
-    await post(accountant.token, `records/${rec.id}/check`);
-    await post(purchaseHead.token, 'purchase-head/approve', { ids: [rec.id] });
-    await post(accountsHead.token, 'accounts-head/approve', { ids: [rec.id] });
+    const ids = (await rowsOf(accountant.token)).rows.map((r) => r.id);
+    await post(accountant.token, 'check', { ids });
+    await post(purchaseHead.token, 'purchase-head/approve', { ids });
+    await post(accountsHead.token, 'accounts-head/approve', { ids });
 
     const res = await load([{ ...lines[0], received_qty: 100 }, lines[1]]);
     expect(res.counts.records.changed).toBe(1);
-    const now = findBy(await rowsOf(accountant.token), (r) => r.id === rec.id);
+    const body = await rowsOf(accountant.token);
+    const now = findBy(body, (r) => r.lines[0].qty === 100);
     expect(now).toMatchObject({ status: 'changed', purchase_approval: null, accounts_approval: null });
     expect(now.changed.changes).toEqual([{ field: 'Socks, PO 002: Qty', old: '103', new: '100' }]);
+    expect(findBy(body, (r) => r.lines[0].qty === 57)).toMatchObject({ status: 'approved' });
     // A system change: "Last updated by" still names the person.
     expect(now.last_change.user_name).toBe('Asha Accounts');
-    const h = await history(accountant.token, rec.id);
+    const h = await history(accountant.token, now.id);
     expect(h.body[0]).toMatchObject({ action_type: 'PURCHASE_ROMS_CHANGED', user_id: null });
 
     // Reading ROMS again with nothing new changes nothing more.
     expect((await load([{ ...lines[0], received_qty: 100 }, lines[1]])).counts.records.changed).toBe(0);
-    expect((await post(accountant.token, `records/${rec.id}/check`)).body.status).toBe('with_purchase_head');
+    expect((await post(accountant.token, `records/${now.id}/check`)).body.status).toBe('with_purchase_head');
   });
 
-  test('an Incoming No corrected in ROMS keeps the record, its files and its history', async () => {
+  test('an Incoming No corrected in ROMS keeps each line\'s record, files and history, and moves it to its new delivery', async () => {
     const lines = [receipt({ incoming_no: '0l/aug' }), receipt({ incoming_no: '0l/aug' })];
     await load(lines);
-    const [rec] = (await rowsOf(accountant.token)).rows;
-    expect((await upload(accountant.token, rec.id, PDF)).status).toBe(201);
+    const before = (await rowsOf(accountant.token)).rows;
+    expect((await upload(accountant.token, before[0].id, PDF)).status).toBe(201);
 
     const res = await load(lines.map((l) => ({ ...l, incoming_no: '01/aug' })));
-    expect(res.counts.records).toMatchObject({ moved: 1, created: 0 });
+    expect(res.counts.records).toMatchObject({ created: 0, split: 0, dropped: 0 });
     const body = await rowsOf(accountant.token);
-    expect(body.rows).toHaveLength(1);
-    expect(body.rows[0]).toMatchObject({ id: rec.id, incoming: '01/aug', status: 'to_check' });
-    expect(body.rows[0].files).toHaveLength(1);
+    expect(body.rows.map((r) => r.id).sort()).toEqual(before.map((r) => r.id).sort());
+    expect(body.rows.map((r) => [r.incoming, r.status, r.delivery.label])).toEqual([
+      ['01/aug', 'to_check', 'Incoming 01/aug (Shree Socks)'], ['01/aug', 'to_check', 'Incoming 01/aug (Shree Socks)'],
+    ]);
+    expect(findBy(body, (r) => r.id === before[0].id).files).toHaveLength(1);
   });
 
-  test('every line deleted in ROMS: removed if someone worked on it, else dropped', async () => {
+  test('a line deleted in ROMS: removed if someone worked on it, else dropped', async () => {
     await load([receipt({ incoming_no: 'KEEP' }), receipt({ incoming_no: 'DROP' })]);
     const rows = (await rowsOf(accountant.token)).rows;
     const keep = rows.find((r) => r.incoming === 'KEEP');
@@ -299,20 +416,21 @@ describe('when ROMS changes a record after its bill check', () => {
   });
 });
 
-describe('files on a purchase record', () => {
+describe('files on a purchase line', () => {
   test('added while the checker has it, locked once the check is saved, viewable by anyone who sees the page', async () => {
     await load([receipt({ incoming_no: 'F-1' })]);
     const [rec] = (await rowsOf(accountant.token)).rows;
     expect((await upload(viewer.token, rec.id, PDF)).status).toBe(403);
     const added = await upload(accountant.token, rec.id, PDF);
     expect(added.status).toBe(201);
+    expect(added.body.also).toEqual({ added: [], skipped: [] });
     expect((await upload(accountant.token, rec.id, PDF)).status).toBe(409); // the same file twice
 
     await post(accountant.token, `records/${rec.id}/check`);
     const locked = await upload(accountant.token, rec.id, PDF2);
     expect(locked.status).toBe(409);
     expect(locked.body.message).toMatch(/locked once the bill check is saved/);
-    expect((await bearer(request(app).delete(`/api/purchases/files/${added.body.id}`), accountant.token)).status).toBe(409);
+    expect((await remove(accountant.token, added.body.id)).status).toBe(409);
 
     const down = await bearer(request(app).get(`/api/purchases/files/${added.body.id}`), viewer.token).buffer(true).parse((res, cb) => {
       const parts = [];
@@ -325,17 +443,40 @@ describe('files on a purchase record', () => {
     expect(h.body.map((e) => e.action_type)).toEqual(['PURCHASE_CHECK', 'FILE_ADD']);
   });
 
-  test('one bill on two records is stored once, and removing it from one keeps it on the other', async () => {
+  test('one upload goes on the ticked lines of a delivery (stored once); a line it can\'t go on is skipped; removing takes it off them too', async () => {
+    await load([receipt({ incoming_no: 'T' }), receipt({ incoming_no: 'T' }), receipt({ incoming_no: 'T' })]);
+    const [a, b, c] = (await rowsOf(accountant.token)).rows;
+    await post(accountant.token, `records/${c.id}/check`); // its files are locked now
+
+    const res = await upload(accountant.token, a.id, PDF, 'bill-121.pdf', [b.id, c.id]);
+    expect(res.status).toBe(201);
+    expect(res.body.also.added.map((x) => x.record_id)).toEqual([b.id]);
+    expect(res.body.also.skipped).toEqual([{ id: c.id, reason: 'The files are locked once the bill check is saved. A head can send the record back to change them' }]);
+    const [{ n: blobs }] = (await db.execute('SELECT COUNT(DISTINCT blob_id) AS n FROM purchase_files')).rows;
+    expect(Number(blobs)).toBe(1);
+    expect((await history(accountant.token, b.id)).body.map((e) => e.description)).toEqual([`File added — bill-121.pdf on ${b.label}`]);
+    // The same file again on b alone is refused, as before.
+    expect((await upload(accountant.token, b.id, PDF)).status).toBe(409);
+
+    const gone = await remove(accountant.token, res.body.id, [b.id, c.id]);
+    expect(gone.status).toBe(200);
+    expect(gone.body.also.removed.map((x) => x.record_id)).toEqual([b.id]);
+    const left = (await rowsOf(accountant.token)).rows;
+    expect(left.every((r) => r.files.length === 0)).toBe(true);
+    expect(Number((await db.execute('SELECT COUNT(*) AS n FROM file_blobs WHERE id NOT IN (SELECT blob_id FROM voucher_files UNION SELECT blob_id FROM purchase_files)')).rows[0].n)).toBe(0);
+  });
+
+  test('one bill on two lines is stored once, and removing it from one keeps it on the other', async () => {
     await load([receipt({ incoming_no: 'S-1' }), receipt({ incoming_no: 'S-2' })]);
     const [one, two] = (await rowsOf(accountant.token)).rows;
     const a = await upload(accountant.token, one.id, PDF);
     const b = await upload(accountant.token, two.id, PDF);
     expect(b.body.stored_once).toBe(true);
-    expect((await bearer(request(app).delete(`/api/purchases/files/${a.body.id}`), accountant.token)).status).toBe(200);
+    expect((await remove(accountant.token, a.body.id)).status).toBe(200);
     expect((await bearer(request(app).get(`/api/purchases/files/${b.body.id}`), viewer.token)).status).toBe(200);
   });
 
-  test('File storage counts them, and lists them with the record they are on', async () => {
+  test('File storage counts them, and lists them with the line they are on and its year', async () => {
     await load([receipt({ incoming_no: 'U-1' })]);
     const [rec] = (await rowsOf(accountant.token)).rows;
     const before = (await bearer(request(app).get('/api/files/usage'), admin.token)).body.files;
@@ -343,23 +484,40 @@ describe('files on a purchase record', () => {
     const usage = (await bearer(request(app).get('/api/files/usage'), admin.token)).body;
     expect(usage.files).toBe(before + 1);
     expect(usage.biggest.find((f) => f.store === 'purchase' && f.id === added.body.id)).toMatchObject({
-      name: 'big-bill.pdf', on: { type: 'purchase', page: 'warehouse', record_id: rec.id, label: 'Incoming U-1 (Shree Socks)', search: 'U-1' },
+      name: 'big-bill.pdf',
+      on: {
+        type: 'purchase', page: 'warehouse', record_id: rec.id, label: 'Incoming U-1 (Shree Socks) — Socks', search: 'U-1', fy: 2026,
+      },
     });
   });
 });
 
 describe('the page', () => {
-  test('filters by company, month and search; a Purchase Head alone sees it, others need purchases.view', async () => {
+  test('filters by financial year, month, company and search; a Purchase Head alone sees it, others need purchases.view', async () => {
     await load([
       receipt({ incoming_no: 'M-9', created_at: '2026-09-10 06:00:00' }),
       receipt({ incoming_no: 'M-10', created_at: '2026-10-02 06:00:00', company_id: 1, company_name: 'Royal Mart', bill_no: 'RM-55' }),
+      // 31 Mar 2026 21:00 UTC is 1 Apr in IST: the year's first day.
+      receipt({ incoming_no: 'M-4', created_at: '2026-03-31 21:00:00' }),
     ]);
     const all = await rowsOf(purchaseHead.token);
+    expect(all).toMatchObject({ fy: 2026, fy_label: '2026-27' });
+    expect(all.years.map((y) => y.label)).toContain('2026-27');
+    expect(all.months).toEqual(expect.arrayContaining(['2026-10', '2026-09', '2026-04']));
+    expect(all.months.at(-1)).toBe('2026-04');
     expect(all.companies).toEqual([{ id: 1, name: 'Royal Mart' }, { id: 2, name: 'Roymax' }]);
-    expect(all.months).toEqual(['2026-10', '2026-09']);
+    expect(all.rows.map((r) => r.incoming)).toEqual(['M-10', 'M-9', 'M-4']);
     expect((await rowsOf(viewer.token, 'warehouse', { company_id: 1 })).rows.map((r) => r.incoming)).toEqual(['M-10']);
     expect((await rowsOf(viewer.token, 'warehouse', { month: '2026-09' })).rows.map((r) => r.incoming)).toEqual(['M-9']);
+    expect((await rowsOf(viewer.token, 'warehouse', { month: '2026-04' })).rows.map((r) => r.incoming)).toEqual(['M-4']);
     expect((await rowsOf(viewer.token, 'warehouse', { q: 'rm-55' })).rows.map((r) => r.incoming)).toEqual(['M-10']);
+    expect((await get(viewer.token, 'warehouse/records', { fy: FY, month: '2027-05' })).status).toBe(400);
+    // A month without a year is in its own year (a page left open over 1 April).
+    const septOnly = await get(viewer.token, 'warehouse/records', { month: '2026-09' });
+    expect(septOnly.status).toBe(200);
+    expect(septOnly.body).toMatchObject({ fy: 2026 });
+    expect(septOnly.body.rows.map((r) => r.incoming)).toEqual(['M-9']);
+    expect((await get(viewer.token, 'warehouse/records', { fy: 2019 })).status).toBe(400);
     expect((await get(viewer.token, 'elsewhere/records')).status).toBe(404);
     expect((await get(viewer.token, 'warehouse/records', { status: 'nope' })).status).toBe(400);
 

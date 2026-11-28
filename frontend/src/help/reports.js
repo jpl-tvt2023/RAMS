@@ -33,7 +33,7 @@ export const billsReceivableHelp = {
         'An invoice of a Minutes, Now or Zepto party is orange while a DN or CN set against it in Tally has no file. Under the CN amount it says how many, for example “1 without a file”.',
         'Click the CN amount. The note without a file is orange and says “No file”.',
         'Click “Add it on Party Statements”. Party Statements opens on that party, from the note’s date, showing just its rows without a file.',
-        'Click Add on the note’s row and attach its document: the marketplace’s DN, or our CN (PDF, photo or email).',
+        'Click Upload on the note’s row and attach its document: the marketplace’s DN, or our CN (PDF, photo or email).',
         'Come back to Bills Receivable: once every DN and CN against the invoice has a file, it is no longer orange.',
       ],
     },
@@ -51,7 +51,7 @@ export const billsReceivableHelp = {
     },
     {
       title: 'Download it',
-      steps: ['Click Download CSV. It downloads every invoice the filters show, not just this page, for Excel.'],
+      steps: ['Click Download CSV, or Download Excel for a spreadsheet with real numbers. Either downloads every invoice the filters show, not just this page.'],
     },
     {
       title: 'See an invoice’s files',
@@ -63,6 +63,7 @@ export const billsReceivableHelp = {
     },
   ],
   faq: [
+    { q: 'Why does a long table scroll inside its box?', a: 'So its column names stay in view: the header row stays at the top while the rows scroll under it, and the sideways scrollbar stays on screen. This is the same on every table in RAMS.' },
     { q: 'Where do the files come from?', a: 'They are attached on Attachments or Party Statements, to the invoice’s or the note’s row, by anyone with “Attach files”. Bills Receivable shows the same files.' },
     { q: 'Why is an invoice orange?', a: 'A DN or CN set against it in Tally has no file yet. Click its CN amount to see which, and add the file on Party Statements or Attachments. Only Minutes, Now and Zepto invoices turn orange: those are the parties on Party Statements, where files are added.' },
     { q: 'One credit note is against two invoices. Do I add its file twice?', a: 'No. Add it once, on the note’s row on Party Statements. Every invoice it is set against stops being orange.' },
@@ -105,7 +106,7 @@ export const invoicesHelp = {
     },
     {
       title: 'Download it',
-      steps: ['Click Download CSV. It downloads every invoice the filters show, not just this page, for Excel.'],
+      steps: ['Click Download CSV, or Download Excel for a spreadsheet with real numbers. Either downloads every invoice the filters show, not just this page.'],
     },
   ],
   faq: [
@@ -175,7 +176,7 @@ export const receivablesHelp = {
         'Tally Reports → Receivables. Choose a company, or All companies for the consolidated figures.',
         'Outstanding is what invoices still owe. Received on account is money a marketplace paid that Tally holds without setting it against an invoice.',
         'Net outstanding = Outstanding − Received on account: what the marketplace really still owes.',
-        'Download CSV gives the same table for Excel.',
+        'Download CSV or Download Excel gives the same table as a file.',
       ],
     },
     {
