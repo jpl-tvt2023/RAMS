@@ -5,12 +5,11 @@ import ReportFrame, { selectCls } from '../../components/reports/ReportFrame';
 import RecordsTable from '../../components/purchases/RecordsTable';
 import CheckDialog from '../../components/purchases/CheckDialog';
 import SendBackDialog from '../../components/purchases/SendBackDialog';
-import FilesDialog from '../../components/files/FilesDialog';
 import Button from '../../components/ui/Button';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Pagination, { loadPersistedPageSize, persistPageSize } from '../../components/ui/Pagination';
 import {
-  getPurchaseRecords, refreshPurchases, saveBillChecks, approvePurchaseRecords, sendBackPurchaseRecord,
+  getPurchaseRecords, refreshPurchases, saveBillChecks, approvePurchaseRecords, sendBackPurchaseRecord, recallPurchaseRecords,
 } from '../../api/purchases.api';
 import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
@@ -19,7 +18,7 @@ import { PERM } from '../../utils/roles';
 import { formatDate, formatDateTime, currentMonthIst } from '../../utils/formatters';
 import { downloadTable } from '../../utils/download';
 import {
-  STATUSES, statusOf, defaultStatus, stepOf, HEAD_OF, approvalOf, purchasesKey,
+  STATUSES, statusOf, defaultStatus, stepOf, HEAD_OF, approvalOf, purchasesKey, notesOf, maySend, mayApprove, mayRecall,
 } from '../../utils/purchaseText';
 
 // Purchase Reports -> Warehouse (/purchases/warehouse) and Stitching
@@ -27,22 +26,25 @@ import {
 // an outbound PO (a receipt) or handed on between stitching stages (a
 // challan). Every ROMS line is its own record (the user, 2026-11-28 evening),
 // listed with the rest of its delivery -- the receipts under one Incoming No
-// from one vendor, or one challan. On each line a person uploads the bill and
-// saves the bill check (one popup, which may cover the delivery's other lines
-// too); the Purchase Head approves, then the Accountant Head, each in a column
-// of their own. Either head can send it back with a reason. The page opens on
-// this financial year and month. RAMS reads ROMS when the page opens (if its
-// copy is more than a few minutes old) and on Refresh.
+// from one vendor, or one challan. On each line the checker attaches the bill
+// ("View/Attach bill", which may cover the delivery's other lines too) and
+// sends it for approval -- attaching alone sends nothing, and lines can be
+// ticked and sent together (the user, 2026-11-29). The Purchase Head approves,
+// then the Accountant Head, each in a column of their own. A head can send it
+// back with a reason, even after approving it; whoever sent it on can recall
+// it until the next person acts. The page opens on this financial year and
+// month. RAMS reads ROMS when the page opens (if its copy is more than a few
+// minutes old) and on Refresh.
 const PAGES = {
   warehouse: {
     title: 'Warehouse',
     help: 'purchases-warehouse',
-    intro: 'Each line ROMS books in for packaging, barcodes and other goods that don’t go through Stitching, listed under its Incoming No. Upload the bill, save the bill check, and the line goes to the Purchase Head, then the Accountant Head.',
+    intro: 'Each line ROMS books in for packaging, barcodes and other goods that don’t go through Stitching, listed under its Incoming No. Attach the bill and send the line for approval: it goes to the Purchase Head, then the Accountant Head.',
   },
   stitching: {
     title: 'Stitching',
     help: 'purchases-stitching',
-    intro: 'Fabric and other goods that go through Stitching: each line ROMS books in (listed under its Incoming No) and each challan line between stages. Upload the bill or challan, save the bill check, and the line goes to the Purchase Head, then the Accountant Head.',
+    intro: 'Fabric and other goods that go through Stitching: each line ROMS books in (listed under its Incoming No) and each challan line between stages. Attach the bill or challan and send the line for approval: it goes to the Purchase Head, then the Accountant Head.',
   },
 };
 const ALL = 10000;
@@ -72,7 +74,7 @@ export default function PurchaseReport({ page }) {
   const [pageNo, setPageNo] = useState(1);
   const [pageSize, setPageSize] = useState(() => loadPersistedPageSize('purchases', 50));
   const [selected, setSelected] = useState(() => new Set());
-  const [dialog, setDialog] = useState(null); // { type: 'check'|'files'|'sendback'|'approve', id?, ids?, step? }
+  const [dialog, setDialog] = useState(null); // { type: 'check'|'send'|'sendback'|'approve'|'recall', id?, ids?, step? }
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const set = (patch) => { setPick((p) => ({ ...p, ...patch })); setPageNo(1); setSelected(new Set()); };
@@ -113,8 +115,14 @@ export default function PurchaseReport({ page }) {
 
   const check = (ids, note) => run(async () => {
     const res = await saveBillChecks(ids, note);
-    if (res.checked) toast.success(res.checked === 1 ? 'Bill check saved — it is with the Purchase Head' : `Bill check saved on ${res.checked} lines — they are with the Purchase Head`);
-    if (res.skipped.length) toast.error(`${res.skipped.length} not checked: ${res.skipped[0].reason}`);
+    if (res.checked) toast.success(res.checked === 1 ? 'Sent for approval — it is with the Purchase Head' : `${res.checked} lines sent for approval — they are with the Purchase Head`);
+    if (res.skipped.length) toast.error(`${res.skipped.length} not sent: ${res.skipped[0].reason}`);
+  });
+
+  const recall = (ids) => run(async () => {
+    const res = await recallPurchaseRecords(ids.map((id) => ({ id, from: recordOf(id)?.status })));
+    if (res.recalled) toast.success(res.recalled === 1 ? 'Recalled' : `${res.recalled} lines recalled`);
+    if (res.skipped.length) toast.error(`${res.skipped.length} not recalled: ${res.skipped[0].reason}`);
   });
 
   const approve = (ids) => run(async () => {
@@ -136,11 +144,11 @@ export default function PurchaseReport({ page }) {
     if (skipped.length) toast.error(`${skipped.length} not approved: ${skipped[0].reason}`);
   });
 
-  const download = async (format) => {
+  const download = async () => {
     try {
       const all = await getPurchaseRecords(page, { ...params, page: 1, page_size: ALL });
       const line = (r) => r.lines[0] || {};
-      downloadTable(format, `rams-purchases-${page}-FY${all.fy_label}${pick.month ? `-${pick.month}` : ''}`, [
+      downloadTable(`rams-purchases-${page}-FY${all.fy_label}${pick.month ? `-${pick.month}` : ''}`, [
         ['Incoming', (r) => r.incoming || ''], [page === 'warehouse' ? 'Vendor' : 'Vendor / Party', (r) => (r.kind === 'challan' ? r.party : r.vendor) || ''],
         ['Date', (r) => (line(r).date ? formatDate(line(r).date) : '')], ['Billing / Challan', (r) => line(r).billing || ''],
         ['From → to', (r) => (line(r).from_stage ? `${line(r).from_stage} → ${line(r).to_stage}` : '')], ['PO', (r) => line(r).po || ''],
@@ -149,7 +157,7 @@ export default function PurchaseReport({ page }) {
         ['Bill check by', (r) => r.check?.name || ''], ['Bill check at', (r) => (r.check ? formatDateTime(r.check.at) : '')],
         ['Purchase Head', (r) => approvalText(r, 'purchase')], ['Accountant Head', (r) => approvalText(r, 'accounts')],
         ['Status', (r) => statusOf(r.status).label],
-        ['Sent back because', (r) => (r.status === 'sent_back' ? r.sent_back?.reason || '' : '')],
+        ['Note', (r) => notesOf(r).map((n) => n.text).join(' · ')],
       ], all.rows, { sheet: meta.title });
     } catch {
       toast.error('The download failed');
@@ -160,10 +168,19 @@ export default function PurchaseReport({ page }) {
   const counts = d?.counts || {};
   const shownStatuses = STATUSES.filter((s) => s.key !== 'removed' || counts.removed);
   const roms = d?.roms;
-  const approvable = [...selected].filter((id) => {
-    const s = stepOf(recordOf(id)?.status);
-    return (s === 'purchase' && canDo.purchase) || (s === 'accounts' && canDo.accounts);
-  });
+  // What the ticked lines allow: each button counts only the lines it fits.
+  const ticked = [...selected].map(recordOf).filter(Boolean);
+  const sendable = ticked.filter((r) => maySend(r, canDo)).map((r) => r.id);
+  const approvable = ticked.filter((r) => mayApprove(r, canDo)).map((r) => r.id);
+  const recallable = ticked.filter((r) => mayRecall(r, canDo)).map((r) => r.id);
+  // A file is not required, but say so before lines go without one.
+  const billWarning = (ids) => {
+    const k = ids.filter((id) => !recordOf(id)?.files?.length).length;
+    if (!k) return '';
+    if (ids.length === 1) return ' It has no bill attached.';
+    if (k === ids.length) return ' None of them has a bill attached.';
+    return ` ${k} of them ${k === 1 ? 'has' : 'have'} no bill attached.`;
+  };
   const fyValue = pick.fy || String(d?.fy ?? '');
 
   return (
@@ -211,8 +228,18 @@ export default function PurchaseReport({ page }) {
         {roms?.error && (
           <span className="inline-flex items-center gap-1 text-gray-700"><CircleAlert size={14} aria-hidden="true" />{roms.error}</span>
         )}
-        {approvable.length > 0 && (
-          <Button size="sm" className="ml-auto" onClick={() => setDialog({ type: 'approve', ids: approvable })}>Approve selected ({approvable.length})</Button>
+        {(sendable.length > 0 || approvable.length > 0 || recallable.length > 0) && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {sendable.length > 0 && (
+              <Button size="sm" onClick={() => setDialog({ type: 'send', ids: sendable })}>Send {sendable.length} for approval</Button>
+            )}
+            {approvable.length > 0 && (
+              <Button size="sm" onClick={() => setDialog({ type: 'approve', ids: approvable })}>Approve selected ({approvable.length})</Button>
+            )}
+            {recallable.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => setDialog({ type: 'recall', ids: recallable })}>Recall {recallable.length}</Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -223,10 +250,10 @@ export default function PurchaseReport({ page }) {
         selected={selected}
         onSelect={(id, on) => setSelected((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; })}
         onSelectMany={(ids, on) => setSelected((s) => { const n = new Set(s); for (const id of ids) { if (on) n.add(id); else n.delete(id); } return n; })}
-        onFiles={(r) => setDialog({ type: 'files', id: r.id })}
         onCheck={(r) => setDialog({ type: 'check', id: r.id })}
         onApprove={(r) => setDialog({ type: 'approve', ids: [r.id] })}
-        onSendBack={(r) => setDialog({ type: 'sendback', id: r.id, step: stepOf(r.status) })}
+        onSendBack={(r, step) => setDialog({ type: 'sendback', id: r.id, step: step || stepOf(r.status) })}
+        onRecall={(r) => setDialog({ type: 'recall', ids: [r.id] })}
         empty={(
           <p className="text-center text-gray-500 py-8 px-4 text-sm">
             {pick.status === 'all' && !pick.q && !pick.company_id
@@ -246,15 +273,6 @@ export default function PurchaseReport({ page }) {
           onClose={() => setDialog(null)}
           onChanged={list.reload}
           onSave={check}
-        />
-      )}
-      {dialog?.type === 'files' && open && (
-        <FilesDialog
-          title={open.label}
-          subtitle={`${statusOf(open.status).label}${open.date ? ` · ${formatDate(open.date)}` : ''}`}
-          files={open.files}
-          canEdit={false}
-          onClose={() => setDialog(null)}
         />
       )}
       {dialog?.type === 'sendback' && open && (
@@ -279,6 +297,34 @@ export default function PurchaseReport({ page }) {
             : `Each is approved at the step it is waiting for${canDo.purchase && canDo.accounts ? '' : ` as ${canDo.purchase ? HEAD_OF.purchase : HEAD_OF.accounts}`}. Each approval is kept in the line’s history.`)
           : ''}
         confirmLabel="Approve"
+      />
+      <ConfirmDialog
+        isOpen={dialog?.type === 'send'}
+        onClose={() => setDialog(null)}
+        onConfirm={() => check(dialog.ids, '')}
+        loading={busy}
+        variant="primary"
+        title={dialog?.ids?.length > 1 ? `Send ${dialog.ids.length} lines for approval?` : 'Send this line for approval?'}
+        message={dialog?.type === 'send'
+          ? `${dialog.ids.length > 1 ? 'They go' : 'It goes'} to the Purchase Head, and ${dialog.ids.length > 1 ? 'their' : 'its'} files are locked once sent. You can recall ${dialog.ids.length > 1 ? 'them' : 'it'} until the Purchase Head acts.${billWarning(dialog.ids)} To add a note, use View/Attach bill instead.`
+          : ''}
+        confirmLabel="Send for approval"
+      />
+      <ConfirmDialog
+        isOpen={dialog?.type === 'recall'}
+        onClose={() => setDialog(null)}
+        onConfirm={() => recall(dialog.ids)}
+        loading={busy}
+        variant="primary"
+        title={dialog?.ids?.length > 1 ? `Recall ${dialog.ids.length} lines?` : 'Recall this line?'}
+        message={dialog?.type === 'recall'
+          ? (dialog.ids.length === 1
+            ? `${recordOf(dialog.ids[0])?.label || 'This line'}: ${recordOf(dialog.ids[0])?.status === 'with_accounts_head'
+              ? 'your approval is taken back, and it waits for the Purchase Head again.'
+              : 'it comes back from the Purchase Head to the bill check, its files unlocked and your note kept.'}`
+            : 'Each comes back one step: from the Purchase Head to the bill check, or from the Accountant Head to the Purchase Head. Each recall is kept in the line’s history.')
+          : ''}
+        confirmLabel="Recall"
       />
     </ReportFrame>
   );

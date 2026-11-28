@@ -9,7 +9,7 @@ import { useSessionState } from '../../hooks/useSessionState';
 import { formatDay, formatRupees } from '../../utils/formatters';
 import { downloadTable } from '../../utils/download';
 import Narration from '../../components/shared/Narration';
-import { narrationForCsv } from '../../utils/highlights';
+import { narrationForFile } from '../../utils/highlights';
 
 // Reports -> Stock transfers: sales from one Roymax registration to another
 // (a party ledger that is "Our own registration" on Party ledgers). They are
@@ -24,11 +24,11 @@ export default function Transfers() {
   const set = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
   const view = data || { rows: [], total: last?.total || 0 };
 
-  const download = async (format) => {
+  const download = async () => {
     try {
       const all = await getTransfers({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page_size: 10000 });
-      downloadTable(format, 'rams-stock-transfers', [
-        ['From', (r) => r.company], ['Voucher', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForCsv], ['To', (r) => r.party], ['Quantity', (r) => r.qty],
+      downloadTable('rams-stock-transfers', [
+        ['From', (r) => r.company], ['Voucher', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForFile], ['To', (r) => r.party], ['Quantity', (r) => r.qty],
         ['Value', (r) => r.total_paise, 'money'],
       ], all.rows);
     } catch { toast.error('The download failed'); }

@@ -11,7 +11,7 @@ import { renderWithProviders, ACCOUNTANT, VIEWER } from '../../../test/renderWit
 import toast from 'react-hot-toast';
 import * as reports from '../../../api/reports.api';
 import * as sync from '../../../api/sync.api';
-import { downloadCsv } from '../../../utils/csv';
+import { downloadXlsx } from '../../../utils/xlsx';
 import { NO_FILE } from '../../../utils/highlights';
 
 vi.mock('../../../api/reports.api', () => ({
@@ -22,7 +22,7 @@ vi.mock('../../../api/sync.api', () => ({ getSyncStatus: vi.fn(), getSyncRuns: v
 vi.mock('../../../api/audit.api', () => ({ getEntityHistory: vi.fn().mockResolvedValue([]) }));
 vi.mock('../../../api/files.api', () => ({ uploadFile: vi.fn(), fetchFile: vi.fn(), deleteFile: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('../../../utils/csv', async (importOriginal) => ({ ...(await importOriginal()), downloadCsv: vi.fn() }));
+vi.mock('../../../utils/xlsx', async (importOriginal) => ({ ...(await importOriginal()), downloadXlsx: vi.fn() }));
 
 const COMPANIES = [{ id: 2, code: 'MH', name: 'Roymax MH' }];
 const INVOICE = {
@@ -252,14 +252,15 @@ describe('Bills Receivable', () => {
       expect(within(dialog).queryByRole('button', { name: 'Add it on Party Statements' })).not.toBeInTheDocument();
     });
 
-    test('the CSV lists the notes without a file', async () => {
+    test('the Excel download lists the notes without a file; there is no CSV', async () => {
       renderWithProviders(<BillsReceivable />, { user: VIEWER });
       const user = userEvent.setup();
       await screen.findByText('700/RM/26-27');
-      await user.click(screen.getByRole('button', { name: /Download CSV/ }));
-      await waitFor(() => expect(downloadCsv).toHaveBeenCalled());
-      const [name, columns, rows] = downloadCsv.mock.calls[0];
-      expect(name).toBe('rams-bills-receivable.csv');
+      expect(screen.queryByRole('button', { name: /Download CSV/ })).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Download Excel/ }));
+      await waitFor(() => expect(downloadXlsx).toHaveBeenCalled());
+      const [name, columns, rows] = downloadXlsx.mock.calls[0];
+      expect(name).toBe('rams-bills-receivable.xlsx');
       const col = columns.find(([h]) => h === 'CN without a file');
       expect(rows.map((r) => col[1](r))).toEqual(['CN/1501', '']);
     });

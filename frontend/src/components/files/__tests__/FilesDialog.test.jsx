@@ -9,11 +9,11 @@ import toast from 'react-hot-toast';
 import FilesDialog from '../FilesDialog';
 import * as filesApi from '../../../api/files.api';
 import * as pdf from '../../../utils/pdf';
-import { saveBlob } from '../../../utils/csv';
+import { saveBlob } from '../../../utils/saveBlob';
 
 vi.mock('../../../api/files.api', () => ({ uploadFile: vi.fn(), fetchFile: vi.fn(), deleteFile: vi.fn() }));
 vi.mock('../../../utils/pdf', () => ({ openPdf: vi.fn(), PAGE_LIMIT: 50 }));
-vi.mock('../../../utils/csv', async (original) => ({ ...(await original()), saveBlob: vi.fn() }));
+vi.mock('../../../utils/saveBlob', () => ({ saveBlob: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 const at = '2026-11-10 08:00:00';

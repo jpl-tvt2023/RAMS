@@ -66,7 +66,7 @@ export default function Receivables() {
   const view = data || { rows: [], totals: null, buckets: [] };
   const buckets = (data || last)?.buckets || [];
 
-  const download = (format) => downloadTable(format, 'rams-receivables', [
+  const download = () => downloadTable('rams-receivables', [
     ['Marketplace', (r) => r.vendor || 'Not known'], ['Company', (r) => r.company], ['Invoices', (r) => r.invoices],
     ['Invoiced', (r) => r.invoiced_paise, 'money'], ['Received', (r) => r.received_paise, 'money'], ['Credit notes', (r) => r.credit_notes_paise, 'money'],
     ['TDS', (r) => r.tds_paise, 'money'], ['Adjustments', (r) => r.adjustments_paise, 'money'], ['Outstanding', (r) => r.outstanding_paise, 'money'],

@@ -10,7 +10,7 @@ import { useSessionState } from '../../hooks/useSessionState';
 import { formatDay, formatDateTime, formatRupees } from '../../utils/formatters';
 import { downloadTable } from '../../utils/download';
 import Narration from '../../components/shared/Narration';
-import { narrationForCsv } from '../../utils/highlights';
+import { narrationForFile } from '../../utils/highlights';
 
 // Reports -> Credit & debit notes: each Tally CN and DN, the invoices it
 // settles (Agst Ref), their PO, the RTV row it was linked to, and whether its
@@ -35,11 +35,11 @@ export default function Notes() {
   const set = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
   const view = data || { rows: [], total: last?.total || 0 };
 
-  const download = async (format) => {
+  const download = async () => {
     try {
       const all = await getNotes({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page_size: 10000 });
-      downloadTable(format, 'rams-credit-debit-notes', [
-        ['Company', (r) => r.company], ['Type', (r) => (r.type === 'cn' ? 'Credit note' : 'Debit note')], ['Number', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForCsv],
+      downloadTable('rams-credit-debit-notes', [
+        ['Company', (r) => r.company], ['Type', (r) => (r.type === 'cn' ? 'Credit note' : 'Debit note')], ['Number', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForFile],
         ['Party', (r) => r.party], ['Against', (r) => r.against.join(' ')], ['PO', (r) => r.pos.join(' ')], ['RTV', (r) => r.rtv?.rtv_no || ''],
         ['Amount', (r) => r.amount_paise, 'money'],
       ], all.rows);

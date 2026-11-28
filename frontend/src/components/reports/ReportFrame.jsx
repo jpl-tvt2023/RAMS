@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Download, FileSpreadsheet } from 'lucide-react';
+import { Search, FileSpreadsheet } from 'lucide-react';
 import AppShell from '../layout/AppShell';
 import Button from '../ui/Button';
 import HelpLink from '../shared/HelpLink';
@@ -13,8 +13,8 @@ export const selectCls = 'px-3 py-2 border border-gray-200 rounded-lg text-sm bg
 // up with the downloads), a line on what it shows, the company filter (All =
 // consolidated, unless allCompanies is false: one company at a time), a search
 // box, extra filters (before the search box with filtersFirst), and the
-// downloads -- onDownload('csv' | 'xlsx') gives "Download CSV" and "Download
-// Excel" side by side (utils/download.js).
+// download -- onDownload() gives "Download Excel" (utils/download.js). Excel
+// only: no CSV (the user, 2026-11-29).
 export default function ReportFrame({
   title, help, intro, companies = [], companyId, onCompany, allCompanies = true, search, onSearch, searchHint, filters, filtersFirst = false, onDownload, children,
 }) {
@@ -46,8 +46,7 @@ export default function ReportFrame({
         {!filtersFirst && filters}
         {onDownload && (
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => onDownload('csv')}><Download size={14} /> Download CSV</Button>
-            <Button size="sm" variant="outline" onClick={() => onDownload('xlsx')}><FileSpreadsheet size={14} /> Download Excel</Button>
+            <Button size="sm" variant="outline" onClick={() => onDownload()}><FileSpreadsheet size={14} /> Download Excel</Button>
           </div>
         )}
       </div>

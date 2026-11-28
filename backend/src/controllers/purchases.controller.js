@@ -5,8 +5,9 @@ const { cleanName, disposition, pickedSize } = require('./files.controller');
 const { listRecords, readRecord, currentLines } = require('../purchases/records');
 const { ensureFresh, refreshPurchases, purchasesState } = require('../purchases/refresh');
 const {
-  saveCheck, saveChecks, approve, sendBack, WITH_CHECKER,
+  saveCheck, saveChecks, approve, sendBack, recall, WITH_CHECKER,
 } = require('../purchases/approval');
+const { hasPermission } = require('../services/permissions');
 const { recordLabel } = require('../purchases/lines');
 
 // Purchase Reports -> Warehouse and Stitching (src/purchases/*). Seeing the
@@ -89,7 +90,27 @@ const approveAt = (step) => async (req, res, next) => {
   } catch (err) { return sendError(res, next, err); }
 };
 
+// POST /api/purchases/recall { items: [{ id, from }] } -- take lines back one
+// step before the next person acts: from the Purchase Head (purchases.check)
+// or the Purchase Head's approval from the Accountant Head
+// (purchases.approve_purchase). A single line that can't be recalled is a 409.
+async function recallMany(req, res, next) {
+  try {
+    const { items } = req.body || {};
+    const [check, purchase] = await Promise.all([
+      hasPermission(db, req.user?.roles, 'purchases.check'),
+      hasPermission(db, req.user?.roles, 'purchases.approve_purchase'),
+    ]);
+    const out = await recall(db, items, req.user, { check, purchase });
+    if (!out.recalled && Array.isArray(items) && items.length === 1 && out.skipped.length) {
+      return res.status(409).json({ message: out.skipped[0].reason, ...out });
+    }
+    return res.json(out);
+  } catch (err) { return sendError(res, next, err); }
+}
+
 // POST /api/purchases/records/:id/{purchase,accounts}-head/send-back { reason }
+// -- also on a line that head (or the next) already approved.
 const sendBackAt = (step) => async (req, res, next) => {
   try {
     const out = await sendBack(db, req.params.id, step, req.user, req.body || {});
@@ -251,6 +272,7 @@ module.exports = {
   refresh,
   check,
   checkMany,
+  recallMany,
   approvePurchase: approveAt('purchase'),
   approveAccounts: approveAt('accounts'),
   sendBackPurchase: sendBackAt('purchase'),

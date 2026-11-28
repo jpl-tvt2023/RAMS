@@ -15,7 +15,7 @@ import { useSessionState } from '../../hooks/useSessionState';
 import { formatDay, formatRupees } from '../../utils/formatters';
 import { downloadTable } from '../../utils/download';
 import Narration from '../../components/shared/Narration';
-import { narrationForCsv, NO_FILE } from '../../utils/highlights';
+import { narrationForFile, NO_FILE } from '../../utils/highlights';
 import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
 import { openStatementsAt } from '../../utils/statementLinks';
@@ -169,11 +169,11 @@ export default function BillsReceivable() {
     ...(shown?.unknown || filters.vendor === '-' ? [['-', 'Not known', shown?.unknown]] : []),
   ];
 
-  const download = async (format) => {
+  const download = async () => {
     try {
       const all = await getBillsReceivable({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page_size: 10000 });
-      downloadTable(format, 'rams-bills-receivable', [
-        ['Company', (r) => r.company], ['Invoice', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForCsv], ['Party', (r) => r.party],
+      downloadTable('rams-bills-receivable', [
+        ['Company', (r) => r.company], ['Invoice', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForFile], ['Party', (r) => r.party],
         ['Marketplace', (r) => r.vendor || ''], ['Internal PO no', (r) => r.pos.join(' ')], ['Vendor PO no', (r) => r.vendor_pos.join(' ')],
         ['Amount', (r) => r.total_paise, 'money'], ['CN', (r) => r.credit_notes_paise, 'money'], ['CN numbers', (r) => r.credit_notes.map((c) => c.number).join(' ')],
         ['Outstanding', (r) => r.outstanding_paise, 'money'], ['Status', (r) => STATUS_LABEL[r.status] || r.status],

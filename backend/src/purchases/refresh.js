@@ -95,17 +95,22 @@ const auditByKey = ({ actionType, description, key }) => ({
 
 // Bring purchase_records in line with the copy. Returns what it did.
 async function regroup(client) {
-  const [receipts, challans, records, fileCounts] = await Promise.all([
+  const [receipts, challans, records, fileCounts, histories] = await Promise.all([
     rowsOf(client, 'SELECT * FROM roms_purchase_receipts'),
     rowsOf(client, 'SELECT * FROM roms_purchase_challans'),
     rowsOf(client, 'SELECT * FROM purchase_records'),
     rowsOf(client, 'SELECT record_id, COUNT(*) AS n FROM purchase_files GROUP BY record_id'),
+    rowsOf(client, "SELECT DISTINCT entity_id FROM audit_logs WHERE entity_type = 'purchase_records'"),
   ]);
   const groups = groupLines(receipts, challans);
   const files = new Map(fileCounts.map((r) => [Number(r.record_id), Number(r.n)]));
+  const withHistory = new Set(histories.map((r) => Number(r.entity_id)));
   const byKey = new Map(records.map((r) => [r.group_key, r]));
   const byId = new Map(records.map((r) => [Number(r.id), r]));
-  const worked = (rec) => rec.status !== 'to_check' || Boolean(rec.checked_at) || Boolean(files.get(Number(rec.id)));
+  // Anyone did anything on it: a recalled line is back To check with no
+  // stamps, but it has a history, so it is marked Removed, never dropped.
+  const worked = (rec) => rec.status !== 'to_check' || Boolean(rec.checked_at) || Boolean(rec.check_note)
+    || Boolean(files.get(Number(rec.id))) || withHistory.has(Number(rec.id));
   const out = {
     created: 0, split: 0, changed: 0, removed: 0, dropped: 0, back: 0,
   };
@@ -262,8 +267,9 @@ async function regroup(client) {
       out.removed += 1;
     } else {
       stmts.push({
-        sql: `DELETE FROM purchase_records WHERE id = ? AND status = 'to_check' AND checked_at IS NULL
-                AND NOT EXISTS (SELECT 1 FROM purchase_files f WHERE f.record_id = purchase_records.id)`,
+        sql: `DELETE FROM purchase_records WHERE id = ? AND status = 'to_check' AND checked_at IS NULL AND check_note IS NULL
+                AND NOT EXISTS (SELECT 1 FROM purchase_files f WHERE f.record_id = purchase_records.id)
+                AND NOT EXISTS (SELECT 1 FROM audit_logs a WHERE a.entity_type = 'purchase_records' AND a.entity_id = purchase_records.id)`,
         args: [id],
       });
       out.dropped += 1;

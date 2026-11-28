@@ -1,5 +1,5 @@
 import { zipStore } from './zip';
-import { saveBlob } from './csv';
+import { saveBlob } from './saveBlob';
 
 // A list as an Excel workbook (.xlsx) the browser downloads: one sheet, the
 // header row bold, frozen and with a filter, columns sized to their contents.

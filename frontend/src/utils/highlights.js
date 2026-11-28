@@ -33,5 +33,5 @@ export const NO_FILE = {
   row: 'bg-orange-100',
 };
 
-// For a CSV: the narration, or "(no narration)" when it is missing.
-export const narrationForCsv = (r) => r.narration || (r.narration_missing ? '(no narration)' : '');
+// For a download: the narration, or "(no narration)" when it is missing.
+export const narrationForFile = (r) => r.narration || (r.narration_missing ? '(no narration)' : '');

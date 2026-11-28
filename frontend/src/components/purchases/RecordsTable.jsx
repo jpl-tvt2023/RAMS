@@ -1,56 +1,62 @@
-import { CircleAlert, RefreshCw, Upload } from 'lucide-react';
+import {
+  CircleAlert, Eye, Paperclip, Undo2,
+} from 'lucide-react';
 import { ReportTable, td, num } from '../reports/ReportFrame';
-import FilesCell from '../files/FilesCell';
 import Button from '../ui/Button';
 import ApprovalCell from './ApprovalCell';
 import { LastUpdatedCell } from '../shared/LastUpdated';
 import { HistoryButton } from '../shared/HistoryDrawer';
 import { formatDate, formatDateTime } from '../../utils/formatters';
 import {
-  statusOf, statusDetail, ROW_FILL, STATUS_TEXT, WITH_CHECKER, stepOf, numText, deliveryRuns,
+  ROW_FILL, numText, deliveryRuns, notesOf, maySend, mayApprove, mayRecall, maySendBack,
 } from '../../utils/purchaseText';
 
+const TONE = { muted: 'text-gray-500', plain: 'text-gray-700', red: 'text-red-700 font-medium' };
+
 /**
- * Purchase Reports' table: one row per ROMS line -- its own files, bill check,
- * two approvals and status -- with the lines of one delivery together under
- * one Incoming cell. Only an approved line (green) and one sent back (red) are
- * highlighted. The tick column is there only when this person can approve a
- * line on the page; a delivery with several such lines gets one tick for all.
+ * Purchase Reports' table: one row per ROMS line -- its bill, check, two
+ * approvals and its Note (one short note per stage) -- with the lines of one
+ * delivery together under one Incoming cell. Only an approved line (green)
+ * and one sent back (red) are highlighted. The bill is reached through the
+ * row's button (the user, 2026-11-29: no Files column): "View/Attach bill"
+ * where this person may attach and send it, else "View bill", read-only.
+ *
+ * The tick column is there only when this person can act on a line on the
+ * page -- send it for approval, approve it, or recall it; a delivery with
+ * several such lines gets one tick for all.
  *
  * can: { check, purchase, accounts } -- what this person may do.
- * selected / onSelect(id, on) / onSelectMany(ids, on): the lines ticked for "Approve selected".
+ * selected / onSelect(id, on) / onSelectMany(ids, on): the ticked lines.
+ * onCheck(r): the bill popup. onApprove(r). onSendBack(r, step). onRecall(r).
  */
 export default function RecordsTable({
-  rows, loading, can, selected, onSelect, onSelectMany, onFiles, onCheck, onApprove, onSendBack, empty,
+  rows, loading, can, selected, onSelect, onSelectMany, onCheck, onApprove, onSendBack, onRecall, empty,
 }) {
-  const mayApprove = (r) => {
-    const step = stepOf(r.status);
-    return (step === 'purchase' && can.purchase) || (step === 'accounts' && can.accounts);
-  };
-  const selectable = rows.some(mayApprove);
+  const tickable = (r) => maySend(r, can) || mayApprove(r, can) || mayRecall(r, can);
+  const selectable = rows.some(tickable);
   const head = [
     ...(selectable ? [{ label: '', className: 'w-10' }] : []),
     'Incoming', 'Date', 'Billing / Challan', 'PO', 'Article', { label: 'Rate', right: true }, { label: 'Qty', right: true }, 'UOM',
-    'Files', 'Bill check by', 'Purchase Head', 'Accountant Head', 'Status', 'Actions',
+    'Bill check by', 'Purchase Head', 'Accountant Head', 'Note', 'Actions',
   ];
   return (
     <ReportTable head={head} loading={loading} empty={!loading && !rows.length ? empty : null}>
       {deliveryRuns(rows).map((run) => {
         const first = run.rows[0];
-        const ticks = run.rows.filter(mayApprove).map((r) => r.id);
+        const ticks = run.rows.filter(tickable).map((r) => r.id);
         const allTicked = ticks.length > 0 && ticks.every((id) => selected.has(id));
         return run.rows.map((r, i) => {
           const l = r.lines[0] || { key: 'none', removed: true };
-          const status = statusOf(r.status);
-          const Icon = status.icon;
           const lineFill = ROW_FILL[r.status] || '';
           const gone = l.removed ? 'line-through text-gray-400' : '';
           const last = i === run.rows.length - 1;
+          const attach = maySend(r, can);
+          const sendBackAs = (step) => (maySendBack(r, step, can) ? () => onSendBack(r, step) : undefined);
           return (
             <tr key={r.id} className={`${last ? 'border-b border-gray-200' : 'border-b border-gray-100'} ${lineFill} align-middle`}>
               {selectable && (
                 <td className={td}>
-                  {mayApprove(r) && (
+                  {tickable(r) && (
                     <input
                       type="checkbox"
                       aria-label={`Select ${r.label}`}
@@ -95,9 +101,6 @@ export default function RecordsTable({
               <td className={`${num} ${gone}`}>{numText(l.qty)}</td>
               <td className={`${td} ${gone}`}>{l.uom || '—'}</td>
               <td className={td}>
-                <FilesCell files={r.files} what={r.label} canFiles={false} onOpen={() => onFiles(r)} />
-              </td>
-              <td className={td}>
                 <LastUpdatedCell
                   name={r.check?.name}
                   at={r.check?.at}
@@ -108,39 +111,45 @@ export default function RecordsTable({
                   description={r.check?.note ? `Note: ${r.check.note}` : 'Bill check — see every change'}
                 />
               </td>
-              <td className={td}><ApprovalCell record={r} step="purchase" /></td>
-              <td className={td}><ApprovalCell record={r} step="accounts" /></td>
-              <td className={`${td} max-w-xs`}>
-                <span className={`inline-flex items-center gap-1 font-medium whitespace-nowrap ${STATUS_TEXT[r.status] || 'text-gray-700'}`}>
-                  <Icon size={14} aria-hidden="true" />{status.label}
-                </span>
-                {statusDetail(r).map((t) => (
-                  <span key={t} className={`block text-xs ${STATUS_TEXT[r.status] || 'text-gray-500'}`}>{t}</span>
-                ))}
-                {r.status === 'changed' && r.changed?.changes?.length > 0 && (
-                  <ul className="mt-0.5 text-xs text-gray-500 space-y-0.5" aria-label="What ROMS changed">
-                    {r.changed.changes.slice(0, 3).map((c) => (
-                      <li key={`${c.field}-${c.new}`}>{c.field}: {c.old ?? '—'} → {c.new ?? '—'}</li>
-                    ))}
-                    {r.changed.changes.length > 3 && <li>and {r.changed.changes.length - 3} more (see the history)</li>}
-                  </ul>
-                )}
-                {r.status === 'changed' && r.changed?.at && (
-                  <span className="flex items-center gap-1 text-xs text-gray-500 mt-0.5"><RefreshCw size={11} aria-hidden="true" />ROMS changed it {formatDateTime(r.changed.at)}</span>
-                )}
+              <td className={td}><ApprovalCell record={r} step="purchase" onSendBack={sendBackAs('purchase')} /></td>
+              <td className={td}><ApprovalCell record={r} step="accounts" onSendBack={sendBackAs('accounts')} /></td>
+              <td className={`${td} min-w-56 max-w-xs`}>
+                <ul className="space-y-0.5" aria-label="Note">
+                  {notesOf(r).map((n) => {
+                    const Icon = n.icon;
+                    return (
+                      <li key={n.key} className={`flex items-start gap-1 text-xs ${TONE[n.tone]}`}>
+                        <Icon size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
+                        <span>
+                          {n.text}
+                          {n.at && <span className="block text-gray-500">{formatDateTime(n.at)}</span>}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
               </td>
               <td className={`${td} whitespace-nowrap`}>
                 <div className="flex items-center gap-1">
-                  {can.check && WITH_CHECKER.includes(r.status) && (
-                    <Button size="sm" onClick={() => onCheck(r)} aria-label={`${r.status === 'to_check' ? 'Upload bill & check' : 'Check again'}: ${r.label}`}>
-                      <Upload size={14} aria-hidden="true" /> {r.status === 'to_check' ? 'Upload bill & check' : 'Check again'}
+                  {attach ? (
+                    <Button size="sm" onClick={() => onCheck(r)} aria-label={`View/Attach bill: ${r.label}`}>
+                      <Paperclip size={14} aria-hidden="true" /> View/Attach bill
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => onCheck(r)} aria-label={`View bill: ${r.label}`}>
+                      <Eye size={14} aria-hidden="true" /> View bill
                     </Button>
                   )}
-                  {mayApprove(r) && (
+                  {mayApprove(r, can) && (
                     <>
                       <Button size="sm" onClick={() => onApprove(r)}>Approve</Button>
                       <Button size="sm" variant="outline" onClick={() => onSendBack(r)}>Send back</Button>
                     </>
+                  )}
+                  {mayRecall(r, can) && (
+                    <Button size="sm" variant="outline" onClick={() => onRecall(r)} aria-label={`Recall: ${r.label}`}>
+                      <Undo2 size={14} aria-hidden="true" /> Recall
+                    </Button>
                   )}
                   <HistoryButton entityType="purchase_records" entityId={r.id} title={`History — ${r.label}`} />
                 </div>

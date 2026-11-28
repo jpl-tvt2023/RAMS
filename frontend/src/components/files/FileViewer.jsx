@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import Button from '../ui/Button';
 import { fetchFile } from '../../api/files.api';
-import { saveBlob } from '../../utils/csv';
+import { saveBlob } from '../../utils/saveBlob';
 import { openPdf, PAGE_LIMIT } from '../../utils/pdf';
 import { KINDS, sizeText } from '../../utils/files';
 import { reasonOf } from './useFileUploads';

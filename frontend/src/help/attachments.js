@@ -25,7 +25,7 @@ export const attachmentsHelp = {
         'Click a month’s name. Its vouchers are listed in Tally’s order, by date.',
         'Each row shows the number and date, the ledger, the city, the amount, the e-invoice’s Ack No, the files, whether there is a narration, and the last change made in RAMS.',
         'On Payments, Ledger is who was paid (the ledger the payment debits), not the bank or cash it was paid from. “+1 more” means it paid several; hover over it to see them all.',
-        'Type in the search box to find a number, ledger, city or Ack No. Download CSV or Download Excel saves what is listed.',
+        'Type in the search box to find a number, ledger, city or Ack No. Download Excel saves what is listed, as a spreadsheet with real numbers.',
         'Click “All months” to go back.',
       ],
     },

@@ -1,5 +1,5 @@
 import {
-  Circle, Clock, CheckCircle2, Undo2, RefreshCw, Trash2,
+  Circle, Clock, CheckCircle2, Undo2, RefreshCw, Trash2, Paperclip, Send, Minus,
 } from 'lucide-react';
 import { ROLES } from './roles';
 
@@ -62,11 +62,64 @@ export function deliveryRuns(rows) {
 // "2,450" / "12.5" -- quantities and rates as ROMS shows them, no rounding away.
 export const numText = (v) => (v == null ? '—' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 3 }));
 
-// The line under the status: why a head sent it back. (The approvals have
-// their own columns.)
-export function statusDetail(r) {
-  if (r.status === 'sent_back' && r.sent_back) return [`By the ${HEAD_OF[r.sent_back.step] || 'head'} (${r.sent_back.name || 'someone'}): ${r.sent_back.reason}`];
-  return [];
+// What this person may do on a line. can: { check, purchase, accounts }.
+//   maySend: send it for approval (and attach files) -- it is with the checker.
+//   mayApprove: approve it -- it waits for a step this person holds.
+//   mayRecall: take back the last step before the next person acts on it --
+//     from the Purchase Head (a checker), or the Purchase Head's own approval
+//     from the Accountant Head.
+//   maySendBack(r, step): send it back as that head -- at their step or after
+//     it, even once approved (the user, 2026-11-29: a head may change their mind).
+const removed = (r) => r.status === 'removed' || Boolean(r.lines?.[0]?.removed);
+export const maySend = (r, can) => Boolean(can.check) && WITH_CHECKER.includes(r.status) && !removed(r);
+export const mayApprove = (r, can) => {
+  const step = stepOf(r.status);
+  return (step === 'purchase' && Boolean(can.purchase)) || (step === 'accounts' && Boolean(can.accounts));
+};
+export const RECALL_FROM = { with_purchase_head: 'check', with_accounts_head: 'purchase' };
+export const mayRecall = (r, can) => Boolean(RECALL_FROM[r.status] && can[RECALL_FROM[r.status]]);
+export const SEND_BACK_FROM = {
+  purchase: ['with_purchase_head', 'with_accounts_head', 'approved'],
+  accounts: ['with_accounts_head', 'approved'],
+};
+export const maySendBack = (r, step, can) => Boolean(can[step]) && SEND_BACK_FROM[step].includes(r.status);
+
+// The Note column (the user, 2026-11-29): one short note per stage the line
+// has been through in this round, oldest first, so each stage adds a line at
+// the bottom. A send back, a ROMS change or a recall clears what came after,
+// so it shows the current round; History keeps everything.
+//   -> [{ key, text, tone: 'muted'|'plain'|'red', icon }]
+export function notesOf(r) {
+  const out = [];
+  const n = r.files?.length || 0;
+  out.push(n
+    ? { key: 'files', text: `Bill attached · ${n} ${n === 1 ? 'file' : 'files'}`, tone: 'plain', icon: Paperclip }
+    : { key: 'files', text: 'No bill attached', tone: 'muted', icon: Minus });
+  if (r.check) {
+    out.push({
+      key: 'sent', text: `Sent for approval by ${r.check.name || 'someone'}${r.check.note ? `: “${r.check.note}”` : ''}`, tone: 'plain', icon: Send,
+    });
+  }
+  if (r.purchase_approval) out.push({ key: 'purchase', text: `Purchase Head approved (${r.purchase_approval.name || 'someone'})`, tone: 'plain', icon: CheckCircle2 });
+  if (r.accounts_approval) out.push({ key: 'accounts', text: `Accountant Head approved (${r.accounts_approval.name || 'someone'})`, tone: 'plain', icon: CheckCircle2 });
+  if (r.status === 'sent_back' && r.sent_back) {
+    out.push({
+      key: 'sent_back',
+      text: `Sent back by ${r.sent_back.name || 'someone'} (${HEAD_OF[r.sent_back.step] || 'head'}): ${r.sent_back.reason}`,
+      tone: 'red',
+      icon: Undo2,
+    });
+  }
+  if (r.status === 'changed' && r.changed) {
+    const changes = r.changed.changes || [];
+    const shown = changes.slice(0, 3).map((c) => `${c.field}: ${c.old ?? '—'} → ${c.new ?? '—'}`);
+    if (changes.length > 3) shown.push(`and ${changes.length - 3} more (see the history)`);
+    out.push({
+      key: 'changed', text: `Changed in ROMS after it was sent${shown.length ? `: ${shown.join('; ')}` : ''}`, tone: 'plain', icon: RefreshCw, at: r.changed.at,
+    });
+  }
+  if (r.status === 'removed') out.push({ key: 'removed', text: 'Removed in ROMS', tone: 'muted', icon: Trash2 });
+  return out;
 }
 
 // A head's column (the user, 2026-11-28): "Approved by <name>" (green) once

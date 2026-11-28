@@ -11,7 +11,7 @@ import FileViewer from './FileViewer';
 import { KIND_ICON } from './icons';
 import { useFileUploads, reasonOf } from './useFileUploads';
 import { fetchFile, deleteFile } from '../../api/files.api';
-import { saveBlob } from '../../utils/csv';
+import { saveBlob } from '../../utils/saveBlob';
 import {
   ACCEPT, KINDS, MAX_UPLOAD_BYTES, pastedFiles, sizeText,
 } from '../../utils/files';
