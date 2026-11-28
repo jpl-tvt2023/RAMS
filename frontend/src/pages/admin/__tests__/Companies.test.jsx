@@ -44,13 +44,17 @@ describe('Tally companies page', () => {
 
   test('lists the companies the Connector has seen, and turns sync on after a confirm', async () => {
     companiesApi.listCompanies.mockResolvedValue([
-      row(),
+      row({ updated_at: '2026-10-05 09:30:00', updated_by_name: 'Keshav' }),
       row({ id: 2, guid: 'a606914f', name: 'Test Company', code: 'MH', gstin: null, sync_enabled: false, vouchers: 0 }),
     ]);
     companiesApi.updateCompany.mockResolvedValue({});
     renderWithProviders(<Companies />, { user: ADMIN });
 
     expect(await screen.findByText('Roymax Products LLP ( Maharashtra )')).toBeInTheDocument();
+    // Who last changed each company, and when; nobody has changed Test Company.
+    expect(screen.getByRole('columnheader', { name: 'Last updated by' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^History of Roymax Products LLP \( Maharashtra \): last updated by Keshav/ })).toHaveTextContent('05 Oct 2026, 03:00');
+    expect(within(screen.getByText('Test Company').closest('tr')).queryByRole('button', { name: /^History of/ })).not.toBeInTheDocument();
     expect(screen.getByText('1 syncing · 1 not synced')).toBeInTheDocument();
     expect(screen.getByText(/Companies are created in Tally by the accountants/)).toBeInTheDocument();
 

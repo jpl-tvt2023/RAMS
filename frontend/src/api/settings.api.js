@@ -28,7 +28,8 @@ export async function updateNarrationRule(body) {
 }
 
 // Admin -> Roles & permissions (Admin/Owner): { catalog, roles, matrix,
-// updated_at, updated_by_name }. matrix is { Accountant: [keys], Viewer: [keys] }.
+// updated_at, updated_by_name, last_changes }. matrix is { Accountant: [keys], Viewer: [keys] };
+// last_changes is { key: { user_name, at } }, each permission's last change by a person.
 export async function getPermissions() {
   const { data } = await api.get('/settings/permissions');
   return data;

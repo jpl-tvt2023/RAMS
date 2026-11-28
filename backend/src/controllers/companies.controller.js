@@ -88,7 +88,22 @@ async function update(req, res, next) {
       const sets = Object.keys(after).map((k) => `${k} = ?`);
       const tx = await db.transaction('write');
       try {
-        if (after.is_default) await tx.execute({ sql: 'UPDATE tally_companies SET is_default = 0 WHERE is_default = 1 AND id <> ?', args: [id] });
+        if (after.is_default) {
+          // The company that loses the star was changed too: stamp it and
+          // give it its own audit row, so its Last updated by and history agree.
+          const { rows: was } = await tx.execute({
+            sql: `UPDATE tally_companies SET is_default = 0, updated_at = datetime('now'), updated_by = ?
+                   WHERE is_default = 1 AND id <> ? RETURNING id, name`,
+            args: [req.user.id, id],
+          });
+          for (const w of was) {
+            await logAction({
+              client: tx, userId: req.user.id, actionType: 'TALLY_COMPANY_DEFAULT',
+              description: `${w.name} is no longer the default company for reports (${before.name} is)`,
+              entityType: 'tally_company', entityId: Number(w.id), changes: [{ field: 'is_default', old: 1, new: 0 }],
+            });
+          }
+        }
         await tx.execute({
           sql: `UPDATE tally_companies SET ${sets.join(', ')}, updated_at = datetime('now'), updated_by = ? WHERE id = ?`,
           args: [...Object.values(after), req.user.id, id],

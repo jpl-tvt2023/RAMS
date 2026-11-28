@@ -6,6 +6,8 @@ import Button from '../../components/ui/Button';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { HistoryButton } from '../../components/shared/HistoryDrawer';
 import HelpLink from '../../components/shared/HelpLink';
+import { LastUpdatedCell } from '../../components/shared/LastUpdated';
+import { lastUpdatedText, LAST_UPDATED } from '../../utils/lastUpdated';
 import {
   getMatchSettings, updateMatchSettings, resetMatchSettings, previewMatchSettings,
   getMatchingSummary, listVendors, updateVendor, listVoucherTypes,
@@ -13,7 +15,6 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
 import { OUTCOMES, reasonLabel } from '../../utils/matchReasons';
-import { formatDateTime } from '../../utils/formatters';
 
 // Matching -> Matching rules. Every rule is a setting (backend migration 012),
 // shown in plain words with an example and how many POs it decides now.
@@ -186,7 +187,7 @@ export default function MatchingRules() {
         </div>
         <p className="text-gray-500 text-sm mt-1">
           How RAMS links ROMS POs to Tally invoices and RTV rows to credit notes. A person&apos;s decision on Match review always wins over these rules.
-          {settings?.updated_at ? ` Last changed ${formatDateTime(settings.updated_at)} by ${settings.updated_by_name || '—'}.` : ''}
+          {settings?.updated_at ? ` ${lastUpdatedText(settings.updated_by_name, settings.updated_at)}.` : ''}
         </p>
       </div>
 
@@ -294,7 +295,7 @@ export default function MatchingRules() {
             <h2 className="font-semibold text-brand">Vendors</h2>
             <p className="text-xs text-gray-500 mt-0.5">How each ROMS marketplace is matched. A change saves at once and re-matches.</p>
             <table className="w-full text-sm mt-2">
-              <thead><tr className="text-left text-gray-500"><th className="py-1 font-medium">Vendor</th><th className="py-1 font-medium">POs</th><th className="py-1 font-medium">Linked</th><th className="py-1 font-medium">Matched as</th></tr></thead>
+              <thead><tr className="text-left text-gray-500"><th className="py-1 font-medium">Vendor</th><th className="py-1 font-medium">POs</th><th className="py-1 font-medium">Linked</th><th className="py-1 font-medium">Matched as</th><th className="py-1 pl-4 font-medium">{LAST_UPDATED}</th></tr></thead>
               <tbody>
                 {vendors.map((v) => (
                   <tr key={v.vendor} className="border-t border-gray-100">
@@ -305,6 +306,9 @@ export default function MatchingRules() {
                       <select aria-label={`How ${v.vendor} is matched`} value={v.mode} disabled={!canEdit} onChange={(e) => changeVendor(v.vendor, e.target.value)} className={inputCls}>
                         {MODES.map(([m, label]) => <option key={m} value={m}>{label}</option>)}
                       </select>
+                    </td>
+                    <td className="py-2 pl-4">
+                      <LastUpdatedCell name={v.updated_by_name} at={v.updated_at} entityType="match_vendor" entityId={v.vendor} what={v.vendor} />
                     </td>
                   </tr>
                 ))}

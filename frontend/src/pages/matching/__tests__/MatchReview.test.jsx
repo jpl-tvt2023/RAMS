@@ -5,6 +5,7 @@ import MatchReview from '../MatchReview';
 import { renderWithProviders, ACCOUNTANT, VIEWER } from '../../../test/renderWithProviders';
 import toast from 'react-hot-toast';
 import * as api from '../../../api/matching.api';
+import * as audit from '../../../api/audit.api';
 
 vi.mock('../../../api/matching.api', () => ({
   getMatchingSummary: vi.fn(), listResults: vi.fn(), getResult: vi.fn(), decide: vi.fn(), searchVouchers: vi.fn(), runMatching: vi.fn(),
@@ -98,6 +99,22 @@ describe('Match review', () => {
     await user.click(within(confirm).getByRole('button', { name: 'Use this invoice' }));
     expect(api.decide).toHaveBeenCalledWith('po', 'S292', 'pick', { company_id: 1, voucher_guid: 'g-1819' });
     await waitFor(() => expect(api.getMatchingSummary).toHaveBeenCalledTimes(2));
+  });
+
+  test('each row says who last changed it, and when; that opens its history, not the row', async () => {
+    api.listResults.mockResolvedValue({
+      rows: [{ ...S292, last_change: { user_name: 'Asha', at: '2026-11-20 05:00:00', action_type: 'MATCH_UNDO', description: 'Undid the decision on PO S292' } }],
+      total: 1, page: 1, page_size: 25,
+    });
+    renderWithProviders(<MatchReview />, { user: VIEWER });
+    expect(screen.getByRole('columnheader', { name: 'Last updated by' })).toBeInTheDocument();
+    const cell = await screen.findByRole('button', { name: /^History of PO S292: last updated by Asha/ });
+    expect(cell).toHaveTextContent('20 Nov 2026, 10:30');
+    const user = userEvent.setup();
+    await user.click(cell);
+    expect(await screen.findByRole('dialog', { name: 'History — PO S292' })).toBeInTheDocument();
+    expect(audit.getEntityHistory).toHaveBeenCalledWith('po', 'S292');
+    expect(screen.queryByRole('dialog', { name: 'PO S292' })).not.toBeInTheDocument();
   });
 
   test('a Viewer reads, but sees no Match now and no decisions', async () => {

@@ -21,7 +21,7 @@ const field = (over) => ({
 });
 const SUMMARY = {
   settings: {
-    bill_mode: 'approve', cn_mode: 'off', replace_typed: true, bill_date_rule: 'tally', updated_at: null, updated_by_name: null,
+    bill_mode: 'approve', cn_mode: 'off', replace_typed: true, bill_date_rule: 'tally', updated_at: '2026-11-01 04:00:00', updated_by_name: 'Keshav',
   },
   recommended: {
     bill_mode: 'off', cn_mode: 'off', replace_typed: true, bill_date_rule: 'tally',
@@ -129,6 +129,23 @@ describe('Auto-fill', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Write it' }));
     expect(api.overwriteAutofill).toHaveBeenCalledWith('po', 'S292');
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Written into ROMS: 1219/RM/26-27'));
+  });
+
+  test('who switched the settings last, and who approved each row', async () => {
+    api.listAutofillItems.mockResolvedValue({
+      rows: [item(), item({
+        id: 'B003', po_id: 'B003', write_kind: 'fill', state: 'to_write', approved_by: 'Asha', approved_at: '2026-11-05 09:00:00',
+      })],
+      total: 2,
+    });
+    renderWithProviders(<AutoFill />, { user: VIEWER });
+    expect(await screen.findByText(/^Last updated by Keshav · 01 Nov 2026/)).toBeInTheDocument();
+    expect(await screen.findByRole('columnheader', { name: 'Last updated by' })).toBeInTheDocument();
+    const approved = await screen.findByRole('button', { name: /^History of PO B003: last updated by Asha/ });
+    expect(approved).toHaveTextContent('05 Nov 2026, 02:30');
+    expect(approved).toHaveAttribute('title', 'Approved by Asha');
+    // Not approved by anyone yet: a dash, nothing to open.
+    expect(within(screen.getByText('B002').closest('tr')).queryByRole('button', { name: /^History of/ })).not.toBeInTheDocument();
   });
 
   test('a refusal shows ROMS\'s words and can be tried again; Written says who approved', async () => {

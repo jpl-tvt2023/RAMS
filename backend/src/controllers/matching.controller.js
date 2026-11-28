@@ -8,6 +8,7 @@ const { refreshState } = require('../services/romsRefs');
 const { runMatching, rematch, previewMatching } = require('../matching/run');
 const { loadNarrationRule, narrationOf, narrationLookup } = require('../services/narration');
 const { statesOf } = require('../utils/gstStates');
+const { lastChanges } = require('../services/lastChange');
 
 // Matching -> Match review, Matching rules and Party ledgers. Who may do what
 // is the matching.* permissions (routes/matching.routes.js). Every change is
@@ -196,9 +197,15 @@ async function results(req, res, next) {
         [...args, pageSize, (page - 1) * pageSize]),
       rowsOf(`SELECT COUNT(*) AS total FROM (${base})`, args),
     ]);
-    const rule = await loadNarrationRule(db);
+    const [rule, changes] = await Promise.all([
+      loadNarrationRule(db),
+      lastChanges(db, kind, rows.map((r) => r.target_id), { by: 'ref' }),
+    ]);
     res.json({
-      rows: rows.map((r) => shapeResult(r, { rule })), total: Number(total), page, page_size: pageSize,
+      // last_change: the last thing a person did to this PO or RTV row in
+      // RAMS -- a match decision, or an auto-fill approval, retry or overwrite.
+      rows: rows.map((r) => ({ ...shapeResult(r, { rule }), last_change: changes.get(String(r.target_id)) || null })),
+      total: Number(total), page, page_size: pageSize,
     });
   } catch (err) { next(err); }
 }
@@ -237,6 +244,10 @@ async function result(req, res, next) {
 async function run(req, res, next) {
   try {
     const out = await runMatching(db, { trigger: 'manual', userId: req.user.id });
+    await logAction({
+      userId: req.user.id, actionType: 'MATCH_RUN', description: 'Pressed Match now: ROMS read again and everything re-matched',
+      entityType: 'match_run', entityId: out.run_id,
+    });
     res.json({ ...out, summary: await summaryData() });
   } catch (err) { sendError(res, next, err); }
 }
@@ -554,6 +565,8 @@ async function acceptSuggestions(req, res, next) {
       companyId ? [companyId] : [],
     );
     if (rows.length) {
+      // One audit row per ledger, so each ledger's history (and its Last
+      // updated by) shows the acceptance.
       await inTx(async (tx) => {
         for (const r of rows) {
           await tx.execute({
@@ -561,13 +574,13 @@ async function acceptSuggestions(req, res, next) {
                    WHERE company_id = ? AND ledger_guid = ? AND kind IS NULL`,
             args: [req.user.id, r.company_id, r.ledger_guid],
           });
+          await logAction({
+            client: tx, userId: req.user.id, actionType: 'PARTY_LEDGERS_ACCEPT',
+            description: `${r.name}: not set → ${r.suggested_vendor} (suggestion accepted)`,
+            entityType: 'party_ledger', entityRef: `${Number(r.company_id)}:${r.ledger_guid}`,
+            changes: [{ field: 'mapping', old: 'not set', new: r.suggested_vendor }],
+          });
         }
-        await logAction({
-          client: tx, userId: req.user.id, actionType: 'PARTY_LEDGERS_ACCEPT',
-          description: `Accepted ${rows.length} suggested party ledger mapping${rows.length === 1 ? '' : 's'}`,
-          entityType: 'party_ledger',
-          changes: rows.slice(0, 100).map((r) => ({ field: r.name, old: 'not set', new: r.suggested_vendor })),
-        });
       });
       await rematch(db);
     }

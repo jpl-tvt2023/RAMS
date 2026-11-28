@@ -67,16 +67,20 @@ describe('roles & permissions', () => {
     const { rows: [audit] } = await db.execute("SELECT * FROM audit_logs WHERE action_type = 'ROLE_PERMISSIONS_UPDATE' ORDER BY id DESC LIMIT 1");
     expect(audit.description).toBe('Permissions changed for Accountant');
     expect(JSON.parse(audit.changes)).toEqual([
-      { field: 'Accountant: Change the sync schedule', old: 'not allowed', new: 'allowed' },
+      { field: 'Accountant: Change the sync schedule', key: 'sync.schedule', old: 'not allowed', new: 'allowed' },
     ]);
+    expect(res.body.last_changes['sync.schedule']).toMatchObject({ user_name: 'Test Admin' });
 
-    await put(admin.token, { Accountant: DEFAULTS.Accountant.filter((k) => k !== 'matching.rules') });
+    const removed = await put(admin.token, { Accountant: DEFAULTS.Accountant.filter((k) => k !== 'matching.rules') });
     expect((await schedule(accountant.token)).status).toBe(403);
     const { rows: [removal] } = await db.execute("SELECT * FROM audit_logs WHERE action_type = 'ROLE_PERMISSIONS_UPDATE' ORDER BY id DESC LIMIT 1");
     expect(JSON.parse(removal.changes)).toEqual([
-      { field: 'Accountant: Change matching rules', old: 'allowed', new: 'not allowed' },
-      { field: 'Accountant: Change the sync schedule', old: 'allowed', new: 'not allowed' },
+      { field: 'Accountant: Change matching rules', key: 'matching.rules', old: 'allowed', new: 'not allowed' },
+      { field: 'Accountant: Change the sync schedule', key: 'sync.schedule', old: 'allowed', new: 'not allowed' },
     ]);
+    // A removal leaves no row, but the permission's Last updated by still shows it.
+    expect(removed.body.last_changes['matching.rules']).toMatchObject({ user_name: 'Test Admin', at: removal.timestamp });
+    expect(removed.body).toMatchObject({ updated_by_name: 'Test Admin', updated_at: removal.timestamp });
     await put(admin.token, DEFAULTS);
   });
 

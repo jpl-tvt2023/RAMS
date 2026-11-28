@@ -22,6 +22,7 @@ const { SYNC_FROM } = require('../config/env');
 const { fyOf } = require('../matching/engine');
 const { loadNarrationRule, narrationOf } = require('../services/narration');
 const { filesFor } = require('../services/files');
+const { lastChanges } = require('../services/lastChange');
 
 const TABS = [
   { key: 'invoice', label: 'Invoice', base_type: 'Sales', side: 'credit', number_label: 'Invoice no', einvoice: true },
@@ -184,27 +185,6 @@ async function debitedLedgers(client, ids) {
   return out;
 }
 
-// The last change a person made in RAMS to each voucher (adding or removing a
-// file, today): voucher id -> { user_name, at, action_type, description }.
-async function lastChanges(client, ids) {
-  const out = new Map();
-  for (const part of chunks(ids)) {
-    const rows = await rowsOf(client, `
-      SELECT a.entity_id, a.timestamp, a.action_type, a.description, u.name AS user_name, u.username
-        FROM audit_logs a
-        JOIN (SELECT entity_id, MAX(id) AS id FROM audit_logs
-               WHERE entity_type = 'tally_vouchers' AND user_id IS NOT NULL AND entity_id IN (${marks(part.length)})
-               GROUP BY entity_id) m ON m.id = a.id
-        LEFT JOIN users u ON u.id = a.user_id`, part);
-    for (const r of rows) {
-      out.set(Number(r.entity_id), {
-        user_name: r.user_name || r.username || null, at: r.timestamp, action_type: r.action_type, description: r.description,
-      });
-    }
-  }
-  return out;
-}
-
 /**
  * Each row's city, first found: the ledger's City in Tally, else the city on
  * the ROMS PO the voucher is linked to (an invoice's PO, a credit note's RTV
@@ -317,7 +297,7 @@ async function loadVouchers(client, {
 
   const [found, changes, cityOf] = await Promise.all([
     filesFor(client, { vouchers: rows.map((v) => [companyId, v.guid]) }),
-    lastChanges(client, rows.map((v) => v.id)),
+    lastChanges(client, 'tally_vouchers', rows.map((v) => v.id)),
     citiesFor(client, companyId, rows),
   ]);
   return {
@@ -332,7 +312,7 @@ async function loadVouchers(client, {
     page: pageNo,
     page_size: size,
     rows: rows.map((v) => ({
-      ...v, ...cityOf(v), files: found.voucher(companyId, v.guid), last_change: changes.get(v.id) || null,
+      ...v, ...cityOf(v), files: found.voucher(companyId, v.guid), last_change: changes.get(String(v.id)) || null,
     })),
   };
 }

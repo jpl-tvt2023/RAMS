@@ -56,6 +56,7 @@ export const autoFill = {
     },
   ],
   faq: [
+    { q: 'What does Last updated by show here?', a: 'Who approved writing that row into ROMS, and when. If Tally changes and RAMS plans a new value for the row, the old approval no longer applies, so the column goes back to a dash until someone approves again. The line at the top is the last change to the switches.' },
     { q: 'What do the colours mean?', a: 'Red: refused by ROMS. Amber: needs a person. Purple: in the approval step, waiting for approval or approved. Green: written next, automatically. Blue: preview only. Grey: auto-fill is off. The legend under the table says the same.' },
     { q: 'Why is a narration highlighted in yellow?', a: 'Tally has no narration on that record, and the narration check (Admin → Tally companies) says it needs one. Ask the accountant to add it in Tally; it shows after the next sync.' },
     { q: 'Will RAMS overwrite what staff typed?', a: 'Only a number staff typed in another form of the same invoice number, like 607 or 0607 for 607/RM/26-27 (you can turn even that off). Anything else is left for a person. And if staff change a field after RAMS read it, ROMS refuses RAMS’s write.' },

@@ -6,10 +6,12 @@ import HelpLink from '../../components/shared/HelpLink';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import { HistoryButton } from '../../components/shared/HistoryDrawer';
+import { LastUpdatedCell, LastUpdatedLine } from '../../components/shared/LastUpdated';
+import { LAST_UPDATED } from '../../utils/lastUpdated';
 import {
   getReportSettings, updateReportSettings, updateTerms, previewTerms,
 } from '../../api/reports.api';
-import { formatDay, formatDateTime, formatRupees } from '../../utils/formatters';
+import { formatDay, formatRupees } from '../../utils/formatters';
 
 // Admin -> Credit terms (reports.settings: Admin, Owner and Accountants to
 // start): how many days each marketplace has to pay an invoice. Bills Receivable marks
@@ -127,6 +129,7 @@ export default function CreditTerms() {
             <div>
               <p className="text-sm font-semibold text-gray-900">Default: {fallback} days</p>
               <p className="text-xs text-gray-500">For every marketplace below that has no days of its own.</p>
+              <LastUpdatedLine name={data.settings.updated_by_name} at={data.settings.updated_at} className="text-xs text-gray-400 mt-0.5" />
             </div>
             <div className="ml-auto flex items-center gap-1">
               <Button size="sm" variant="outline" onClick={() => setEditing({ vendor: null, current: fallback })}><Pencil size={14} /> Edit</Button>
@@ -141,7 +144,7 @@ export default function CreditTerms() {
                   <th className="px-4 py-3">Marketplace</th>
                   <th className="px-4 py-3">Credit days</th>
                   <th className="px-4 py-3">An invoice dated today is due</th>
-                  <th className="px-4 py-3">Last changed</th>
+                  <th className="px-4 py-3">{LAST_UPDATED}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -153,7 +156,12 @@ export default function CreditTerms() {
                       <td className="px-4 py-3 font-medium text-gray-900">{t.vendor}</td>
                       <td className="px-4 py-3 tabular-nums">{t.credit_days == null ? <span className="text-gray-500">Default ({fallback})</span> : `${t.credit_days} days`}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{formatDay(plusDays(today, days))}</td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{t.updated_at ? `${t.updated_by_name || 'someone'}, ${formatDateTime(t.updated_at)}` : '—'}</td>
+                      <td className="px-4 py-3">
+                        <LastUpdatedCell
+                          name={t.last_change?.user_name} at={t.last_change?.at} description={t.last_change?.description}
+                          entityType="vendor_terms" entityId={t.vendor} what={t.vendor} title={`History — ${t.vendor} credit days`}
+                        />
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <button type="button" aria-label={`Edit ${t.vendor}`} onClick={() => setEditing({ vendor: t.vendor, current: t.credit_days })} className="p-1.5 rounded hover:bg-gray-100 text-gray-500"><Pencil size={14} /></button>
                       </td>

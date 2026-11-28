@@ -21,6 +21,7 @@ const VIEW = {
   catalog: CATALOG, roles: ['Accountant', 'Viewer'],
   matrix: { Accountant: ['matching.view', 'matching.rules', 'reports.view'], Viewer: ['matching.view'] },
   updated_at: null, updated_by_name: null,
+  last_changes: { 'matching.rules': { user_name: 'Asha', at: '2026-10-01 04:30:00' } },
 };
 
 describe('Roles & permissions', () => {
@@ -33,6 +34,10 @@ describe('Roles & permissions', () => {
     expect(screen.getByLabelText('Admin: See matching (always)')).toBeDisabled();
     expect(screen.getByLabelText('Owner: Change the sync schedule (always)')).toBeChecked();
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    // Each permission's own Last updated by; "—" where nobody changed it.
+    expect(screen.getByRole('columnheader', { name: 'Last updated by' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^History of Change matching rules: last updated by Asha/ })).toHaveTextContent('01 Oct 2026');
+    expect(screen.getByText('See matching').closest('tr')).toHaveTextContent('—');
 
     const user = userEvent.setup();
     await user.click(screen.getByLabelText('Accountant: Change the sync schedule'));
@@ -42,7 +47,7 @@ describe('Roles & permissions', () => {
       Accountant: ['matching.view', 'matching.rules', 'reports.view', 'sync.schedule'],
       Viewer: [],
     });
-    expect(await screen.findByText(/Last changed .* by Keshav/)).toBeInTheDocument();
+    expect(await screen.findByText(/^Last updated by Keshav · 05 Oct 2026/)).toBeInTheDocument();
   });
 
   test('a permission whose screens are all held is not shown', async () => {

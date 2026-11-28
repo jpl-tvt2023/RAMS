@@ -16,14 +16,47 @@ async function lastChange(client) {
   return rows[0] || { updated_at: null, updated_by_name: null };
 }
 
+// Each permission's last change by a person, for either role, from the audit
+// trail: { key: { user_name, at } }. A removal leaves no role_permissions row,
+// so the stamp columns can't say this. Each change names its key (from now
+// on); older rows are matched by "Role: label".
+async function lastChangesByKey(client) {
+  const { rows } = await client.execute(
+    `SELECT a.changes, a.timestamp, u.name AS user_name, u.username FROM audit_logs a
+       LEFT JOIN users u ON u.id = a.user_id
+      WHERE a.action_type = 'ROLE_PERMISSIONS_UPDATE' AND a.user_id IS NOT NULL AND a.changes IS NOT NULL
+      ORDER BY a.id DESC`,
+  );
+  const byField = new Map();
+  for (const role of GRANTABLE_ROLES) for (const p of CATALOG) byField.set(`${role}: ${p.label}`, p.key);
+  const out = {};
+  for (const r of rows) {
+    let changes = [];
+    try { changes = JSON.parse(r.changes) || []; } catch { changes = []; }
+    for (const c of changes) {
+      const key = c.key || byField.get(c.field);
+      if (key && !out[key]) out[key] = { user_name: r.user_name || r.username || null, at: r.timestamp };
+    }
+  }
+  return out;
+}
+
 async function view(client) {
-  const { updated_at, updated_by_name } = await lastChange(client);
+  const [stamp, matrix, lastChanges] = await Promise.all([
+    lastChange(client), loadMatrix(client), lastChangesByKey(client),
+  ]);
+  // The whole grid's last change: the newest audited one (a removal leaves no
+  // row to stamp), else the stamp.
+  const newest = Object.values(lastChanges).sort((a, b) => String(b.at).localeCompare(String(a.at)))[0];
+  const updated_at = newest ? newest.at : stamp.updated_at;
+  const updated_by_name = newest ? newest.user_name : stamp.updated_by_name;
   return {
     catalog: CATALOG,
     roles: GRANTABLE_ROLES,
-    matrix: await loadMatrix(client),
+    matrix,
     updated_at: updated_at ?? null,
     updated_by_name: updated_by_name ?? null,
+    last_changes: lastChanges,
   };
 }
 
@@ -48,7 +81,9 @@ async function update(req, res, next) {
       const after = new Set(matrix[role]);
       for (const p of CATALOG) {
         if (before.has(p.key) !== after.has(p.key)) {
-          changes.push({ field: `${role}: ${p.label}`, old: before.has(p.key) ? 'allowed' : 'not allowed', new: after.has(p.key) ? 'allowed' : 'not allowed' });
+          changes.push({
+            field: `${role}: ${p.label}`, key: p.key, old: before.has(p.key) ? 'allowed' : 'not allowed', new: after.has(p.key) ? 'allowed' : 'not allowed',
+          });
         }
       }
     }

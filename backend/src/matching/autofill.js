@@ -368,15 +368,28 @@ async function itemOf(client, kind, id) {
 }
 
 // Approve what is waiting in Ask first: every item of a field, or the listed
-// ones. Returns how many.
+// ones. Returns how many. Each approved row gets its own audit row (on the PO
+// or RTV row, like a match decision), written first with the same WHERE, so
+// the row's history and its "Last updated by" show who approved it. Pass a
+// transaction as the client to keep the two together.
 async function approve(client, { kind, ids = null, userId }) {
   if (!TARGETS[kind]) throw fail(400, 'Say which field: po (Bill No) or rtv (CN No)');
   const list = Array.isArray(ids) ? ids.map(String) : null;
   if (list && !list.length) return 0;
+  const where = `target_kind = ? AND state IN ('to_check','checked')
+             ${list ? `AND target_id IN (${list.map(() => '?').join(',')})` : ''}`;
+  const field = kind === 'po' ? 'Bill No' : 'CN No';
+  const row = kind === 'po' ? "'PO ' || po_id" : "'RTV row ' || target_id || ' (PO ' || po_id || ')'";
+  await client.execute({
+    sql: `INSERT INTO audit_logs (user_id, action_type, description, entity_type, entity_ref)
+          SELECT ?, 'AUTOFILL_APPROVE', 'Approved writing ' || COALESCE(value, '') || ' as the ${field} of ' || ${row} || ' in ROMS',
+                 target_kind, target_id
+            FROM autofill_items WHERE ${where}`,
+    args: [userId, kind, ...(list || [])],
+  });
   const { rowsAffected } = await client.execute({
     sql: `UPDATE autofill_items SET state = 'to_write', approved_by = ?, approved_at = datetime('now'), updated_at = datetime('now')
-           WHERE target_kind = ? AND state IN ('to_check','checked')
-             ${list ? `AND target_id IN (${list.map(() => '?').join(',')})` : ''}`,
+           WHERE ${where}`,
     args: [userId, kind, ...(list || [])],
   });
   return rowsAffected;

@@ -5,6 +5,7 @@ import MatchingRules from '../MatchingRules';
 import PartyLedgers from '../PartyLedgers';
 import { renderWithProviders, ACCOUNTANT, VIEWER } from '../../../test/renderWithProviders';
 import * as api from '../../../api/matching.api';
+import * as audit from '../../../api/audit.api';
 
 vi.mock('../../../api/matching.api', () => ({
   getMatchSettings: vi.fn(), updateMatchSettings: vi.fn(), resetMatchSettings: vi.fn(), previewMatchSettings: vi.fn(),
@@ -80,6 +81,19 @@ describe('Matching rules', () => {
     expect(api.updateMatchSettings).toHaveBeenCalledWith({ check_split: 'review' });
   });
 
+  test('who last changed the rules, and each vendor', async () => {
+    api.getMatchSettings.mockResolvedValue({ settings: { ...RECOMMENDED, updated_at: '2026-11-02 06:00:00', updated_by_name: 'Keshav' }, recommended: RECOMMENDED });
+    api.listVendors.mockResolvedValue([
+      { vendor: 'Blinkit', mode: 'match', pos: 108, linked: 106, updated_at: '2026-11-03 07:30:00', updated_by_name: 'Asha' },
+      { vendor: 'Flipkart', mode: 'transfer', pos: 26, linked: 0, updated_at: null, updated_by_name: null },
+    ]);
+    renderWithProviders(<MatchingRules />, { user: VIEWER });
+    expect(await screen.findByText(/Last updated by Keshav · 02 Nov 2026/)).toBeInTheDocument();
+    expect(await screen.findByRole('columnheader', { name: 'Last updated by' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^History of Blinkit: last updated by Asha/ })).toHaveTextContent('03 Nov 2026, 01:00');
+    expect(within(screen.getByLabelText('How Flipkart is matched').closest('tr')).getByText('—')).toBeInTheDocument();
+  });
+
   test('a voucher type can be left out, and a vendor set to stock transfer', async () => {
     api.updateVendor.mockResolvedValue({});
     renderWithProviders(<MatchingRules />, { user: ACCOUNTANT });
@@ -98,7 +112,10 @@ describe('Party ledgers', () => {
   const LEDGERS = {
     rows: [
       { company_id: 1, company: 'MH', guid: 'L1', name: 'BLINK COMMERCE PVT LTD(BENGALURU B5)', gstin: '29AAICB1234C1Z5', vouchers: 24, kind: null, vendor: null, source: null, suggested_vendor: 'Blinkit', suggested_votes: 12 },
-      { company_id: 1, company: 'MH', guid: 'L2', name: 'Roymax (Haryana)', gstin: '06ABGFR0562B1ZM', vouchers: 8, kind: 'internal', vendor: null, source: 'gstin', suggested_vendor: null, suggested_votes: 0 },
+      {
+        company_id: 1, company: 'MH', guid: 'L2', name: 'Roymax (Haryana)', gstin: '06ABGFR0562B1ZM', vouchers: 8, kind: 'internal', vendor: null, source: 'gstin', suggested_vendor: null, suggested_votes: 0,
+        updated_at: '2026-11-04 08:00:00', updated_by_name: 'Ravi',
+      },
     ],
     total: 2, page: 1, page_size: 25, suggestions_waiting: 1,
   };
@@ -125,6 +142,16 @@ describe('Party ledgers', () => {
     expect(api.updatePartyLedger).toHaveBeenCalledWith(1, 'L1', { kind: 'vendor', vendor: 'Zepto' });
     await user.selectOptions(screen.getByLabelText('What Roymax (Haryana) is'), '');
     await waitFor(() => expect(api.updatePartyLedger).toHaveBeenLastCalledWith(1, 'L2', { kind: null }));
+  });
+
+  test('each ledger says who last set it, and that opens its history; RAMS’s own suggestions don’t count', async () => {
+    renderWithProviders(<PartyLedgers />, { user: VIEWER });
+    expect(await screen.findByRole('columnheader', { name: 'Last updated by' })).toBeInTheDocument();
+    expect(within(screen.getByText('BLINK COMMERCE PVT LTD(BENGALURU B5)').closest('tr')).getByText('—')).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^History of Roymax \(Haryana\): last updated by Ravi/ }));
+    expect(await screen.findByRole('dialog', { name: 'History — Roymax (Haryana)' })).toBeInTheDocument();
+    expect(audit.getEntityHistory).toHaveBeenCalledWith('party_ledger', '1:L2');
   });
 
   test('without "Map party ledgers" the mappings are read-only', async () => {

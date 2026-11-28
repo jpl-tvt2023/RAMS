@@ -60,7 +60,7 @@ export const attachmentsHelp = {
     {
       title: 'See who changed a voucher in RAMS',
       steps: [
-        'The Audit Log column shows who last changed the voucher in RAMS — added or removed a file — and when.',
+        'The Last updated by column shows who last changed the voucher in RAMS — added or removed a file — and when.',
         'Click it to see the voucher’s whole history, newest first.',
         'A dash means nobody has changed it in RAMS yet. Changes made in Tally itself are in Tally’s own Edit Log.',
       ],
@@ -75,6 +75,7 @@ export const attachmentsHelp = {
     },
   ],
   faq: [
+    { q: 'Where did the Audit Log column go?', a: 'It is now called Last updated by, the same as on every other screen. It still shows who last added or removed a file on the voucher, and when.' },
     { q: 'What does “needs attention” mean?', a: 'The voucher has no file attached, or it has no narration while the narration check asks for one. The narration check (which voucher types, and from which date) is set by an Admin on Admin → Tally companies.' },
     { q: 'Why aren’t April and May vouchers yellow when they have no narration?', a: 'The narration check starts on the date an Admin set on Admin → Tally companies (8 June 2026 to begin with). Vouchers before it are never flagged for a narration. Move the date to 1 April to check the whole year.' },
     { q: 'Why does Payments show a different ledger from Tally’s party?', a: 'In Tally a payment’s party is often the bank or cash it was paid from. Attachments shows who was paid — the ledger the payment debits — since that is whose bill or receipt belongs on it.' },

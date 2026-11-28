@@ -156,11 +156,20 @@ describe('Preview, then Ask first, then Automatic', () => {
     const approve = await api('post', accountant.token, '/approve', { kind: 'po', ids: ['AF1'] });
     expect(approve.status).toBe(200);
     expect(approve.body.approved).toBe(1);
-    expect((await lastAudit('AUTOFILL_APPROVE')).description).toBe('Approved 1 Bill No write into ROMS: AF1');
+    // One audit row per approved row, on the PO, so its history shows it.
+    const { rows: approvals } = await db.execute("SELECT * FROM audit_logs WHERE action_type = 'AUTOFILL_APPROVE'");
+    expect(approvals).toHaveLength(1);
+    expect(approvals[0]).toMatchObject({
+      description: 'Approved writing 701/AF/26-27 as the Bill No of PO AF1 in ROMS', entity_type: 'po', entity_ref: 'AF1',
+    });
+    expect(approvals[0].user_id).not.toBeNull();
 
     const res = await api('post', accountant.token, '/run');
     expect(res.status).toBe(200);
     expect(res.body.counts).toMatchObject({ written: 1 });
+    expect(await lastAudit('AUTOFILL_RUN')).toMatchObject({
+      entity_type: 'autofill_run', description: expect.stringMatching(/^Write now \(one round\): 1 written/),
+    });
     expect(romsPo('AF1')).toMatchObject({ bill_no: '701/AF/26-27', bill_date: '2026-07-01' });
     const sent = roms.autofills.at(-1);
     expect(sent.dry_run).toBe(false);

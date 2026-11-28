@@ -10,7 +10,8 @@ export async function getMatchingSummary() {
 }
 
 // { rows, total, page, page_size }; params: kind, outcome, reason, vendor,
-// company_id, q, sort, page, page_size
+// company_id, q, sort, page, page_size. Each row has last_change: { user_name, at,
+// action_type, description } | null -- the last thing a person did to it.
 export async function listResults(params) {
   const { data } = await api.get('/matching/results', { params });
   return data;

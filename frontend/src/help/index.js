@@ -4,7 +4,7 @@
 // with <HelpLink section={id} />. Every page in the top bar must have one
 // (utils/__tests__/help.test.js), so a new screen can't ship without its guide.
 // A screen still held (utils/releases.js) has its section left out.
-import { signingIn, dashboard } from './gettingStarted';
+import { signingIn, dashboard, lastUpdated } from './gettingStarted';
 import {
   users, auditLog, tallyCompanies, creditTerms, rolesPermissions, fileStorage,
 } from './admin';
@@ -20,6 +20,7 @@ import { isReleased } from '../utils/releases';
 export const HELP_SECTIONS = [
   signingIn,
   dashboard,
+  lastUpdated,
   matchReview,
   matchingRules,
   partyLedgers,

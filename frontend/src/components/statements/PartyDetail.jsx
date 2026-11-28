@@ -3,6 +3,8 @@ import FilesCell from '../files/FilesCell';
 import Badge from '../ui/Badge';
 import Narration from '../shared/Narration';
 import Legend from '../shared/Legend';
+import { LastUpdatedCell } from '../shared/LastUpdated';
+import { LAST_UPDATED } from '../../utils/lastUpdated';
 import { ReportTable, td, num } from '../reports/ReportFrame';
 import {
   COLUMN, LEGEND, STATE_DIFFERS, OPENING_SOURCE, noteStatus, dnNumbers, balance, signed,
@@ -75,7 +77,7 @@ export default function PartyDetail({
         )}
       </div>
       <ReportTable
-        head={['Date', 'Type', 'No', 'Narration', 'Column', { label: 'Amount', right: true }, { label: 'Balance', right: true }, 'Files']}
+        head={['Date', 'Type', 'No', 'Narration', 'Column', { label: 'Amount', right: true }, { label: 'Balance', right: true }, 'Files', LAST_UPDATED]}
         empty={!rows.length && (
           <p className="text-center text-gray-400 py-6 text-sm">
             {onlyNoFile ? 'Every row here has a file.' : 'Tally has nothing on this party for these dates.'}
@@ -86,7 +88,7 @@ export default function PartyDetail({
           <tr className="border-b border-gray-100 bg-gray-50 text-gray-600">
             <td className={td} colSpan={6}>Opening on {formatDay(day.from)}</td>
             <td className={num}>{balance(day.opening_paise)}</td>
-            <td />
+            <td colSpan={2} />
           </tr>
         )}
         {rows.map((v) => {
@@ -108,6 +110,12 @@ export default function PartyDetail({
               <td className={td}>
                 <FilesCell files={files} what={`${v.voucher_type} ${v.number || ''}`.trim()} flagged canFiles={canFiles} onOpen={() => onFiles?.({ voucherGuid: v.guid })} />
               </td>
+              <td className={td}>
+                <LastUpdatedCell
+                  name={v.last_change?.user_name} at={v.last_change?.at} description={v.last_change?.description}
+                  entityType="tally_vouchers" entityId={v.id} what={`${v.voucher_type} ${v.number || ''}`.trim()}
+                />
+              </td>
             </tr>
           );
         })}
@@ -115,7 +123,7 @@ export default function PartyDetail({
           <tr className="bg-gray-50 font-semibold">
             <td className={td} colSpan={6}>Closing on {formatDay(day.to)}</td>
             <td className={num}>{balance(day.closing_paise)}</td>
-            <td />
+            <td colSpan={2} />
           </tr>
         )}
       </ReportTable>

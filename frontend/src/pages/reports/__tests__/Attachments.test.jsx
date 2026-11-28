@@ -151,7 +151,7 @@ describe('Attachments', () => {
     });
     expect(within(list).getByRole('heading', { name: 'Invoice · July 2026' })).toBeInTheDocument();
     const heads = within(list).getAllByRole('columnheader').map((h) => h.textContent);
-    expect(heads).toEqual(['Invoice no', 'Ledger', 'City', 'Amount', 'E-Invoice (Ack No)', 'Invoice PDF', 'Narration', 'Audit Log']);
+    expect(heads).toEqual(['Invoice no', 'Ledger', 'City', 'Amount', 'E-Invoice (Ack No)', 'Invoice PDF', 'Narration', 'Last updated by']);
 
     const [r1, r2] = within(list).getAllByRole('row').slice(1);
     expect(r1).toHaveClass(NO_FILE.row); // no file: orange
@@ -166,7 +166,7 @@ describe('Attachments', () => {
     expect(within(list).getByText(/e-invoice of 1 voucher here hasn’t been read yet/)).toBeInTheDocument();
 
     // The last change opens the voucher's history.
-    await user.click(within(r2).getByRole('button', { name: 'History of Invoice 608/RM/26-27' }));
+    await user.click(within(r2).getByRole('button', { name: /^History of Invoice 608\/RM\/26-27: last updated by Asha/ }));
     await waitFor(() => expect(audit.getEntityHistory).toHaveBeenCalledWith('tally_vouchers', 12));
   });
 
@@ -185,7 +185,7 @@ describe('Attachments', () => {
     await screen.findByRole('button', { name: 'July 2026' });
     await user.click(screen.getByRole('tab', { name: /Payments/ }));
     const list = await openJuly(user);
-    expect(within(list).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Voucher no', 'Ledger', 'City', 'Amount', 'Files', 'Narration', 'Audit Log']);
+    expect(within(list).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Voucher no', 'Ledger', 'City', 'Amount', 'Files', 'Narration', 'Last updated by']);
     expect(within(list).getByText('Tirupati Textiles')).toBeInTheDocument();
     expect(within(list).getByText('+1 more')).toHaveAttribute('title', 'Tirupati Textiles\nFreight Outward');
     expect(within(list).queryByText('HDFC BANK - 8412')).not.toBeInTheDocument();

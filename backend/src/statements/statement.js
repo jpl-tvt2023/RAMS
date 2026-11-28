@@ -355,6 +355,7 @@ async function partyDetailOf(client, {
   const vouchers = figures.rows.filter((v) => inRange(v.date, from, to)).map((v) => {
     balance += v.effect_paise;
     return {
+      id: v.id,
       guid: v.guid,
       date: v.date,
       voucher_type: v.voucher_type,

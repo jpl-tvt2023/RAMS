@@ -5,6 +5,7 @@ import PartyStatements from '../PartyStatements';
 import { renderWithProviders, ADMIN, ACCOUNTANT, VIEWER } from '../../../test/renderWithProviders';
 import * as statements from '../../../api/statements.api';
 import { NO_FILE } from '../../../utils/highlights';
+import * as audit from '../../../api/audit.api';
 
 vi.mock('../../../api/statements.api', () => ({
   getStatementParties: vi.fn(),
@@ -14,6 +15,7 @@ vi.mock('../../../api/statements.api', () => ({
   updateStatementSettings: vi.fn(),
 }));
 vi.mock('../../../api/files.api', () => ({ uploadFile: vi.fn(), fetchFile: vi.fn(), deleteFile: vi.fn() }));
+vi.mock('../../../api/audit.api', () => ({ getEntityHistory: vi.fn().mockResolvedValue([]) }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 const Z1 = {
@@ -333,7 +335,10 @@ describe('Party Statements files', () => {
     rows_without_file: 2,
     vouchers: [
       { ...DAY.vouchers[0], files: [INVOICE_SCAN] },
-      { ...DAY.vouchers[1], files: [PDF] },
+      {
+        ...DAY.vouchers[1], id: 71, files: [PDF],
+        last_change: { user_name: 'Asha', at: '2026-11-02 09:00:00', action_type: 'FILE_ADD', description: 'File added — FKIDN51803946.pdf' },
+      },
       DAY.vouchers[2],
       DAY.vouchers[3],
     ],
@@ -374,6 +379,19 @@ describe('Party Statements files', () => {
     // A Viewer can open files but not add them.
     expect(within(detail).queryByRole('button', { name: /^Add a file/ })).not.toBeInTheDocument();
     expect(within(detail).getByRole('note', { name: 'What the colours mean' })).toHaveTextContent('No file');
+  });
+
+  test('each Tally row says who last added or removed a file, and that opens its history', async () => {
+    renderWithProviders(<PartyStatements />, { user: VIEWER });
+    await chooseZeptoPune(userEvent.setup());
+    const detail = await screen.findByRole('region', { name: `Statement of ${Z1.name}` });
+    expect(within(detail).getByRole('columnheader', { name: 'Last updated by' })).toBeInTheDocument();
+    const cell = within(rowOf(detail, '901')).getByRole('button', { name: /^History of Credit Note 901: last updated by Asha/ });
+    expect(cell).toHaveTextContent('02 Nov 2026, 02:30');
+    expect(within(rowOf(detail, '908')).queryByRole('button', { name: /^History of/ })).not.toBeInTheDocument();
+    await userEvent.setup().click(cell);
+    expect(await screen.findByRole('dialog', { name: 'History — Credit Note 901' })).toBeInTheDocument();
+    expect(audit.getEntityHistory).toHaveBeenCalledWith('tally_vouchers', 71);
   });
 
   test('“Without a file” shows just those rows', async () => {

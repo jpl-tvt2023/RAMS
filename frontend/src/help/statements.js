@@ -121,6 +121,7 @@ export const partyStatementsHelp = {
     },
   ],
   faq: [
+    { q: 'What does Last updated by show on a party’s rows?', a: 'Who last added or removed a file on that Tally row, and when. Click it to see every change. Changes made in Tally itself are not shown; they are in Tally’s own Edit Log.' },
     { q: 'What do the colours and icons mean?', a: 'Purple ≠ differs (a DN booked twice, or a state that differs), the yellow highlight is a record with no narration, and an orange row is a Tally row with no file. Each colour means only that, on this page, and the legend under the table repeats it.' },
     { q: 'Why are debit and credit notes no longer typed here?', a: 'Everything is already in Tally: a check of every Minutes, Now and Zepto party found that RAMS holds every entry Tally has on them — 559 of 559, with the same amounts. Typing them again here was double work, so Party Statements now shows only Tally’s rows.' },
     { q: 'How does RAMS tell a marketplace DN from our own CN?', a: 'Tally has no debit notes on these parties: a DN the marketplace raises is booked as a credit note, with the DN number in its narration. A credit note whose narration names a DN number (FKIDN…, RTDN…, …DN…) is in the DN column; any other, such as a return or a monthly discount, is ours, in CN. So the accountant should always write the DN number in the narration.' },

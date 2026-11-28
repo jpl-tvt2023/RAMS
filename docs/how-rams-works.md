@@ -303,7 +303,7 @@ Each party has two states: the one on its ledger in Tally, and the one its GSTIN
 | E-Invoice (Ack No) | The e-invoice acknowledgement number and date Tally holds (15 digits, for example 122633978676286). Hover over it to see the full IRN, and click the copy button to copy it. *IRN cancelled* when it was cancelled on the portal |
 | Invoice PDF / Files | The documents attached: PDFs, photos or emails. Add, view, download or remove them here; they are the same files *Party Statements* and *Bills Receivable* show |
 | Narration | *Yes* (hover to read it), or the yellow *No narration* |
-| Audit Log | Who last changed the voucher in RAMS (added or removed a file) and when. Click it for the full history. Changes made in Tally itself are in Tally's own Edit Log |
+| Last updated by | Who last changed the voucher in RAMS (added or removed a file) and when. Click it for the full history. Changes made in Tally itself are in Tally's own Edit Log. (This column used to be called *Audit Log*.) |
 
 A voucher **without a document is orange**, across the row, until one is added. Tick *Needs attention only* to see only what is left to do, search by number, ledger, city or Ack No, and download the list for Excel.
 
@@ -334,6 +334,8 @@ There are four roles. **Admin and Owner can always do everything**, and they dec
 | Users, Audit Log, Roles & permissions, File storage | Never: Admin/Owner only | Never |
 
 Every change anyone makes in RAMS is recorded in the **Audit Log**, with who made it and when.
+
+**Last updated by, on every screen.** Wherever something can be changed, each row has a *Last updated by* column: the name of the person who last changed it, with the date and time under it. RAMS fills it in from the account that was signed in, so nobody types it. Click the name to see every change to that row, with the old and new values. A dash means nobody has changed the row in RAMS yet. What RAMS works out by itself, what the Connector copies from Tally, and what is typed in Tally don't count. It is on Users, Tally companies, Credit terms, Roles & permissions (per permission), Match review, Matching rules (the Vendors list), Party ledgers, Auto-fill (who approved each write), Party Statements (each Tally row, for files) and Attachments. A setting that is a single form, such as the office hours or the narration check, shows the same as one line: "Last updated by Asha · 27 Nov 2026, 10:15 am".
 
 ## 14. What you can change yourselves (no programmer needed)
 

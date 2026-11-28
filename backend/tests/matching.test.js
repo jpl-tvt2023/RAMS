@@ -102,6 +102,8 @@ describe('running a match', () => {
     expect(res.status).toBe(200);
     expect(res.body.roms).toMatchObject({ ok: true, connected: true });
     expect(res.body.summary.last_run).toMatchObject({ status: 'ok', trigger: 'manual', by: 'Test Accountant', roms_ok: true });
+    const { rows: [pressed] } = await db.execute("SELECT * FROM audit_logs WHERE action_type = 'MATCH_RUN' ORDER BY id DESC LIMIT 1");
+    expect(pressed).toMatchObject({ entity_type: 'match_run', entity_id: res.body.run_id });
 
     expect(await resultOf(viewer.token, 'po', 'MT1')).toMatchObject({
       outcome: 'linked', method: 'order_no', voucher_number: '601/MT/26-27',
@@ -197,8 +199,15 @@ describe('people decide', () => {
     expect(audit).toMatchObject({ entity_type: 'po', entity_ref: 'MT3' });
     expect(audit.description).toMatch(/^Picked invoice MT1819\/RM\/26-27 \(HR, 2026-07-01\) for PO MT3$/);
 
+    const listed = await get(viewer.token, '/results?kind=po&q=MT3');
+    expect(listed.body.rows.find((r) => r.id === 'MT3').last_change).toMatchObject({ user_name: 'Test Accountant', action_type: 'MATCH_PICK' });
+
     const undone = await post(accountant.token, '/results/po/MT3/undo');
     expect(undone.body).toMatchObject({ outcome: 'review', reason: 'bill_differs' });
+    // Undo deletes the decision, but the row's Last updated by shows the undo.
+    const after = await get(viewer.token, '/results?kind=po&q=MT3');
+    expect(after.body.rows.find((r) => r.id === 'MT3').last_change).toMatchObject({ user_name: 'Test Accountant', action_type: 'MATCH_UNDO' });
+    expect((await get(viewer.token, '/results?kind=po&q=MT6')).body.rows.find((r) => r.id === 'MT6').last_change).toBeNull();
   });
 
   test('reject a link and it is never proposed again; confirm keeps it whatever the rules', async () => {
@@ -295,6 +304,10 @@ describe('party ledgers', () => {
 
     const accepted = await post(accountant.token, '/party-ledgers/accept-suggestions', { company_id: company.id });
     expect(accepted.body.accepted).toBe(1);
+    // One audit row per ledger, on that ledger, so its history shows it.
+    const { rows: [acceptance] } = await db.execute("SELECT * FROM audit_logs WHERE action_type = 'PARTY_LEDGERS_ACCEPT' ORDER BY id DESC LIMIT 1");
+    expect(acceptance).toMatchObject({ entity_type: 'party_ledger', entity_ref: `${company.id}:MTL1`, description: `${blink.name}: not set → Blinkit (suggestion accepted)` });
+    expect(JSON.parse(acceptance.changes)).toEqual([{ field: 'mapping', old: 'not set', new: 'Blinkit' }]);
     const after = await get(viewer.token, `/party-ledgers?company_id=${company.id}&status=set`);
     expect(after.body.rows.find((r) => r.guid === 'MTL1')).toMatchObject({ kind: 'vendor', vendor: 'Blinkit', source: 'person', updated_by_name: 'Test Accountant' });
     // MT ROYMAX (MUMBAI) carries our own PAN: an internal party, found without anyone setting it.

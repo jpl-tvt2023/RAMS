@@ -5,8 +5,9 @@ import AppShell from '../../components/layout/AppShell';
 import Button from '../../components/ui/Button';
 import { HistoryButton } from '../../components/shared/HistoryDrawer';
 import HelpLink from '../../components/shared/HelpLink';
+import { LastUpdatedCell } from '../../components/shared/LastUpdated';
+import { lastUpdatedText, LAST_UPDATED } from '../../utils/lastUpdated';
 import { getPermissions, updatePermissions } from '../../api/settings.api';
-import { formatDateTime } from '../../utils/formatters';
 import { permissionReleased } from '../../utils/releases';
 
 // Admin/Owner only: what Accountants and Viewers may do. Admin and Owner hold
@@ -62,7 +63,7 @@ export default function Permissions() {
         </p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden max-w-4xl">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden max-w-5xl">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -71,16 +72,17 @@ export default function Permissions() {
                 {['Admin', 'Owner', ...(data?.roles || ['Accountant', 'Viewer'])].map((r) => (
                   <th key={r} className="px-4 py-3 text-center font-semibold text-gray-600 w-28">{r}</th>
                 ))}
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{LAST_UPDATED}</th>
               </tr>
             </thead>
             <tbody>
               {!data ? (
                 [...Array(4)].map((_, i) => (
-                  <tr key={i}><td colSpan={5} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
+                  <tr key={i}><td colSpan={6} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
                 ))
               ) : areas.map((area) => [
                 <tr key={area} className="bg-gray-50/60 border-b border-gray-100">
-                  <td colSpan={5} className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">{area}</td>
+                  <td colSpan={6} className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">{area}</td>
                 </tr>,
                 ...catalog.filter((p) => p.area === area).map((p) => (
                   <tr key={p.key} className="border-b border-gray-100">
@@ -107,6 +109,12 @@ export default function Permissions() {
                         />
                       </td>
                     ))}
+                    <td className="px-4 py-3">
+                      <LastUpdatedCell
+                        name={data.last_changes?.[p.key]?.user_name} at={data.last_changes?.[p.key]?.at}
+                        entityType="role_permissions" entityId={1} what={p.label} title="History — Roles & permissions"
+                      />
+                    </td>
                   </tr>
                 )),
               ])}
@@ -115,7 +123,7 @@ export default function Permissions() {
         </div>
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-gray-200">
           <p className="text-xs text-gray-400">
-            {data?.updated_at ? `Last changed ${formatDateTime(data.updated_at)} by ${data.updated_by_name || '—'}.` : 'The defaults: Accountants do the matching work, Viewers only look.'}
+            {lastUpdatedText(data?.updated_by_name, data?.updated_at) || 'The defaults: Accountants do the matching work, Viewers only look.'}
           </p>
           <div className="flex items-center gap-2">
             <HistoryButton entityType="role_permissions" entityId={1} title="History — Roles & permissions" />

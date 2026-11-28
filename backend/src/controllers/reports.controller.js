@@ -7,6 +7,7 @@ const { narrationLookup } = require('../services/narration');
 const { filesFor } = require('../services/files');
 const { SYNC_FROM, MATCH_FROM } = require('../config/env');
 const { loadSettings: loadStatementSettings, loadParties } = require('../statements/statement');
+const { lastChanges } = require('../services/lastChange');
 
 // Reports: Bills Receivable, Invoices, Credit & debit notes, Stock transfers,
 // Receivables and Exceptions, worked out at read time from the Tally copy
@@ -21,6 +22,17 @@ const INVOICE_STATUSES = ['open', 'overdue', 'settled', 'no_po', 'not_billwise']
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const sendError = (res, next, err) => (err.status && err.status < 500 ? res.status(err.status).json({ message: err.message }) : next(err));
 const rowsOf = async (sql, args = []) => (await db.execute({ sql, args })).rows;
+async function inTx(work) {
+  const tx = await db.transaction('write');
+  try {
+    const out = await work(tx);
+    await tx.commit();
+    return out;
+  } catch (err) {
+    await tx.rollback();
+    throw err;
+  }
+}
 const pageOf = (q) => {
   const page = Math.max(1, Number.parseInt(q.page, 10) || 1);
   const pageSize = Math.min(PAGE_SIZE_MAX, Math.max(1, Number.parseInt(q.page_size, 10) || PAGE_SIZE));
@@ -393,6 +405,9 @@ async function settingsData() {
              ORDER BY v.vendor`),
   ]);
   const { terms, ...rest } = settings;
+  // last_change comes from the audit trail, not the row's stamp: going back to
+  // the default deletes the row, and who did it must still show.
+  const changes = await lastChanges(db, 'vendor_terms', vendors.map((v) => v.vendor), { by: 'ref' });
   return {
     settings: rest,
     // transfer: a vendor set to stock transfer, whose sales are never owed.
@@ -402,6 +417,7 @@ async function settingsData() {
       transfer: v.mode === 'transfer',
       updated_at: v.updated_at || null,
       updated_by_name: v.updated_by_name || null,
+      last_change: changes.get(v.vendor) || null,
     })),
   };
 }
@@ -425,12 +441,14 @@ async function updateSettings(req, res, next) {
     if (!intIn(merged.exception_days, 1, 180)) throw fail(400, 'Exception days must be 1-180');
     const changes = diffFields(current, merged, ['default_credit_days', 'exception_days']);
     if (changes.length) {
-      await db.execute({
-        sql: "UPDATE report_settings SET default_credit_days = ?, exception_days = ?, updated_at = datetime('now'), updated_by = ? WHERE id = 1",
-        args: [merged.default_credit_days, merged.exception_days, req.user.id],
-      });
-      await logAction({
-        userId: req.user.id, actionType: 'REPORT_SETTINGS_UPDATE', description: 'Report settings changed', entityType: 'report_settings', entityId: 1, changes,
+      await inTx(async (tx) => {
+        await tx.execute({
+          sql: "UPDATE report_settings SET default_credit_days = ?, exception_days = ?, updated_at = datetime('now'), updated_by = ? WHERE id = 1",
+          args: [merged.default_credit_days, merged.exception_days, req.user.id],
+        });
+        await logAction({
+          client: tx, userId: req.user.id, actionType: 'REPORT_SETTINGS_UPDATE', description: 'Report settings changed', entityType: 'report_settings', entityId: 1, changes,
+        });
       });
     }
     res.json(await settingsData());
@@ -448,21 +466,24 @@ async function updateTerms(req, res, next) {
     const [old] = await rowsOf('SELECT credit_days FROM vendor_terms WHERE vendor = ?', [vendor]);
     const before = old ? Number(old.credit_days) : null;
     if (before !== days) {
-      if (days === null) await db.execute({ sql: 'DELETE FROM vendor_terms WHERE vendor = ?', args: [vendor] });
-      else {
-        await db.execute({
-          sql: `INSERT INTO vendor_terms (vendor, credit_days, updated_at, updated_by) VALUES (?, ?, datetime('now'), ?)
-                ON CONFLICT(vendor) DO UPDATE SET credit_days = excluded.credit_days, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
-          args: [vendor, days, req.user.id],
+      await inTx(async (tx) => {
+        if (days === null) await tx.execute({ sql: 'DELETE FROM vendor_terms WHERE vendor = ?', args: [vendor] });
+        else {
+          await tx.execute({
+            sql: `INSERT INTO vendor_terms (vendor, credit_days, updated_at, updated_by) VALUES (?, ?, datetime('now'), ?)
+                  ON CONFLICT(vendor) DO UPDATE SET credit_days = excluded.credit_days, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+            args: [vendor, days, req.user.id],
+          });
+        }
+        await logAction({
+          client: tx,
+          userId: req.user.id,
+          actionType: 'VENDOR_TERMS_UPDATE',
+          description: `${vendor}: credit days ${before == null ? 'default' : before} → ${days == null ? 'default' : days}`,
+          entityType: 'vendor_terms',
+          entityRef: vendor,
+          changes: [{ field: 'credit_days', old: before, new: days }],
         });
-      }
-      await logAction({
-        userId: req.user.id,
-        actionType: 'VENDOR_TERMS_UPDATE',
-        description: `${vendor}: credit days ${before == null ? 'default' : before} → ${days == null ? 'default' : days}`,
-        entityType: 'vendor_terms',
-        entityRef: vendor,
-        changes: [{ field: 'credit_days', old: before, new: days }],
       });
     }
     res.json(await settingsData());

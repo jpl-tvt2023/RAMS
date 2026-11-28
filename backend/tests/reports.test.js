@@ -221,8 +221,13 @@ describe('Invoices', () => {
     const inv = (await get(viewer.token, `/invoices?${q}&q=901`)).body.rows[0];
     expect(inv).toMatchObject({ credit_days: 10, due_date: '2026-07-11', status: 'overdue' });
     expect(inv.overdue_days).toBeGreaterThan(0);
-    await bearer(request(app).put('/api/reports/terms/Blinkit'), accountant.token).send({ credit_days: null });
+    const reset = await bearer(request(app).put('/api/reports/terms/Blinkit'), accountant.token).send({ credit_days: null });
     expect((await get(viewer.token, `/invoices?${q}&q=901`)).body.rows[0].credit_days).toBe(30);
+    // Going back to the default deletes the row, but who did it still shows.
+    expect(reset.body.terms.find((t) => t.vendor === 'Blinkit')).toMatchObject({
+      credit_days: null, updated_at: null,
+      last_change: { user_name: 'Test Accountant', action_type: 'VENDOR_TERMS_UPDATE', description: 'Blinkit: credit days 10 → default' },
+    });
   });
 });
 
@@ -266,7 +271,7 @@ describe('settings, permissions and Sync now', () => {
     expect(res.status).toBe(200);
     expect(res.body.settings).toMatchObject({ exception_days: 5, default_credit_days: 30 });
     expect(res.body.terms).toEqual(expect.arrayContaining([{
-      vendor: 'Scootsy', credit_days: 5, transfer: false, updated_at: null, updated_by_name: null,
+      vendor: 'Scootsy', credit_days: 5, transfer: false, updated_at: null, updated_by_name: null, last_change: null,
     }]));
     const { rows: [audit] } = await db.execute("SELECT * FROM audit_logs WHERE action_type = 'REPORT_SETTINGS_UPDATE' ORDER BY id DESC LIMIT 1");
     expect(JSON.parse(audit.changes)).toEqual([{ field: 'exception_days', old: 15, new: 5 }]);
