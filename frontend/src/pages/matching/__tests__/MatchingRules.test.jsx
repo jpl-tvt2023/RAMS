@@ -146,8 +146,10 @@ describe('Party ledgers', () => {
 
   test('each ledger says who last set it, and that opens its history; RAMS’s own suggestions don’t count', async () => {
     renderWithProviders(<PartyLedgers />, { user: VIEWER });
-    expect(await screen.findByRole('columnheader', { name: 'Last updated by' })).toBeInTheDocument();
-    expect(within(screen.getByText('BLINK COMMERCE PVT LTD(BENGALURU B5)').closest('tr')).getByText('—')).toBeInTheDocument();
+    // The header is there from the first render, while the rows still load: wait for a row.
+    const blink = await screen.findByText('BLINK COMMERCE PVT LTD(BENGALURU B5)');
+    expect(screen.getByRole('columnheader', { name: 'Last updated by' })).toBeInTheDocument();
+    expect(within(blink.closest('tr')).getByText('—')).toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /^History of Roymax \(Haryana\): last updated by Ravi/ }));
     expect(await screen.findByRole('dialog', { name: 'History — Roymax (Haryana)' })).toBeInTheDocument();
