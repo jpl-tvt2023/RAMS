@@ -58,10 +58,10 @@ export default function FileStorage() {
     });
     navigate('/reports/party-statements');
   };
-  // The purchase page, searching for the record's Incoming No (or bill / challan).
+  // The purchase page, in the record's financial year, searching for its Incoming No (or bill / challan).
   const openOnPurchases = (f) => {
     writeSessionState(purchasesKey(f.on.page, user), {
-      company_id: '', status: 'all', month: '', q: f.on.search || '',
+      company_id: '', fy: f.on.fy != null ? String(f.on.fy) : '', status: 'all', month: '', q: f.on.search || '',
     });
     navigate(`/purchases/${f.on.page}`);
   };

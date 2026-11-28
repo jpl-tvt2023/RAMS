@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useSessionState } from '../../hooks/useSessionState';
 import { PERM } from '../../utils/roles';
+import { TABLE_BOX, FIT_SCREEN, STICKY_HEAD, HEAD_CELL } from '../../components/ui/tableBox';
 
 // Matching -> Party ledgers: which marketplace each Tally party ledger belongs
 // to. RAMS suggests one from the POs linked through the ledger; a person
@@ -127,12 +128,12 @@ export default function PartyLedgers() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className={`${TABLE_BOX} ${FIT_SCREEN}`}>
           <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+            <thead className={STICKY_HEAD}>
+              <tr>
                 {['Company', 'Ledger', 'GSTIN and state', 'Vouchers', 'Suggested', 'Maps to', '', LAST_UPDATED].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>
+                  <th key={h} className={`px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap ${HEAD_CELL}`}>{h}</th>
                 ))}
               </tr>
             </thead>

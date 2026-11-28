@@ -18,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
 import { listCompanies, updateCompany } from '../../api/companies.api';
 import { formatDateTime } from '../../utils/formatters';
+import { TABLE_BOX, FIT_SCREEN, STICKY_HEAD, HEAD_CELL } from '../../components/ui/tableBox';
 
 // Admin/Owner, and any role granted sync.companies or sync.schedule (Admin ->
 // Roles & permissions); each part's buttons show only with its own permission.
@@ -77,12 +78,12 @@ export default function Companies() {
       <NarrationRulePanel />
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className={`${TABLE_BOX} ${FIT_SCREEN}`}>
           <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+            <thead className={STICKY_HEAD}>
+              <tr>
                 {['Company', 'Code', 'State', 'GSTIN', 'In Tally', 'Vouchers', 'Sync', 'Last seen', LAST_UPDATED, 'Actions'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>
+                  <th key={h} className={`px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap ${HEAD_CELL}`}>{h}</th>
                 ))}
               </tr>
             </thead>

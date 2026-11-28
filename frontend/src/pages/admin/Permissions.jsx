@@ -9,6 +9,7 @@ import { LastUpdatedCell } from '../../components/shared/LastUpdated';
 import { lastUpdatedText, LAST_UPDATED } from '../../utils/lastUpdated';
 import { getPermissions, updatePermissions } from '../../api/settings.api';
 import { permissionReleased } from '../../utils/releases';
+import { TABLE_BOX, FIT_SCREEN, STICKY_HEAD, HEAD_CELL } from '../../components/ui/tableBox';
 
 // Admin/Owner only: what Accountants, Viewers and the two heads may do. Admin and Owner hold
 // every permission, shown ticked and locked. Users, the Audit Log and this page
@@ -66,15 +67,15 @@ export default function Permissions() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden max-w-5xl">
-        <div className="overflow-x-auto">
+        <div className={`${TABLE_BOX} ${FIT_SCREEN}`}>
           <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Permission</th>
+            <thead className={STICKY_HEAD}>
+              <tr>
+                <th className={`px-4 py-3 text-left font-semibold text-gray-600 ${HEAD_CELL}`}>Permission</th>
                 {['Admin', 'Owner', ...(data?.roles || ['Accountant', 'Viewer'])].map((r) => (
-                  <th key={r} className="px-4 py-3 text-center font-semibold text-gray-600 w-28">{r}</th>
+                  <th key={r} className={`px-4 py-3 text-center font-semibold text-gray-600 w-28 ${HEAD_CELL}`}>{r}</th>
                 ))}
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{LAST_UPDATED}</th>
+                <th className={`px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap ${HEAD_CELL}`}>{LAST_UPDATED}</th>
               </tr>
             </thead>
             <tbody>

@@ -26,6 +26,7 @@ import {
   FIELDS, MODES, itemStatus, changeText, AUTOFILL_LEGEND,
 } from '../../utils/autofillText';
 import { formatDateTime } from '../../utils/formatters';
+import { TABLE_BOX, FIT_SCREEN, STICKY_HEAD, HEAD_CELL } from '../../components/ui/tableBox';
 
 // Matching -> Auto-fill: RAMS writes Tally's numbers into ROMS -- a linked
 // PO's Bill No + Bill Date, a linked RTV row's CN No + CN Date. Each field has
@@ -319,14 +320,14 @@ export default function AutoFill() {
       )}
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className={`${TABLE_BOX} ${FIT_SCREEN}`}>
           <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+            <thead className={STICKY_HEAD}>
+              <tr>
                 {(tab === 'written'
                   ? ['When', field.row, 'Change in ROMS', 'By']
                   : [field.row, 'Vendor', 'Tally', tab === 'differs' ? 'ROMS has → Tally says' : 'Change in ROMS', tab === 'refused' ? 'ROMS said' : 'Status', LAST_UPDATED, '']
-                ).map((h) => <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">{h}</th>)}
+                ).map((h) => <th key={h} className={`px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap ${HEAD_CELL}`}>{h}</th>)}
               </tr>
             </thead>
             <tbody>

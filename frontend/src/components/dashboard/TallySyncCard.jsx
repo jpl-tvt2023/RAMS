@@ -4,6 +4,7 @@ import { RefreshCw, AlertTriangle } from 'lucide-react';
 import Badge from '../ui/Badge';
 import { getSyncStatus } from '../../api/sync.api';
 import { formatDateTime, formatDay } from '../../utils/formatters';
+import { TABLE_BOX, FIT_SCREEN, STICKY_HEAD, HEAD_PLAIN } from '../ui/tableBox';
 
 // The Dashboard's "Tally sync" card: is the Connector online, does Tally
 // answer, and where each company with sync on stands. Refreshes every minute,
@@ -94,12 +95,12 @@ export default function TallySyncCard({ isAdmin = false }) {
                 : 'An Admin or Owner chooses which Tally companies RAMS mirrors.'}
             </p>
           ) : (
-            <div className="overflow-x-auto mt-4">
+            <div className={`${TABLE_BOX} ${FIT_SCREEN} mt-4`}>
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 text-gray-500">
+                <thead className={STICKY_HEAD}>
+                  <tr className="text-gray-500">
                     {['Company', 'Vouchers', 'Status', 'Last synced', 'End-of-day check'].map((h) => (
-                      <th key={h} className="py-2 pr-4 text-left font-medium whitespace-nowrap">{h}</th>
+                      <th key={h} className={`py-2 pr-4 text-left font-medium whitespace-nowrap ${HEAD_PLAIN}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>

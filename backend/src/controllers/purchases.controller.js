@@ -5,7 +5,7 @@ const { cleanName, disposition, pickedSize } = require('./files.controller');
 const { listRecords, readRecord, currentLines } = require('../purchases/records');
 const { ensureFresh, refreshPurchases, purchasesState } = require('../purchases/refresh');
 const {
-  saveCheck, approve, sendBack, WITH_CHECKER,
+  saveCheck, saveChecks, approve, sendBack, WITH_CHECKER,
 } = require('../purchases/approval');
 const { recordLabel } = require('../purchases/lines');
 
@@ -29,7 +29,7 @@ async function inTx(work) {
   }
 }
 
-// GET /api/purchases/:page/records?company_id&status&month&q&page&page_size
+// GET /api/purchases/:page/records?company_id&fy&month&status&q&page&page_size
 // Reads ROMS first when the copy is more than a few minutes old.
 async function list(req, res, next) {
   try {
@@ -39,10 +39,10 @@ async function list(req, res, next) {
   } catch (err) { sendError(res, next, err); }
 }
 
-// GET /api/purchases/records/:id
+// GET /api/purchases/records/:id -- with its delivery's lines (delivery_lines).
 async function one(req, res, next) {
   try {
-    const r = await readRecord(db, req.params.id);
+    const r = await readRecord(db, req.params.id, { delivery: true });
     if (!r) throw fail(404, 'That purchase record isn’t in RAMS');
     res.json(r);
   } catch (err) { sendError(res, next, err); }
@@ -62,6 +62,19 @@ async function check(req, res, next) {
     const out = await saveCheck(db, req.params.id, req.user, req.body || {});
     res.json(await readRecord(db, out.id));
   } catch (err) { sendError(res, next, err); }
+}
+
+// POST /api/purchases/check { ids: [...], note? } -- one bill check on several
+// lines of a delivery. A single line that can't be checked is a 409.
+async function checkMany(req, res, next) {
+  try {
+    const { ids, note } = req.body || {};
+    const out = await saveChecks(db, ids, req.user, { note });
+    if (!out.checked && Array.isArray(ids) && ids.length === 1 && out.skipped.length) {
+      return res.status(409).json({ message: out.skipped[0].reason, ...out });
+    }
+    return res.json(out);
+  } catch (err) { return sendError(res, next, err); }
 }
 
 // POST /api/purchases/{purchase,accounts}-head/approve { ids: [...] }
@@ -100,36 +113,74 @@ async function recordForFiles(client, id) {
   return { id: Number(r.id), label };
 }
 
-// POST /api/purchases/records/:id/files?name&gzip=1&original_size -- the body is the file.
+// The other records an upload or a removal also applies to (?also=12,13: the
+// lines of the delivery the checker ticked), without the record itself.
+const ALSO_MAX = 50;
+function alsoOf(value, selfId) {
+  if (value == null || value === '') return [];
+  const ids = [...new Set(String(value).split(',').map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0))]
+    .filter((n) => n !== Number(selfId));
+  if (ids.length > ALSO_MAX) throw fail(400, `Choose at most ${ALSO_MAX} lines at a time`);
+  return ids;
+}
+
+// Puts a stored blob on one record, with its audit row. Returns the new file's
+// id, or throws (409) why it can't go on.
+async function attachBlob(tx, rec, blob, name, req) {
+  const [{ n }] = await rowsOf(tx, 'SELECT COUNT(*) AS n FROM purchase_files WHERE record_id = ?', [rec.id]);
+  if (Number(n) >= files.MAX_PER_ROW) throw fail(409, `A line can have at most ${files.MAX_PER_ROW} files. Remove one first.`);
+  const [dup] = await rowsOf(tx, 'SELECT file_name FROM purchase_files WHERE blob_id = ? AND record_id = ?', [blob.blobId, rec.id]);
+  if (dup) throw fail(409, `This file is already on ${rec.label}${dup.file_name !== name ? `, as “${dup.file_name}”` : ''}`);
+  const r = await tx.execute({
+    sql: `INSERT INTO purchase_files (blob_id, record_id, file_name, kind, original_size, uploaded_by)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [blob.blobId, rec.id, name, blob.kind, pickedSize(req.query.original_size), req.user.id],
+  });
+  await logAction({
+    client: tx,
+    userId: req.user.id,
+    actionType: 'FILE_ADD',
+    description: `File added — ${name} on ${rec.label}`,
+    entityType: 'purchase_records',
+    entityId: rec.id,
+  });
+  return Number(r.lastInsertRowid);
+}
+
+// POST /api/purchases/records/:id/files?name&gzip=1&original_size&also=12,13 --
+// the body is the file. Stored once, it goes on the record and on each `also`
+// line the checker still has; a line it can't go on is skipped with the reason.
 async function uploadFile(req, res, next) {
   try {
     const q = req.query;
     const name = cleanName(q.name);
     if (!Buffer.isBuffer(req.body) || !req.body.length) throw fail(400, 'Send the file itself as the request body');
+    const also = alsoOf(q.also, req.params.id);
     const out = await inTx(async (tx) => {
       const rec = await recordForFiles(tx, req.params.id);
-      const [{ n }] = await rowsOf(tx, 'SELECT COUNT(*) AS n FROM purchase_files WHERE record_id = ?', [rec.id]);
-      if (Number(n) >= files.MAX_PER_ROW) throw fail(409, `A record can have at most ${files.MAX_PER_ROW} files. Remove one first.`);
       const blob = await files.storeBlob(tx, { bytes: req.body, gzip: q.gzip === '1' }, name);
-      const [dup] = await rowsOf(tx, 'SELECT file_name FROM purchase_files WHERE blob_id = ? AND record_id = ?', [blob.blobId, rec.id]);
-      if (dup) throw fail(409, `This file is already on ${rec.label}${dup.file_name !== name ? `, as “${dup.file_name}”` : ''}`);
-      const r = await tx.execute({
-        sql: `INSERT INTO purchase_files (blob_id, record_id, file_name, kind, original_size, uploaded_by)
-              VALUES (?, ?, ?, ?, ?, ?)`,
-        args: [blob.blobId, rec.id, name, blob.kind, pickedSize(q.original_size), req.user.id],
-      });
-      const id = Number(r.lastInsertRowid);
-      await logAction({
-        client: tx,
-        userId: req.user.id,
-        actionType: 'FILE_ADD',
-        description: `File added — ${name} on ${rec.label}`,
-        entityType: 'purchase_records',
-        entityId: rec.id,
-      });
+      const id = await attachBlob(tx, rec, blob, name, req);
+      const added = [];
+      const skipped = [];
+      for (const otherId of also) {
+        try {
+          added.push({ record_id: otherId, id: await attachBlob(tx, await recordForFiles(tx, otherId), blob, name, req) });
+        } catch (err) {
+          if (!err.status || err.status >= 500) throw err;
+          skipped.push({ id: otherId, reason: err.message });
+        }
+      }
       const [row] = await rowsOf(tx, 'SELECT uploaded_at FROM purchase_files WHERE id = ?', [id]);
       return {
-        id, name, kind: blob.kind, size: blob.size, uploaded_by_name: req.user.name || req.user.username, uploaded_at: row.uploaded_at, stored_once: blob.reused, store: 'purchase',
+        id,
+        name,
+        kind: blob.kind,
+        size: blob.size,
+        uploaded_by_name: req.user.name || req.user.username,
+        uploaded_at: row.uploaded_at,
+        stored_once: blob.reused,
+        store: 'purchase',
+        also: { added, skipped },
       };
     });
     res.status(201).json(out);
@@ -152,25 +203,45 @@ async function downloadFile(req, res, next) {
   } catch (err) { sendError(res, next, err); }
 }
 
-// DELETE /api/purchases/files/:id
+// DELETE /api/purchases/files/:id?also=12,13 -- takes the file off its record,
+// and the same file off each `also` line that has it and that the checker
+// still has (a line it can't come off is skipped with the reason).
 async function removeFile(req, res, next) {
   try {
     const id = Number(req.params.id) || 0;
-    const [f] = await rowsOf(db, 'SELECT id, record_id, file_name FROM purchase_files WHERE id = ?', [id]);
+    const [f] = await rowsOf(db, 'SELECT id, record_id, blob_id, file_name FROM purchase_files WHERE id = ?', [id]);
     if (!f) throw fail(404, 'That file isn’t there any more');
-    await inTx(async (tx) => {
-      const rec = await recordForFiles(tx, f.record_id);
-      await files.unlink(tx, id, { table: 'purchase_files' });
-      await logAction({
-        client: tx,
-        userId: req.user.id,
-        actionType: 'FILE_REMOVE',
-        description: `File removed — ${f.file_name} from ${rec.label}`,
-        entityType: 'purchase_records',
-        entityId: rec.id,
-      });
+    const also = alsoOf(req.query.also, f.record_id);
+    const out = await inTx(async (tx) => {
+      const takeOff = async (fileId, fileName, recordId) => {
+        const rec = await recordForFiles(tx, recordId);
+        await files.unlink(tx, fileId, { table: 'purchase_files' });
+        await logAction({
+          client: tx,
+          userId: req.user.id,
+          actionType: 'FILE_REMOVE',
+          description: `File removed — ${fileName} from ${rec.label}`,
+          entityType: 'purchase_records',
+          entityId: rec.id,
+        });
+      };
+      await takeOff(id, f.file_name, f.record_id);
+      const removed = [];
+      const skipped = [];
+      for (const otherId of also) {
+        const [same] = await rowsOf(tx, 'SELECT id, file_name FROM purchase_files WHERE record_id = ? AND blob_id = ?', [otherId, f.blob_id]);
+        if (!same) continue;
+        try {
+          await takeOff(Number(same.id), same.file_name, otherId);
+          removed.push({ record_id: otherId, id: Number(same.id) });
+        } catch (err) {
+          if (!err.status || err.status >= 500) throw err;
+          skipped.push({ id: otherId, reason: err.message });
+        }
+      }
+      return { removed, skipped };
     });
-    res.json({ id, removed: true });
+    res.json({ id, removed: true, also: out });
   } catch (err) { sendError(res, next, err); }
 }
 
@@ -179,6 +250,7 @@ module.exports = {
   one,
   refresh,
   check,
+  checkMany,
   approvePurchase: approveAt('purchase'),
   approveAccounts: approveAt('accounts'),
   sendBackPurchase: sendBackAt('purchase'),

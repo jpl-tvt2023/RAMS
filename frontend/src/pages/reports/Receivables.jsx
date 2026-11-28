@@ -11,7 +11,7 @@ import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
 import { PERM } from '../../utils/roles';
 import { formatDay, formatRupees } from '../../utils/formatters';
-import { downloadCsv, rupeesForCsv } from '../../utils/csv';
+import { downloadTable } from '../../utils/download';
 
 // Reports -> Receivables: per marketplace and company, what was invoiced, how
 // it was settled, what is still owed, how old it is, and money received On
@@ -66,12 +66,12 @@ export default function Receivables() {
   const view = data || { rows: [], totals: null, buckets: [] };
   const buckets = (data || last)?.buckets || [];
 
-  const csv = () => downloadCsv('rams-receivables.csv', [
+  const download = (format) => downloadTable(format, 'rams-receivables', [
     ['Marketplace', (r) => r.vendor || 'Not known'], ['Company', (r) => r.company], ['Invoices', (r) => r.invoices],
-    ['Invoiced', (r) => rupeesForCsv(r.invoiced_paise)], ['Received', (r) => rupeesForCsv(r.received_paise)], ['Credit notes', (r) => rupeesForCsv(r.credit_notes_paise)],
-    ['TDS', (r) => rupeesForCsv(r.tds_paise)], ['Adjustments', (r) => rupeesForCsv(r.adjustments_paise)], ['Outstanding', (r) => rupeesForCsv(r.outstanding_paise)],
-    ['Overdue', (r) => rupeesForCsv(r.overdue_paise)], ...buckets.map((b) => [b.label, (r) => rupeesForCsv(r[`${b.key}_paise`])]),
-    ['Received on account', (r) => rupeesForCsv(r.unallocated_paise)], ['Net outstanding', (r) => rupeesForCsv(r.net_outstanding_paise)],
+    ['Invoiced', (r) => r.invoiced_paise, 'money'], ['Received', (r) => r.received_paise, 'money'], ['Credit notes', (r) => r.credit_notes_paise, 'money'],
+    ['TDS', (r) => r.tds_paise, 'money'], ['Adjustments', (r) => r.adjustments_paise, 'money'], ['Outstanding', (r) => r.outstanding_paise, 'money'],
+    ['Overdue', (r) => r.overdue_paise, 'money'], ...buckets.map((b) => [b.label, (r) => r[`${b.key}_paise`], 'money']),
+    ['Received on account', (r) => r.unallocated_paise, 'money'], ['Net outstanding', (r) => r.net_outstanding_paise, 'money'],
   ], view.rows);
 
   const row = (r, key, strong) => (
@@ -97,7 +97,7 @@ export default function Receivables() {
       companies={last?.companies || []}
       companyId={filters.company_id}
       onCompany={(v) => setFilters({ company_id: v })}
-      onCsv={csv}
+      onDownload={download}
     >
       {data && <p className="text-sm text-gray-500 mb-2">As of {formatDay(data.as_of)}. Age is days since the invoice date.</p>}
       <ReportTable

@@ -7,7 +7,7 @@ import { getTransfers } from '../../api/reports.api';
 import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
 import { formatDay, formatRupees } from '../../utils/formatters';
-import { downloadCsv, rupeesForCsv } from '../../utils/csv';
+import { downloadTable } from '../../utils/download';
 import Narration from '../../components/shared/Narration';
 import { narrationForCsv } from '../../utils/highlights';
 
@@ -24,12 +24,12 @@ export default function Transfers() {
   const set = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
   const view = data || { rows: [], total: last?.total || 0 };
 
-  const csv = async () => {
+  const download = async (format) => {
     try {
       const all = await getTransfers({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page_size: 10000 });
-      downloadCsv('rams-stock-transfers.csv', [
+      downloadTable(format, 'rams-stock-transfers', [
         ['From', (r) => r.company], ['Voucher', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForCsv], ['To', (r) => r.party], ['Quantity', (r) => r.qty],
-        ['Value', (r) => rupeesForCsv(r.total_paise)],
+        ['Value', (r) => r.total_paise, 'money'],
       ], all.rows);
     } catch { toast.error('The download failed'); }
   };
@@ -45,7 +45,7 @@ export default function Transfers() {
       search={filters.q}
       onSearch={(v) => set({ q: v })}
       searchHint="Voucher or party"
-      onCsv={csv}
+      onDownload={download}
     >
       <p className="text-sm text-gray-500 mb-2">
         A ledger counts as our own registration when its GSTIN carries Roymax&apos;s PAN, or when someone sets it so on{' '}

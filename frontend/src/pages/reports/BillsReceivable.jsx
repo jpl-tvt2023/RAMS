@@ -13,12 +13,13 @@ import { getBillsReceivable } from '../../api/reports.api';
 import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
 import { formatDay, formatRupees } from '../../utils/formatters';
-import { downloadCsv, rupeesForCsv } from '../../utils/csv';
+import { downloadTable } from '../../utils/download';
 import Narration from '../../components/shared/Narration';
 import { narrationForCsv, NO_FILE } from '../../utils/highlights';
 import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
 import { openStatementsAt } from '../../utils/statementLinks';
+import { TABLE_BOX, IN_POPUP, STICKY_HEAD, HEAD_CELL } from '../../components/ui/tableBox';
 
 // Tally Reports -> Bills Receivable (the page at /reports/bills-receivable, once called Debtors):
 // each Tally sales invoice with its internal (ROMS)
@@ -84,12 +85,12 @@ function CreditNotes({
   return (
     <Modal isOpen={!!invoice} onClose={onClose} title={`Credit notes — ${invoice?.number}`} size="lg">
       <p className="text-sm text-gray-500 mb-3">{invoice?.party} · {invoice?.company} · invoice of {formatDay(invoice?.date)} for {formatRupees(invoice?.total_paise)}</p>
-      <div className="overflow-x-auto">
+      <div className={`${TABLE_BOX} ${IN_POPUP}`}>
         <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+          <thead className={STICKY_HEAD}>
+            <tr>
               {['CN No', 'Date', 'Type', 'Narration', 'Amount', 'RTV No', 'Files'].map((h) => (
-                <th key={h} className={`px-3 py-2 font-semibold text-gray-600 whitespace-nowrap ${h === 'Amount' ? 'text-right' : 'text-left'}`}>{h}</th>
+                <th key={h} className={`px-3 py-2 font-semibold text-gray-600 whitespace-nowrap ${h === 'Amount' ? 'text-right' : 'text-left'} ${HEAD_CELL}`}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -168,14 +169,14 @@ export default function BillsReceivable() {
     ...(shown?.unknown || filters.vendor === '-' ? [['-', 'Not known', shown?.unknown]] : []),
   ];
 
-  const csv = async () => {
+  const download = async (format) => {
     try {
       const all = await getBillsReceivable({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page_size: 10000 });
-      downloadCsv('rams-bills-receivable.csv', [
+      downloadTable(format, 'rams-bills-receivable', [
         ['Company', (r) => r.company], ['Invoice', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForCsv], ['Party', (r) => r.party],
         ['Marketplace', (r) => r.vendor || ''], ['Internal PO no', (r) => r.pos.join(' ')], ['Vendor PO no', (r) => r.vendor_pos.join(' ')],
-        ['Amount', (r) => rupeesForCsv(r.total_paise)], ['CN', (r) => rupeesForCsv(r.credit_notes_paise)], ['CN numbers', (r) => r.credit_notes.map((c) => c.number).join(' ')],
-        ['Outstanding', (r) => rupeesForCsv(r.outstanding_paise)], ['Status', (r) => STATUS_LABEL[r.status] || r.status],
+        ['Amount', (r) => r.total_paise, 'money'], ['CN', (r) => r.credit_notes_paise, 'money'], ['CN numbers', (r) => r.credit_notes.map((c) => c.number).join(' ')],
+        ['Outstanding', (r) => r.outstanding_paise, 'money'], ['Status', (r) => STATUS_LABEL[r.status] || r.status],
         ['CN without a file', (r) => (r.ledger ? r.credit_notes.filter((c) => !(c.files || []).length).map((c) => c.number).join(' ') : '')],
       ], all.rows);
     } catch { toast.error('The download failed'); }
@@ -192,7 +193,7 @@ export default function BillsReceivable() {
       search={filters.q}
       onSearch={(v) => set({ q: v })}
       searchHint="Invoice, party, internal or vendor PO no"
-      onCsv={csv}
+      onDownload={download}
       filters={(
         <select aria-label="Status" value={filters.status} onChange={(e) => set({ status: e.target.value })} className={selectCls}>
           {STATUSES.map(([k, label]) => <option key={label} value={k}>{label === 'All' ? 'All statuses' : label}</option>)}

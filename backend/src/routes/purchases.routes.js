@@ -23,6 +23,7 @@ const rawFile = (req, res, next) => parseFile(req, res, (err) => {
 
 router.post('/refresh', auth, view, c.refresh);
 router.get('/records/:id', auth, view, c.one);
+router.post('/check', auth, checker, c.checkMany);
 router.post('/records/:id/check', auth, checker, c.check);
 router.post('/records/:id/files', auth, checker, rawFile, c.uploadFile);
 router.get('/files/:id', auth, view, c.downloadFile);

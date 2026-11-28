@@ -10,42 +10,50 @@ import Button from '../../components/ui/Button';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Pagination, { loadPersistedPageSize, persistPageSize } from '../../components/ui/Pagination';
 import {
-  getPurchaseRecords, refreshPurchases, saveBillCheck, approvePurchaseRecords, sendBackPurchaseRecord,
+  getPurchaseRecords, refreshPurchases, saveBillChecks, approvePurchaseRecords, sendBackPurchaseRecord,
 } from '../../api/purchases.api';
 import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
 import { useAuth } from '../../context/AuthContext';
 import { PERM } from '../../utils/roles';
-import { formatDate, formatDateTime } from '../../utils/formatters';
-import { downloadCsv } from '../../utils/csv';
+import { formatDate, formatDateTime, currentMonthIst } from '../../utils/formatters';
+import { downloadTable } from '../../utils/download';
 import {
-  STATUSES, statusOf, defaultStatus, stepOf, HEAD_OF, WITH_CHECKER, purchasesKey,
+  STATUSES, statusOf, defaultStatus, stepOf, HEAD_OF, approvalOf, purchasesKey,
 } from '../../utils/purchaseText';
 
 // Purchase Reports -> Warehouse (/purchases/warehouse) and Stitching
 // (/purchases/stitching): what ROMS records when goods are booked in against
 // an outbound PO (a receipt) or handed on between stitching stages (a
-// challan). Receipts sharing an Incoming No from one vendor are one record;
-// each challan is one. On each record a person attaches the bill or challan
-// and saves the bill check; the Purchase Head approves, then the Accountant
-// Head. Either head can send it back with a reason. RAMS reads ROMS when the
-// page opens (if its copy is more than a few minutes old) and on Refresh.
+// challan). Every ROMS line is its own record (the user, 2026-11-28 evening),
+// listed with the rest of its delivery -- the receipts under one Incoming No
+// from one vendor, or one challan. On each line a person uploads the bill and
+// saves the bill check (one popup, which may cover the delivery's other lines
+// too); the Purchase Head approves, then the Accountant Head, each in a column
+// of their own. Either head can send it back with a reason. The page opens on
+// this financial year and month. RAMS reads ROMS when the page opens (if its
+// copy is more than a few minutes old) and on Refresh.
 const PAGES = {
   warehouse: {
     title: 'Warehouse',
     help: 'purchases-warehouse',
-    intro: 'Each delivery ROMS books in for packaging, barcodes and other goods that don’t go through Stitching, one record per Incoming No. Attach the bill, save the bill check, and it goes to the Purchase Head, then the Accountant Head.',
+    intro: 'Each line ROMS books in for packaging, barcodes and other goods that don’t go through Stitching, listed under its Incoming No. Upload the bill, save the bill check, and the line goes to the Purchase Head, then the Accountant Head.',
   },
   stitching: {
     title: 'Stitching',
     help: 'purchases-stitching',
-    intro: 'Fabric and other goods that go through Stitching: each delivery ROMS books in (one record per Incoming No) and each challan between stages. Attach the bill or challan, save the bill check, and it goes to the Purchase Head, then the Accountant Head.',
+    intro: 'Fabric and other goods that go through Stitching: each line ROMS books in (listed under its Incoming No) and each challan line between stages. Upload the bill or challan, save the bill check, and the line goes to the Purchase Head, then the Accountant Head.',
   },
 };
 const ALL = 10000;
 const monthLabel = (m) => {
   const [y, mo] = m.split('-').map(Number);
   return new Date(Date.UTC(y, mo - 1, 1)).toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+};
+// A head's column in a download: the same words as on the page.
+const approvalText = (r, step) => {
+  const a = approvalOf(r, step);
+  return a.state === 'approved' && a.at ? `${a.text}, ${formatDateTime(a.at)}` : a.text;
 };
 
 export default function PurchaseReport({ page }) {
@@ -57,20 +65,21 @@ export default function PurchaseReport({ page }) {
     accounts: can(PERM.PURCHASES_APPROVE_ACCOUNTS),
   };
   // Per person: whoever signs in next on this tab opens on their own step.
+  // The year '' is the current one; the month opens on this month.
   const [pick, setPick] = useSessionState(purchasesKey(page, user), () => ({
-    company_id: '', status: defaultStatus(user, can, PERM), month: '', q: '',
+    company_id: '', fy: '', month: currentMonthIst(), status: defaultStatus(user, can, PERM), q: '',
   }));
   const [pageNo, setPageNo] = useState(1);
   const [pageSize, setPageSize] = useState(() => loadPersistedPageSize('purchases', 50));
   const [selected, setSelected] = useState(() => new Set());
-  const [dialog, setDialog] = useState(null); // { type: 'check'|'files'|'sendback'|'approve', id?, ids?, step?, back? }
+  const [dialog, setDialog] = useState(null); // { type: 'check'|'files'|'sendback'|'approve', id?, ids?, step? }
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const set = (patch) => { setPick((p) => ({ ...p, ...patch })); setPageNo(1); setSelected(new Set()); };
 
   const fetcher = useCallback((params) => getPurchaseRecords(page, params), [page]);
   const params = {
-    company_id: pick.company_id, status: pick.status, month: pick.month, q: pick.q, page: pageNo, page_size: pageSize,
+    company_id: pick.company_id, fy: pick.fy ?? '', status: pick.status, month: pick.month, q: pick.q, page: pageNo, page_size: pageSize,
   };
   const list = useKeyedLoad(fetcher, params);
   const d = list.data || list.last;
@@ -102,8 +111,14 @@ export default function PurchaseReport({ page }) {
     } finally { setBusy(false); }
   };
 
+  const check = (ids, note) => run(async () => {
+    const res = await saveBillChecks(ids, note);
+    if (res.checked) toast.success(res.checked === 1 ? 'Bill check saved — it is with the Purchase Head' : `Bill check saved on ${res.checked} lines — they are with the Purchase Head`);
+    if (res.skipped.length) toast.error(`${res.skipped.length} not checked: ${res.skipped[0].reason}`);
+  });
+
   const approve = (ids) => run(async () => {
-    // A person who holds both steps (Admin) may tick records at either one.
+    // A person who holds both steps (Admin) may tick lines at either one.
     const byStep = { purchase: [], accounts: [] };
     for (const id of ids) {
       const s = stepOf(recordOf(id)?.status);
@@ -117,26 +132,25 @@ export default function PurchaseReport({ page }) {
       approved += res.approved;
       skipped.push(...res.skipped);
     }
-    if (approved) toast.success(approved === 1 ? 'Approved' : `${approved} records approved`);
+    if (approved) toast.success(approved === 1 ? 'Approved' : `${approved} lines approved`);
     if (skipped.length) toast.error(`${skipped.length} not approved: ${skipped[0].reason}`);
   });
 
-  const csv = async () => {
+  const download = async (format) => {
     try {
       const all = await getPurchaseRecords(page, { ...params, page: 1, page_size: ALL });
-      const lines = all.rows.flatMap((r) => (r.lines.length ? r.lines : [{}]).map((l) => ({ r, l })));
-      downloadCsv(`rams-purchases-${page}.csv`, [
-        ['Incoming', ({ r }) => r.incoming || ''], [page === 'warehouse' ? 'Vendor' : 'Vendor / Party', ({ r }) => (r.kind === 'challan' ? r.party : r.vendor) || ''],
-        ['Date', ({ l }) => (l.date ? formatDate(l.date) : '')], ['Billing / Challan', ({ l }) => l.billing || ''],
-        ['From → to', ({ l }) => (l.from_stage ? `${l.from_stage} → ${l.to_stage}` : '')], ['PO', ({ l }) => l.po || ''],
-        ['Article', ({ l }) => l.article || ''], ['Rate', ({ l }) => l.rate ?? ''], ['Qty', ({ l }) => l.qty ?? ''], ['UOM', ({ l }) => l.uom || ''],
-        ['Files', ({ r }) => r.files.map((f) => f.name).join('; ')],
-        ['Bill check by', ({ r }) => r.check?.name || ''], ['Bill check at', ({ r }) => (r.check ? formatDateTime(r.check.at) : '')],
-        ['Status', ({ r }) => statusOf(r.status).label],
-        ['Purchase Head', ({ r }) => (r.purchase_approval ? `${r.purchase_approval.name} ${formatDateTime(r.purchase_approval.at)}` : '')],
-        ['Accountant Head', ({ r }) => (r.accounts_approval ? `${r.accounts_approval.name} ${formatDateTime(r.accounts_approval.at)}` : '')],
-        ['Sent back because', ({ r }) => (r.status === 'sent_back' ? r.sent_back?.reason || '' : '')],
-      ], lines);
+      const line = (r) => r.lines[0] || {};
+      downloadTable(format, `rams-purchases-${page}-FY${all.fy_label}${pick.month ? `-${pick.month}` : ''}`, [
+        ['Incoming', (r) => r.incoming || ''], [page === 'warehouse' ? 'Vendor' : 'Vendor / Party', (r) => (r.kind === 'challan' ? r.party : r.vendor) || ''],
+        ['Date', (r) => (line(r).date ? formatDate(line(r).date) : '')], ['Billing / Challan', (r) => line(r).billing || ''],
+        ['From → to', (r) => (line(r).from_stage ? `${line(r).from_stage} → ${line(r).to_stage}` : '')], ['PO', (r) => line(r).po || ''],
+        ['Article', (r) => line(r).article || ''], ['Rate', (r) => line(r).rate ?? ''], ['Qty', (r) => line(r).qty ?? ''], ['UOM', (r) => line(r).uom || ''],
+        ['Files', (r) => r.files.map((f) => f.name).join('; ')],
+        ['Bill check by', (r) => r.check?.name || ''], ['Bill check at', (r) => (r.check ? formatDateTime(r.check.at) : '')],
+        ['Purchase Head', (r) => approvalText(r, 'purchase')], ['Accountant Head', (r) => approvalText(r, 'accounts')],
+        ['Status', (r) => statusOf(r.status).label],
+        ['Sent back because', (r) => (r.status === 'sent_back' ? r.sent_back?.reason || '' : '')],
+      ], all.rows, { sheet: meta.title });
     } catch {
       toast.error('The download failed');
     }
@@ -150,6 +164,7 @@ export default function PurchaseReport({ page }) {
     const s = stepOf(recordOf(id)?.status);
     return (s === 'purchase' && canDo.purchase) || (s === 'accounts' && canDo.accounts);
   });
+  const fyValue = pick.fy || String(d?.fy ?? '');
 
   return (
     <ReportFrame
@@ -163,12 +178,18 @@ export default function PurchaseReport({ page }) {
       search={pick.q}
       onSearch={(q) => set({ q })}
       searchHint="Incoming, bill or challan no, PO, article, vendor"
-      onCsv={d ? csv : undefined}
+      onDownload={d ? download : undefined}
       filters={(
-        <select aria-label="Month" value={pick.month} onChange={(e) => set({ month: e.target.value })} className={selectCls}>
-          <option value="">All months</option>
-          {(d?.months || []).map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
-        </select>
+        <>
+          <select aria-label="Financial year" value={fyValue} onChange={(e) => set({ fy: e.target.value, month: '' })} className={selectCls}>
+            {!d && <option value="">This financial year</option>}
+            {(d?.years || []).map((y) => <option key={y.fy} value={String(y.fy)}>FY {y.label}</option>)}
+          </select>
+          <select aria-label="Month" value={pick.month} onChange={(e) => set({ month: e.target.value })} className={selectCls}>
+            <option value="">All months</option>
+            {(d?.months?.includes(pick.month) || !pick.month ? [] : [pick.month]).concat(d?.months || []).map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+          </select>
+        </>
       )}
     >
       <div role="tablist" aria-label="Status" className="flex flex-wrap gap-1 mb-3 border-b border-gray-200">
@@ -201,15 +222,16 @@ export default function PurchaseReport({ page }) {
         can={canDo}
         selected={selected}
         onSelect={(id, on) => setSelected((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; })}
+        onSelectMany={(ids, on) => setSelected((s) => { const n = new Set(s); for (const id of ids) { if (on) n.add(id); else n.delete(id); } return n; })}
         onFiles={(r) => setDialog({ type: 'files', id: r.id })}
         onCheck={(r) => setDialog({ type: 'check', id: r.id })}
         onApprove={(r) => setDialog({ type: 'approve', ids: [r.id] })}
         onSendBack={(r) => setDialog({ type: 'sendback', id: r.id, step: stepOf(r.status) })}
         empty={(
           <p className="text-center text-gray-500 py-8 px-4 text-sm">
-            {pick.status === 'all' && !pick.q && !pick.month && !pick.company_id
-              ? `Nothing here yet. Records appear when ROMS books in a ${page === 'warehouse' ? 'delivery of goods that don’t go through Stitching' : 'delivery of stitching goods or a challan'}.`
-              : 'No record matches. Try another status, month or search.'}
+            {pick.status === 'all' && !pick.q && !pick.company_id
+              ? `Nothing ${pick.month ? `in ${monthLabel(pick.month)}` : `in FY ${d?.fy_label || 'this year'}`} yet. Lines appear when ROMS books in a ${page === 'warehouse' ? 'delivery of goods that don’t go through Stitching' : 'delivery of stitching goods or a challan'}.`
+              : `No line matches. Try another status${pick.month ? ', All months' : ''} or search.`}
           </p>
         )}
       />
@@ -219,10 +241,11 @@ export default function PurchaseReport({ page }) {
       {dialog?.type === 'check' && open && (
         <CheckDialog
           record={open}
+          canEdit={canDo.check}
           saving={busy}
           onClose={() => setDialog(null)}
-          onFiles={() => setDialog({ type: 'files', id: open.id, back: 'check' })}
-          onSave={(note) => run(() => saveBillCheck(open.id, note), 'Bill check saved — it is with the Purchase Head')}
+          onChanged={list.reload}
+          onSave={check}
         />
       )}
       {dialog?.type === 'files' && open && (
@@ -230,10 +253,8 @@ export default function PurchaseReport({ page }) {
           title={open.label}
           subtitle={`${statusOf(open.status).label}${open.date ? ` · ${formatDate(open.date)}` : ''}`}
           files={open.files}
-          target={canDo.check && WITH_CHECKER.includes(open.status) ? { purchaseRecordId: open.id } : undefined}
-          canEdit={canDo.check && WITH_CHECKER.includes(open.status)}
-          onClose={() => setDialog(dialog.back ? { type: dialog.back, id: open.id } : null)}
-          onChanged={list.reload}
+          canEdit={false}
+          onClose={() => setDialog(null)}
         />
       )}
       {dialog?.type === 'sendback' && open && (
@@ -251,11 +272,11 @@ export default function PurchaseReport({ page }) {
         onConfirm={() => approve(dialog.ids)}
         loading={busy}
         variant="primary"
-        title={dialog?.ids?.length > 1 ? `Approve ${dialog.ids.length} records?` : 'Approve this record?'}
+        title={dialog?.ids?.length > 1 ? `Approve ${dialog.ids.length} lines?` : 'Approve this line?'}
         message={dialog?.type === 'approve'
           ? (dialog.ids.length === 1
-            ? `${recordOf(dialog.ids[0])?.label || 'This record'}: ${stepOf(recordOf(dialog.ids[0])?.status) === 'purchase' ? 'it goes on to the Accountant Head.' : 'this is the final approval.'}`
-            : `Each is approved at the step it is waiting for${canDo.purchase && canDo.accounts ? '' : ` as ${canDo.purchase ? HEAD_OF.purchase : HEAD_OF.accounts}`}. Each approval is kept in the record’s history.`)
+            ? `${recordOf(dialog.ids[0])?.label || 'This line'}: ${stepOf(recordOf(dialog.ids[0])?.status) === 'purchase' ? 'it goes on to the Accountant Head.' : 'this is the final approval.'}`
+            : `Each is approved at the step it is waiting for${canDo.purchase && canDo.accounts ? '' : ` as ${canDo.purchase ? HEAD_OF.purchase : HEAD_OF.accounts}`}. Each approval is kept in the line’s history.`)
           : ''}
         confirmLabel="Approve"
       />

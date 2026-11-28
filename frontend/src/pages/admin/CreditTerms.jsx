@@ -12,6 +12,7 @@ import {
   getReportSettings, updateReportSettings, updateTerms, previewTerms,
 } from '../../api/reports.api';
 import { formatDay, formatRupees } from '../../utils/formatters';
+import { TABLE_BOX, FIT_SCREEN, STICKY_HEAD, HEAD_CELL } from '../../components/ui/tableBox';
 
 // Admin -> Credit terms (reports.settings: Admin, Owner and Accountants to
 // start): how many days each marketplace has to pay an invoice. Bills Receivable marks
@@ -137,15 +138,15 @@ export default function CreditTerms() {
             </div>
           </section>
 
-          <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+          <div className={`${TABLE_BOX} ${FIT_SCREEN} bg-white rounded-xl border border-gray-200`}>
             <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  <th className="px-4 py-3">Marketplace</th>
-                  <th className="px-4 py-3">Credit days</th>
-                  <th className="px-4 py-3">An invoice dated today is due</th>
-                  <th className="px-4 py-3">{LAST_UPDATED}</th>
-                  <th className="px-4 py-3" />
+              <thead className={STICKY_HEAD}>
+                <tr className="text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  <th className={`px-4 py-3 ${HEAD_CELL}`}>Marketplace</th>
+                  <th className={`px-4 py-3 ${HEAD_CELL}`}>Credit days</th>
+                  <th className={`px-4 py-3 ${HEAD_CELL}`}>An invoice dated today is due</th>
+                  <th className={`px-4 py-3 ${HEAD_CELL}`}>{LAST_UPDATED}</th>
+                  <th className={`px-4 py-3 ${HEAD_CELL}`} />
                 </tr>
               </thead>
               <tbody>

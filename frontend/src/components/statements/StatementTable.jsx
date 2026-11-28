@@ -49,8 +49,9 @@ export function StateLine({ party }) {
 
 /**
  * The bill-to-bill statement: one row per party, every figure Tally's, so each
- * row adds up to Tally's closing. A row opens that party's detail. With
- * maxHeight the rows scroll inside the box, the header and Total staying put.
+ * row adds up to Tally's closing. A row opens that party's detail. The rows
+ * scroll inside the box (maxHeight, else the screen's height), the header and
+ * Total staying put.
  */
 export default function StatementTable({
   data, loading, selected, onOpen, showCompany, maxHeight,
@@ -67,7 +68,7 @@ export default function StatementTable({
         maxHeight={maxHeight}
         empty={!loading && !rows.length && <p className="text-center text-gray-400 py-8 text-sm">No party matches these filters.</p>}
         foot={t && rows.length > 1 ? (
-          <tfoot className={maxHeight ? 'sticky bottom-0 z-10' : undefined}>
+          <tfoot className="sticky bottom-0 z-10">
             <tr className="bg-gray-50 font-semibold border-t border-gray-200 [&>td]:shadow-[inset_0_1px_0_var(--color-gray-200)]">
               <td className={td}>
                 Total

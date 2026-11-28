@@ -11,14 +11,16 @@ import api from './axios';
 const base = (store) => (store === 'purchase' ? '/purchases/files' : '/files');
 
 // The file goes as the request body, after utils/files.js prepared it
-// (gzip when `gzip`). -> { id, name, kind, size, uploaded_by_name, uploaded_at, stored_once }
+// (gzip when `gzip`). A purchase target may name `also`: other records (the
+// ticked lines of its delivery) the same file goes on, stored once.
+// -> { id, name, kind, size, uploaded_by_name, uploaded_at, stored_once, also? }
 export async function uploadFile({
-  companyId, voucherGuid, purchaseRecordId, name, blob, gzip, originalSize,
+  companyId, voucherGuid, purchaseRecordId, also, name, blob, gzip, originalSize,
 }, onProgress) {
   const purchase = purchaseRecordId != null;
   const { data } = await api.post(purchase ? `/purchases/records/${purchaseRecordId}/files` : '/files', blob, {
     params: {
-      ...(purchase ? {} : { company_id: companyId, voucher_guid: voucherGuid }),
+      ...(purchase ? { also: also?.length ? also.join(',') : undefined } : { company_id: companyId, voucher_guid: voucherGuid }),
       name,
       gzip: gzip ? 1 : undefined,
       original_size: originalSize || undefined,
@@ -36,8 +38,10 @@ export async function fetchFile(id, store) {
   return data;
 }
 
-export async function deleteFile(id, store) {
-  const { data } = await api.delete(`${base(store)}/${id}`);
+// A purchase file may name `also`: other records the same file comes off too.
+export async function deleteFile(id, store, { also } = {}) {
+  const params = store === 'purchase' && also?.length ? { also: also.join(',') } : undefined;
+  const { data } = await api.delete(`${base(store)}/${id}`, params ? { params } : undefined);
   return data;
 }
 

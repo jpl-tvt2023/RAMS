@@ -1,20 +1,20 @@
 // Purchase Reports: how ROMS's receipts and challans (RAMS's copy, migration
-// 022) become the lines on the Warehouse and Stitching pages, how lines group
-// into records, and what a bill check remembers of them. Pure functions -- the
-// reading and writing is in refresh.js, records.js and approval.js.
+// 022) become the lines on the Warehouse and Stitching pages, which delivery
+// each line belongs to, and what a bill check remembers of them. Pure
+// functions -- the reading and writing is in refresh.js, records.js and
+// approval.js.
 //
-// The user's rules (2026-11-28):
+// The user's rules:
 //   - a receipt is on Warehouse when its article never goes through Stitching
 //     (ROMS's goes_to_stitching tick), else on Stitching. Every challan is on
-//     Stitching.
-//   - receipts sharing an Incoming No from one vendor are ONE record (one
-//     delivery): one set of files, one bill check, one approval. The Incoming
-//     No isn't unique in ROMS -- the same number from another vendor is another
-//     delivery, so the vendor is part of the key. A receipt with no Incoming No
-//     stands alone.
-//   - each challan is its own record: its lines share the parent lot, the
-//     challan no and the party (a challan into Stitching has one ROMS row per
-//     line).
+//     Stitching. (2026-11-28)
+//   - every ROMS line is its own RECORD: its own files, bill check and two
+//     approvals. (2026-11-28 evening -- a record used to be a whole delivery.)
+//   - lines are listed by DELIVERY: the receipts sharing an Incoming No from
+//     one vendor (the Incoming No isn't unique in ROMS -- the same number from
+//     another vendor is another delivery), or one challan (its lines share the
+//     parent lot, the challan no and the party). A receipt with no Incoming No
+//     is a delivery of its own.
 
 const PAGES = ['warehouse', 'stitching'];
 
@@ -84,31 +84,41 @@ function challanLine(c) {
   };
 }
 
-// The record a receipt belongs to: { key, page, kind }.
-function receiptGroup(r) {
-  const page = pageOfReceipt(r);
+// A line's record key: its ROMS row. (A lone receipt and a one-line challan
+// had these keys when a record was a delivery, so those records carry over.)
+const receiptKey = (r) => `rcpt:${Number(r.id)}`;
+const challanKey = (c) => `chal:${Number(c.id)}`;
+
+// The delivery a receipt belongs to: its Incoming No from its vendor, on its
+// page, else the receipt alone.
+function receiptDelivery(r) {
   const incoming = incomingOf(r);
-  const key = incoming ? `inc:${page}:${Number(r.vendor_id) || 0}:${fold(incoming)}` : `rcpt:${Number(r.id)}`;
-  return { key, page, kind: 'receipts' };
+  return incoming ? `inc:${pageOfReceipt(r)}:${Number(r.vendor_id) || 0}:${fold(incoming)}` : receiptKey(r);
 }
 
-// The header a challan's lines share. The record's key is its lowest ROMS id,
-// set once the lines are gathered (groupLines).
+// The header a challan's lines share. The delivery's key is its lowest ROMS
+// id, set once the lines are gathered (groupLines).
 const challanHeader = (c) => [c.parent_src, Number(c.parent_id) || 0, fold(text(c.challan_no)), fold(text(c.party_name))].join('|');
 
 /**
- * Every receipt and challan in RAMS's copy, as records:
- * Map(key -> { key, page, kind, receipts: [rows], challans: [rows], first_at }).
+ * Every receipt and challan in RAMS's copy, one record per line:
+ * Map(key -> { key, page, kind, receipts: [row] | challans: [row], first_at,
+ * delivery_key, delivery_at }). delivery_at is the delivery's earliest line.
  */
 function groupLines(receipts, challans) {
   const groups = new Map();
-  const add = (g, field, row) => {
-    if (!groups.has(g.key)) groups.set(g.key, { ...g, receipts: [], challans: [], first_at: null });
-    const into = groups.get(g.key);
-    into[field].push(row);
-    if (row.created_at && (!into.first_at || row.created_at < into.first_at)) into.first_at = row.created_at;
+  const earliest = new Map(); // delivery_key -> created_at
+  const note = (delivery, at) => {
+    const cur = earliest.get(delivery) ?? null;
+    earliest.set(delivery, at && (cur == null || at < cur) ? at : cur);
   };
-  for (const r of receipts) add(receiptGroup(r), 'receipts', r);
+  for (const r of receipts) {
+    const delivery = receiptDelivery(r);
+    note(delivery, r.created_at || null);
+    groups.set(receiptKey(r), {
+      key: receiptKey(r), page: pageOfReceipt(r), kind: 'receipts', receipts: [r], challans: [], first_at: r.created_at || null, delivery_key: delivery,
+    });
+  }
   const byHeader = new Map();
   for (const c of challans) {
     const h = challanHeader(c);
@@ -116,9 +126,15 @@ function groupLines(receipts, challans) {
     byHeader.get(h).push(c);
   }
   for (const rows of byHeader.values()) {
-    const first = Math.min(...rows.map((c) => Number(c.id)));
-    for (const c of rows) add({ key: `chal:${first}`, page: 'stitching', kind: 'challan' }, 'challans', c);
+    const delivery = `chal:${Math.min(...rows.map((c) => Number(c.id)))}`;
+    for (const c of rows) {
+      note(delivery, c.created_at || null);
+      groups.set(challanKey(c), {
+        key: challanKey(c), page: 'stitching', kind: 'challan', receipts: [], challans: [c], first_at: c.created_at || null, delivery_key: delivery,
+      });
+    }
   }
+  for (const g of groups.values()) g.delivery_at = earliest.get(g.delivery_key) ?? g.first_at;
   return groups;
 }
 
@@ -168,8 +184,9 @@ function diffSnapshot(before, lines) {
   return changes;
 }
 
-// How a record is named in its history and messages.
-function recordLabel(kind, lines) {
+// How a delivery is named: "Incoming PNL349 (Nirvan Textiles)", "Challan 001
+// from Mahakali creation", "Bill 777 (Shree Socks)" when ROMS has no Incoming No.
+function deliveryLabel(kind, lines) {
   const first = lines[0] || {};
   if (kind === 'challan') {
     return `Challan ${first.billing || '(no number)'}${first.party ? ` from ${first.party}` : ''}`;
@@ -179,6 +196,14 @@ function recordLabel(kind, lines) {
   return `Bill ${first.billing || '(no number)'}${who}`;
 }
 
+// How a record is named in its history and messages: its delivery, and the
+// article when it is one line ("Incoming PNL349 (Nirvan Textiles) — Handkerchief").
+function recordLabel(kind, lines) {
+  const first = lines[0] || {};
+  const what = lines.length === 1 && first.article ? ` — ${first.article}` : '';
+  return `${deliveryLabel(kind, lines)}${what}`;
+}
+
 module.exports = {
-  PAGES, poNo, receiptLine, challanLine, receiptGroup, groupLines, linesOf, snapshotOf, diffSnapshot, recordLabel, SNAPSHOT_FIELDS,
+  PAGES, poNo, receiptLine, challanLine, receiptKey, challanKey, groupLines, linesOf, snapshotOf, diffSnapshot, recordLabel, deliveryLabel, SNAPSHOT_FIELDS,
 };

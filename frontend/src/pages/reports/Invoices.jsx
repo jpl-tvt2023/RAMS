@@ -10,7 +10,7 @@ import { getInvoices } from '../../api/reports.api';
 import { useKeyedLoad } from '../../hooks/useKeyedLoad';
 import { useSessionState } from '../../hooks/useSessionState';
 import { formatDay, formatRupees } from '../../utils/formatters';
-import { downloadCsv, rupeesForCsv } from '../../utils/csv';
+import { downloadTable } from '../../utils/download';
 import Narration from '../../components/shared/Narration';
 import { narrationForCsv } from '../../utils/highlights';
 
@@ -37,15 +37,15 @@ export default function Invoices() {
   const set = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
   const view = data || { rows: [], total: last?.total || 0 };
 
-  const csv = async () => {
+  const download = async (format) => {
     try {
       const all = await getInvoices({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page_size: 10000 });
-      downloadCsv('rams-invoices.csv', [
+      downloadTable(format, 'rams-invoices', [
         ['Company', (r) => r.company], ['Invoice', (r) => r.number], ['Date', (r) => r.date], ['Narration', narrationForCsv], ['Party', (r) => r.party],
-        ['Marketplace', (r) => r.vendor || ''], ['PO', (r) => r.pos.join(' ')], ['Taxable', (r) => rupeesForCsv(r.taxable_paise)],
-        ['GST', (r) => rupeesForCsv(r.gst_paise)], ['Total', (r) => rupeesForCsv(r.total_paise)], ['Received', (r) => rupeesForCsv(r.received_paise)],
-        ['Credit notes', (r) => rupeesForCsv(r.credit_notes_paise)], ['TDS', (r) => rupeesForCsv(r.tds_paise)], ['Adjustments', (r) => rupeesForCsv(r.adjustments_paise)],
-        ['Outstanding', (r) => rupeesForCsv(r.outstanding_paise)], ['Due', (r) => r.due_date], ['Overdue days', (r) => r.overdue_days], ['Status', (r) => r.status],
+        ['Marketplace', (r) => r.vendor || ''], ['PO', (r) => r.pos.join(' ')], ['Taxable', (r) => r.taxable_paise, 'money'],
+        ['GST', (r) => r.gst_paise, 'money'], ['Total', (r) => r.total_paise, 'money'], ['Received', (r) => r.received_paise, 'money'],
+        ['Credit notes', (r) => r.credit_notes_paise, 'money'], ['TDS', (r) => r.tds_paise, 'money'], ['Adjustments', (r) => r.adjustments_paise, 'money'],
+        ['Outstanding', (r) => r.outstanding_paise, 'money'], ['Due', (r) => r.due_date], ['Overdue days', (r) => r.overdue_days], ['Status', (r) => r.status],
       ], all.rows);
     } catch { toast.error('The download failed'); }
   };
@@ -61,7 +61,7 @@ export default function Invoices() {
       search={filters.q}
       onSearch={(v) => set({ q: v })}
       searchHint="Invoice, party or PO"
-      onCsv={csv}
+      onDownload={download}
       filters={(
         <>
           <select aria-label="Marketplace" value={filters.vendor} onChange={(e) => set({ vendor: e.target.value })} className={selectCls}>

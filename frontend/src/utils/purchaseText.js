@@ -47,14 +47,36 @@ export function defaultStatus(user, can, perms) {
   return 'all';
 }
 
+// Consecutive rows of one delivery (an Incoming No from one vendor, or one
+// challan), as the server sorted them: [{ key, rows }].
+export function deliveryRuns(rows) {
+  const runs = [];
+  for (const r of rows) {
+    const key = r.delivery?.key ?? `record-${r.id}`;
+    if (runs.length && runs[runs.length - 1].key === key) runs[runs.length - 1].rows.push(r);
+    else runs.push({ key, rows: [r] });
+  }
+  return runs;
+}
+
 // "2,450" / "12.5" -- quantities and rates as ROMS shows them, no rounding away.
 export const numText = (v) => (v == null ? '—' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 3 }));
 
-// The line under the status: who did what so far.
+// The line under the status: why a head sent it back. (The approvals have
+// their own columns.)
 export function statusDetail(r) {
-  const bits = [];
   if (r.status === 'sent_back' && r.sent_back) return [`By the ${HEAD_OF[r.sent_back.step] || 'head'} (${r.sent_back.name || 'someone'}): ${r.sent_back.reason}`];
-  if (r.purchase_approval) bits.push(`Purchase Head: ${r.purchase_approval.name || 'someone'}`);
-  if (r.accounts_approval) bits.push(`Accountant Head: ${r.accounts_approval.name || 'someone'}`);
-  return bits;
+  return [];
+}
+
+// A head's column (the user, 2026-11-28): "Approved by <name>" (green) once
+// that head approved; "Pending approval" only while the line waits for that
+// head; "Not approved" otherwise -- before it reaches them, and after a send
+// back or a ROMS change cleared the approvals. No highlight but the green.
+//   step: 'purchase' | 'accounts' -> { state: 'approved'|'pending'|'not', text, name, at }
+export function approvalOf(r, step) {
+  const a = step === 'purchase' ? r.purchase_approval : r.accounts_approval;
+  if (a) return { state: 'approved', text: `Approved by ${a.name || 'someone'}`, name: a.name || 'someone', at: a.at };
+  if (stepOf(r.status) === step) return { state: 'pending', text: 'Pending approval' };
+  return { state: 'not', text: 'Not approved' };
 }

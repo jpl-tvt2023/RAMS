@@ -56,6 +56,48 @@ For the day itself, `go-live-cheatsheet.md` has the same steps as commands and c
    - **Decisions for the client:**
      - Files are expected on every voucher from 1 April, here and on Party Statements, so both show April and May as orange until they have files.
      - The narration check still starts on 8 June. An Admin can move it to 1 April on Admin → Tally companies. Tally's sales invoices carry no narration today, so every invoice counts as needing attention until the check leaves Sales out or narrations are added.
+10. **Purchase Reports (migration 022, 2026-11-28).** The new *Purchase Reports → Warehouse / Stitching* pages list every ROMS receipt and challan, for a bill check and the Purchase Head → Accountant Head approval.
+   - **What 022 does:**
+     - It rebuilds `user_roles` and `role_permissions` so they accept the two new roles, *Purchase Head* and *Accountant Head*, keeping every row.
+     - It adds the purchase tables and seeds the `purchases.*` permissions.
+     - It puts back the one `roms_refresh` row, which the go-live `reset-data` deleted instead of emptying.
+     - It changes nothing the current code uses, so the site in use keeps working.
+   - **ROMS comes first.** RAMS reads two new ROMS references, `purchase-receipts` and `purchase-challans` (ROMS branch `feature/RAMS`, read only).
+     - That ROMS build must be deployed to the ROMS the site reads: the test ROMS for the test site, ROMS production for production.
+     - Its database needs ROMS migration **107** (the receipt's warehouse). The ROMS **test** database was at 103 on 28 Nov.
+     - Until then the pages say "ROMS doesn't send purchases yet", or show ROMS's error. Nothing else breaks.
+   - **Order, for each pair** (the test database with the test site first, then production with the PR merge):
+     1. Deploy ROMS with the new references.
+     2. Run `npm run migrate` (022) on the RAMS database.
+     3. Deploy RAMS.
+     4. Production also needs the ROMS integration switched on (§2).
+   - **Check after:**
+     - *Purchase Reports → Warehouse* says "Read from ROMS" with a time, and lists records.
+     - On the ROMS test data (to 25 Nov): 302 records on Warehouse, and 162 on Stitching (104 deliveries and 58 challans).
+     - *Admin → Roles & permissions* has columns for both heads.
+   - **Then, on Users:** tick *Purchase Head* or *Accountant Head* beside each approver's usual role (for example Accountant + Accountant Head). A person can now hold several roles.
+   - **Status (28 Nov):** 022 is applied on both databases; production RAMS and ROMS serve the pages (906 receipt lines + 58 challans read).
+11. **Purchase Reports per line (migration 023, 2026-11-28, after the client's first look).**
+   - **What changes on the pages:**
+     - Every ROMS line is its own record, with its own files, bill check and two approvals. The lines of one delivery (an Incoming No from one vendor, or a challan) are listed together.
+     - One window does the bill check and the upload, and it can cover the delivery's other lines.
+     - The Purchase Head and Accountant Head each have a column: Not approved / Pending approval / Approved by (green).
+     - The pages open on this financial year and month.
+     - Every report with Download CSV also has Download Excel.
+     - Every table keeps its header in view while it scrolls.
+   - **What 023 does:** it adds two columns to `purchase_records` (`delivery_key`, `delivery_at`) and an index. It changes no rows, and the code in use never reads them, so it can run before the deploy.
+   - **On the first read of ROMS after the deploy:** each old record (one per delivery) is split into one per line.
+     - The old record stays with its first line, and the other lines get records of their own.
+     - Any work done on an old record (files, bill check, approvals) is copied to each of its lines, with a "Split from …" line in each history.
+     - Expect on production: 466 records → 964 (906 receipt lines + 58 challan lines).
+   - **Order:**
+     1. Run `npm run migrate` (023) on the test database, then on production.
+     2. Deploy the test site and check it.
+     3. Merge the PR (production deploys).
+   - **Check after:**
+     - *Purchase Reports → Warehouse* opens on this year and month.
+     - Incoming PNL349 (Stitching) shows four rows, each with its own Upload bill & check button.
+     - *Download Excel* opens in Excel with a bold, frozen header.
 
 ## 1. The production database for RAMS (you, then maintainer)
 
